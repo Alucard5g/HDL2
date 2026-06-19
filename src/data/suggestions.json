@@ -1,0 +1,20 @@
+[
+  {
+    "id": "sug_1",
+    "username": "Pepin Guardiolas",
+    "email": "pepin.scout@gmail.com",
+    "suggestion": "Me encantaría que se agregara una tabla táctica en 3D para móviles más fluidos. Excelente álbum, ¡muy adictivo!",
+    "sentTo": "geovannygrk3d@gmail.com",
+    "createdAt": "2026-06-17T16:00:00.000Z",
+    "status": "pending"
+  },
+  {
+    "id": "sug_2",
+    "username": "Profe Marcelo Fan",
+    "email": "dt.bielsa@gmail.com",
+    "suggestion": "La trivia del Grupo B tiene un par de preguntas excelentes. Espectacular el sistema de auditoría de sorteos transparentes.",
+    "sentTo": "geovannygrk3d@gmail.com",
+    "createdAt": "2026-06-18T05:12:00.000Z",
+    "status": "reviewed"
+  }
+]

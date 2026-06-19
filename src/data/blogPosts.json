@@ -1,0 +1,16 @@
+[
+  {
+    "id": "post_1",
+    "title": "¡Bienvenidos al Álbum Digital del Mundial 2026!",
+    "content": "Estamos emocionados de lanzar la plataforma oficial interactiva de cromos de fútbol con estética de novela gráfica. Podrás armar tu alineación ideal en la pizarra táctica, responder trivias mundialistas desafiantes y canjear pases VIP.",
+    "imageUrl": "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop",
+    "createdAt": "2026-06-15T10:00:00.000Z"
+  },
+  {
+    "id": "post_2",
+    "title": "Códigos QR de Promotoras ya en Circulación",
+    "content": "Hemos activado nuevos códigos de licencia en Quito, Guayaquil y Madrid a través de nuestras promotoras oficiales. Escanea el código para canjear tu Plan VIP.",
+    "imageUrl": "https://images.unsplash.com/photo-1540747737956-37872404a80a?q=80&w=800&auto=format&fit=crop",
+    "createdAt": "2026-06-17T14:30:00.000Z"
+  }
+]

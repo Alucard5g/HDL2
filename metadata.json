@@ -1,0 +1,6 @@
+{
+  "name": "Pro Football Sticker Album",
+  "description": "TactikAI - El álbum digital de los Héroes del Balompié. Álbum digital con trivias interactivas, pizarra táctica de Director Técnico y estadísticas de fantasía en tiempo real.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
