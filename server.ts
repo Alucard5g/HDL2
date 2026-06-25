@@ -8,7 +8,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
-import Stripe from "stripe";
 import { z } from "zod";
 import { getPregeneratedTrivia } from "./src/data/triviaData";
 
