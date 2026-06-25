@@ -2,7 +2,6 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { createServer as createViteServer } from "vite";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,7 +13,7 @@ import { getPregeneratedTrivia } from "./src/data/triviaData";
 dotenv.config();
 
 // Default values if envs are missing
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT || 3000);
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Initialize GoogleGenAI client lazily or safely
@@ -355,13 +354,6 @@ async function startServer() {
     cashBalance: z.number().optional()
   });
 
-  const checkoutStripeSchema = z.object({
-    userId: z.string().min(1, "UserId es requerido"),
-    planTier: z.string().min(1, "Plan es requerido"),
-    currency: z.string().length(3, "Código de moneda de 3 cifras"),
-    promoterId: z.string().optional()
-  });
-
   const checkoutPayphoneSchema = z.object({
     userId: z.string().min(1, "UserId es requerido"),
     planTier: z.string().min(1, "Plan es requerido"),
@@ -553,7 +545,7 @@ async function startServer() {
       res.json(triviaData);
     } catch (error: any) {
       console.error("Error retrieving pregenerated trivia:", error);
-      res.json(getSimulatedTrivia(country, difficultyLevel));
+      res.json(getSeededTrivia(country, difficultyLevel));
     }
   });
 
@@ -1149,8 +1141,8 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
       email: "dt.bielsa@gmail.com",
       planTier: "Plan Scout Básico",
       licenseCode: "LIC-SCOUT-774029",
-      gateway: "Stripe",
-      reference: "ch_stripe_99A1b2c3",
+      gateway: "Payphone",
+      reference: "txn_payphone_99A1b2c3",
       amount: 5.00,
       timestamp: "2026-06-01T12:00:00Z",
       status: "Aprobado"
@@ -1653,86 +1645,9 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
   });
 
   // ==========================================================================
-  // REAL PRODUCTION PAYMENT ENDPOINTS & WEBHOOKS (STRIPE & PAYPHONE)
-  // Dual-currency (Euros/USD), zero-hardcoding security, and full metadata logs
+  // REAL PRODUCTION PAYMENT ENDPOINTS & WEBHOOKS (PAYPHONE)
+  // Zero-hardcoding security, and full metadata logs
   // ==========================================================================
-
-  // Utility to obtain Stripe securely (Lazy Initialization prevents startup crashes)
-  const getStripeInstance = (): Stripe | null => {
-    const stripeKey = process.env.STRIPE_LIVE_SECRET_KEY || process.env.STRIPE_SECRET_KEY;
-    if (!stripeKey || stripeKey.includes("yourProductionStripeSecretKey")) {
-      console.warn("[Stripe Warning] Missing or placeholder STRIPE_LIVE_SECRET_KEY. Falling back to sandbox/simulation.");
-      return null;
-    }
-    return new Stripe(stripeKey, { apiVersion: "2023-10-16" as any });
-  };
-
-  // Endpoint: Create Secure Live Stripe Checkout Session (Madrid/Europe Euros, Ecuador/USD)
-  app.post("/api/checkout/stripe-session", loginRateLimiter, validateBody(checkoutStripeSchema), async (req, res) => {
-    const { userId, planTier, currency, promoterId } = req.body;
-    const targetUserId = userId || "user_me";
-    const selectedCurrency = (currency || "USD").toLowerCase();
-    
-    // Convert current plan amounts
-    const isVIP = planTier === "Pase VIP Mundialista";
-    const amountInCents = isVIP ? 1500 : 500; // $15 or $5 equivalent
-    
-    console.log(`[Stripe Checkout] Initializing checkout for user ${targetUserId}, purchasing ${planTier} in ${selectedCurrency.toUpperCase()}`);
-
-    try {
-      const stripe = getStripeInstance();
-      
-      if (!stripe) {
-        // Safe developer fallback if secrets are not uploaded yet
-        const mockSessionId = "cs_live_sim_" + Math.random().toString(36).substring(2, 12).toUpperCase();
-        const mockUrl = `${process.env.APP_URL || "http://localhost:3000"}?session_id=${mockSessionId}&success=true`;
-        return res.json({
-          status: "simulated_success",
-          sessionId: mockSessionId,
-          url: mockUrl,
-          message: "Modo simulación activo. Configure STRIPE_LIVE_SECRET_KEY para conectar con pasarelas bancarias reales."
-        });
-      }
-
-      const session = await stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: selectedCurrency,
-              product_data: {
-                name: planTier,
-                description: isVIP 
-                  ? "Pase VIP completo: Desbloqueo inmediato de análisis de scout, escudo especial y cromos premium ilimitados" 
-                  : "Plan Scout: Desbloqueo parcial de estadísticas y cromos de liga de banca",
-                images: ["https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&q=80&w=400"],
-              },
-              unit_amount: amountInCents,
-            },
-            quantity: 1,
-          },
-        ],
-        mode: "payment",
-        metadata: {
-          userId: targetUserId,
-          planTier: planTier,
-          promoterId: promoterId || "",
-          currency: selectedCurrency.toUpperCase()
-        },
-        success_url: `${process.env.APP_URL || "https://tactikai.com"}?payment_status=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.APP_URL || "https://tactikai.com"}?payment_status=cancelled`,
-      });
-
-      return res.json({
-        status: "success",
-        sessionId: session.id,
-        url: session.url
-      });
-    } catch (error: any) {
-      console.error("[Stripe Checkout Session Create Error]:", error);
-      res.status(500).json({ error: "Fallo al inicializar la pasarela de Stripe: " + error.message });
-    }
-  });
 
   // Endpoint: Create Payphone Ecuador Payment Intent (Ecuador Dollars/Debit cards)
   app.post("/api/checkout/payphone", loginRateLimiter, validateBody(checkoutPayphoneSchema), async (req, res) => {
@@ -1749,11 +1664,8 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     console.log(`[PayPhone API] Requesting transaction of $${amountInCents / 100} for phone +593${cleanPhone}. Referrer Promoter: ${promoterId}`);
 
     if (!payphoneToken || payphoneToken.includes("yourPayphoneProductionBearerTokenHere")) {
-      // Return simulated success to enable offline physical testing for developer
-      return res.json({
-        status: "simulated_success",
-        transactionId: "PP-TX-SIM-" + Math.floor(Math.random() * 900000 + 100000),
-        message: "Simulación PayPhone activa. Carga tus credenciales PAYPHONE_LIVE_TOKEN para interactuar con la app móvil de PayPhone en vivo."
+      return res.status(403).json({
+        error: "Falta configurar PAYPHONE_LIVE_TOKEN. Por favor configure PAYPHONE_LIVE_TOKEN en la sección de secretos (Settings > Secrets) de AI Studio."
       });
     }
 
@@ -1796,79 +1708,6 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
       console.error("[PayPhone SDK Prepare Error]:", err);
       res.status(500).json({ error: "Fallo de conexión con la pasarela de pagos de PayPhone: " + err.message });
     }
-  });
-
-  // Endpoint: Secure STRIPE Real-Time Payment Webhook
-  app.post("/api/webhook/stripe", webhookRateLimiter, express.raw({ type: "application/json" }), async (req, res) => {
-    const sig = req.headers["stripe-signature"] as string;
-    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
-    if (!webhookSecret) {
-      console.warn("[Stripe Webhook] No webhook key uploaded. Active bypass for testing.");
-      return res.status(200).json({ status: "skipped", message: "No static secret configured." });
-    }
-
-    let event: any;
-    try {
-      const stripe = getStripeInstance();
-      if (!stripe) throw new Error("Stripe is not initialized.");
-      
-      event = stripe.webhooks.constructEvent(
-        req.body,
-        sig,
-        webhookSecret
-      );
-    } catch (err: any) {
-      console.error(`[Stripe Webhook Signature Failed]: ${err.message}`);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
-    }
-
-    // Process secure payment confirmation
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object;
-      const { userId, planTier, promoterId } = session.metadata || {};
-      
-      if (userId && planTier) {
-        console.log(`[Stripe Webhook Verified] Payment received from ${userId} for plan ${planTier}. Activating license.`);
-        
-        let user = REGISTERED_USERS.find(u => u.id === userId);
-        if (user) {
-          user.subscription = planTier;
-          user.licenseCode = `LIC-STRIPE-${(planTier === "Pase VIP Mundialista" || planTier === "Pase VIP Elite") ? "VIP" : "SCOUT"}-${Math.floor(100000 + Math.random() * 900000)}`;
-          
-          // Log detailed subscription transaction
-          recordSubscriptionTxn({
-            userId,
-            planTier,
-            licenseCode: user.licenseCode,
-            gateway: "Stripe Checkout",
-            reference: session.id,
-            promoterId
-          });
-
-          // Allocate promoter earnings securely
-          if (promoterId && promoterId.trim()) {
-            const cleanPromoterId = promoterId.toUpperCase().trim();
-            const amount = (planTier === "Pase VIP Mundialista" || planTier === "Pase VIP Elite") ? 15.00 : 5.00;
-            
-            AFFILIATE_SALES.push({
-              id: "s_" + Math.floor(Math.random() * 999999 + 100000),
-              promoterId: cleanPromoterId,
-              city: parseCity(cleanPromoterId),
-              amount,
-              timestamp: new Date().toISOString(),
-              transactionId: "TX_STRIPE_" + session.id.substring(3, 12),
-              planTier: planTier,
-              userId: userId
-            });
-            console.log(`[Stripe Attribution Successful] Assigned commissions to ${cleanPromoterId}`);
-          }
-          saveUsersToDisk();
-        }
-      }
-    }
-
-    res.json({ received: true });
   });
 
   // Endpoint: Secure PAYPHONE Real-Time Payment Webhook
@@ -2340,6 +2179,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
 
   // Serve static files / Vite middleware
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -2356,12 +2196,12 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Mundial Scouting Album running on port ${PORT}...`);
-});
+    console.log(`Mundial Scouting Album running on standard port: http://localhost:${PORT}`);
+  });
 }
 
 // Fallback trivia if Gemini doesn't answer or is not set up
-function getSimulatedTrivia(country: string, level: number) {
+function getSeededTrivia(country: string, level: number) {
   const normalizedCountry = country.toLowerCase().trim();
   
   const seedQuestions: { [key: string]: { [level: number]: any[] } } = {
