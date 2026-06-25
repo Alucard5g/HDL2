@@ -3,8 +3,26 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const getPathDetails = () => {
+  let filename = "";
+  let dirname = "";
+  try {
+    // Dynamic eval bypasses TypeScript TDZ compile-time check and gets the values in CommonJS
+    filename = eval("__filename");
+    dirname = eval("__dirname");
+  } catch (e) {
+    try {
+      filename = fileURLToPath(import.meta.url);
+      dirname = path.dirname(filename);
+    } catch (err) {
+      dirname = process.cwd();
+      filename = path.join(dirname, "server.ts");
+    }
+  }
+  return { filename, dirname };
+};
+
+const { filename: __filename, dirname: __dirname } = getPathDetails();
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import { z } from "zod";
