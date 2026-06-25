@@ -1,5 +1,5 @@
 import React from 'react';
-const logoImg = '/src/assets/images/tactikai_logo_1781484659642.jpg';
+const logoImg = '/src/assets/images/heroes_del_deporte_logo_1782326056278.jpg';
 
 interface TactikAiLogoProps {
   /**
@@ -23,8 +23,8 @@ export const TactikAiLogo: React.FC<TactikAiLogoProps> = ({
       <div className={`inline-flex items-center justify-center p-1 ${className}`}>
         <img
           src={logoImg}
-          alt="TactikAI Badge"
-          className="rounded-xl object-cover border-2 border-cyan-400/40 shadow-lg shadow-cyan-500/20 hover:scale-105 transition-transform duration-200"
+          alt="Héroes del Deporte Badge"
+          className="rounded-xl object-cover border-2 border-emerald-500/40 shadow-lg shadow-emerald-500/20 hover:scale-105 transition-transform duration-200"
           style={{ width: iconSize, height: iconSize }}
           referrerPolicy="no-referrer"
         />
@@ -39,8 +39,8 @@ export const TactikAiLogo: React.FC<TactikAiLogoProps> = ({
         <div className="shrink-0 transition-all duration-300 transform hover:scale-110">
           <img
             src={logoImg}
-            alt="TactikAI Icon"
-            className="w-12 h-12 rounded-xl object-cover border-2 border-[#22d3ee]/60 shadow-[0_0_12px_rgba(34,211,238,0.3)]"
+            alt="Héroes del Deporte Icon"
+            className="w-12 h-12 rounded-xl object-cover border-2 border-[#22c55e]/60 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
             referrerPolicy="no-referrer"
           />
         </div>
@@ -49,16 +49,16 @@ export const TactikAiLogo: React.FC<TactikAiLogoProps> = ({
         <div className="flex flex-col text-left">
           <div className="flex items-center gap-1 font-bangers tracking-wider uppercase leading-none">
             <span className="text-2xl md:text-3xl font-extrabold text-[#FFFDEC] drop-shadow-[2.5px_2.5px_0px_#000] tracking-normal">
-              TACTIK
+              HÉROES
             </span>
-            {/* Styled "AI" letters matching the glowing technology design */}
-            <span className="inline-flex items-center justify-center text-center font-black px-2 py-0.5 rounded-lg bg-[#0891b2]/35 border-2 border-[#22d3ee]/60 text-sm text-[#22d3ee] shadow-[0_0_12px_rgba(34,211,238,0.4)] tracking-wider h-6 ml-1 relative overflow-hidden transform -rotate-2">
-              AI
+            {/* Styled "DEL DEPORTE" letters matching the glowing technology design */}
+            <span className="inline-flex items-center justify-center text-center font-black px-2 py-0.5 rounded-lg bg-[#15803d]/35 border-2 border-[#22c55e]/60 text-xs text-[#22c55e] shadow-[0_0_12px_rgba(34,197,94,0.4)] tracking-wider h-6 ml-1 relative overflow-hidden transform -rotate-2">
+              DEL DEPORTE
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
             </span>
           </div>
           
-          <span className="text-[8.5px] md:text-[9.5px] font-mono tracking-widest font-black text-[#11b782] uppercase leading-none mt-1.5">
+          <span className="text-[8.5px] md:text-[9.5px] font-mono tracking-widest font-black text-[#22c55e] uppercase leading-none mt-1.5">
             EL ÁLBUM DIGITAL DE LOS HÉROES DEL DEPORTE
           </span>
         </div>
@@ -76,13 +76,13 @@ export const TactikAiLogo: React.FC<TactikAiLogoProps> = ({
         {/* Main high-fidelity cover image */}
         <img
           src={logoImg}
-          alt="TactikAI Digital Album Official Logo"
+          alt="Héroes del Deporte Digital Album Official Logo"
           className="w-full h-auto object-cover block transition-transform duration-500 group-hover:scale-105"
           referrerPolicy="no-referrer"
         />
         
-        {/* Intense Cyan/Teal border shimmer action */}
-        <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#22d3ee]/60 transition-colors pointer-events-none rounded-2xl" />
+        {/* Intense Green/Red border shimmer action */}
+        <div className="absolute inset-0 border-2 border-transparent group-hover:border-[#22c55e]/60 transition-colors pointer-events-none rounded-2xl" />
       </div>
     </div>
   );

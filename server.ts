@@ -13,7 +13,7 @@ import { getPregeneratedTrivia } from "./src/data/triviaData";
 dotenv.config();
 
 // Default values if envs are missing
-const PORT = Number(process.env.PORT || 3000);
+const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Initialize GoogleGenAI client lazily or safely
@@ -2178,25 +2178,34 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
   });
 
   // Serve static files / Vite middleware
-  if (process.env.NODE_ENV !== "production") {
+  const isProd = process.env.NODE_ENV === "production" || !!process.env.PORT;
+
+  if (!isProd) {
+    console.log("Modo: Desarrollo Local");
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "custom",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
-    // Explicitly expose src/assets for hardcoded image URLs to load properly in production
-    app.use("/src/assets", express.static(path.join(process.cwd(), "src/assets")));
+    console.log("Modo: Producción en Cloud Run");
+    const distPath = fs.existsSync(path.join(__dirname, "../dist")) 
+      ? path.join(__dirname, "../dist")
+      : path.join(process.cwd(), "dist");
+
+    // Explicitly expose src/assets if it exists for assets to load properly in production
+    if (fs.existsSync(path.join(process.cwd(), "src/assets"))) {
+      app.use("/src/assets", express.static(path.join(process.cwd(), "src/assets")));
+    }
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Mundial Scouting Album running on standard port: http://localhost:${PORT}`);
+  app.listen(Number(PORT), "0.0.0.0", () => {
+    console.log(`Server running on port ${PORT}...`);
   });
 }
 

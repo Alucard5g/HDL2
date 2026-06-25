@@ -24,6 +24,26 @@ import {
 } from 'lucide-react';
 import { getPopulatedMatch } from '../data';
 
+const localStorage = (() => {
+  try {
+    const test = window.localStorage;
+    const testKey = '__test_local_storage_leader__';
+    test.setItem(testKey, '1');
+    test.removeItem(testKey);
+    return test;
+  } catch (e) {
+    const memoryStore: Record<string, string> = {};
+    return {
+      getItem: (key: string): string | null => (key in memoryStore ? memoryStore[key] : null),
+      setItem: (key: string, value: string): void => { memoryStore[key] = String(value); },
+      removeItem: (key: string): void => { delete memoryStore[key]; },
+      clear: (): void => { Object.keys(memoryStore).forEach(key => delete memoryStore[key]); },
+      key: (index: number): string | null => Object.keys(memoryStore)[index] || null,
+      get length() { return Object.keys(memoryStore).length; }
+    } as any;
+  }
+})();
+
 interface LeaderboardViewProps {
   userBoards: { [countryName: string]: UserTacticalBoard };
   playersDB: { [countryName: string]: Player[] };
@@ -86,7 +106,14 @@ export default function LeaderboardView({
   const [inviteEmail, setInviteEmail] = useState<string>('');
   const [invitedList, setInvitedList] = useState<string[]>(() => {
     const list = localStorage.getItem('dt_invited_emails');
-    return list ? JSON.parse(list) : [];
+    if (list) {
+      try {
+        return JSON.parse(list);
+      } catch (e) {
+        console.warn("Error parsing dt_invited_emails:", e);
+      }
+    }
+    return [];
   });
   const [inviteSuccessMsg, setInviteSuccessMsg] = useState<string>('');
   const [inviteErrorMsg, setInviteErrorMsg] = useState<string>('');
@@ -601,16 +628,6 @@ export default function LeaderboardView({
                 <span className="text-cyan-400 font-bold text-[10.5px] select-all break-all bg-slate-900/80 px-2 py-0.5 rounded border border-slate-850/60 font-mono">
                   {userLicense || 'SIN LICENCIA REGISTRADA'}
                 </span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-900">
-                <div>
-                  <span className="text-gray-550 block text-[8px] uppercase">Monedas (Coins):</span>
-                  <span className="text-yellow-405 font-bold text-xs">🪙 {userCoins}</span>
-                </div>
-                <div>
-                  <span className="text-gray-550 block text-[8px] uppercase">Saldo Caja:</span>
-                  <span className="text-emerald-450 font-bold text-xs">$ {userCashBalance.toFixed(2)} USD</span>
-                </div>
               </div>
               <div className="pt-2 border-t border-slate-900/60">
                 <span className="text-gray-550 block text-[8px] uppercase">Usuario ID Técnico:</span>

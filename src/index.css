@@ -7,13 +7,13 @@
   --font-comic: "Comic Neue", cursive, sans-serif;
   --font-bangers: "Bangers", cursive, Impact, sans-serif;
 
-  --color-brand-deep: #050b07;
-  --color-brand-sidebar: #0b110e;
+  --color-brand-deep: #000000;
+  --color-brand-sidebar: #080c09;
   --color-brand-card: #ffffff;
   --color-brand-list: #ffffff;
-  --color-brand-footer: #020604;
-  --color-brand-neon: #11b782;
-  --color-brand-out: #ff4a5a;
+  --color-brand-footer: #020403;
+  --color-brand-neon: #22c55e;
+  --color-brand-out: #ef4444;
 }
 
 /* Halftone background pattern with green futuristic tint */

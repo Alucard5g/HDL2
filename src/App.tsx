@@ -3,6 +3,7 @@ import { COUNTRIES, generatePlayersForCountry, getPopulatedMatch, MATCH_FIXTURES
 import { Player, UserTacticalBoard, Match, getCountryOfPlay } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { DigitalStickerCard } from './components/DigitalStickerCard';
+import { AnimeHighTechSkin } from './components/AnimeHighTechSkin';
 import TriviaModule from './components/TriviaModule';
 import ActivePitch from './components/ActivePitch';
 import LeaderboardView from './components/LeaderboardView';
@@ -33,23 +34,71 @@ import {
   MessageSquare
 } from 'lucide-react';
 
+function getSafeImageUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("data:image/") || url.startsWith("/") || url.startsWith("./")) {
+    return url;
+  }
+  return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+}
+
 // Helper to safely write custom sticker generations to localStorage without hitting size limits (QuotaExceededError)
+const localStorage = (() => {
+  try {
+    const test = window.localStorage;
+    const testKey = '__test_local_storage_app__';
+    test.setItem(testKey, '1');
+    test.removeItem(testKey);
+    return test;
+  } catch (e) {
+    console.warn('[Storage Safeguard] LocalStorage is restricted/blocked in this environment. Falling back to safe in-memory store.');
+    const memoryStore: Record<string, string> = {};
+    return {
+      getItem: (key: string): string | null => (key in memoryStore ? memoryStore[key] : null),
+      setItem: (key: string, value: string): void => { memoryStore[key] = String(value); },
+      removeItem: (key: string): void => { delete memoryStore[key]; },
+      clear: (): void => { Object.keys(memoryStore).forEach(key => delete memoryStore[key]); },
+      key: (index: number): string | null => Object.keys(memoryStore)[index] || null,
+      get length() { return Object.keys(memoryStore).length; }
+    } as any;
+  }
+})();
+
 function safeSaveCustomStickers(generations: { [key: string]: string }) {
   try {
     localStorage.setItem('dt_custom_sticker_generations', JSON.stringify(generations));
   } catch (e: any) {
-    console.warn("localStorage quota exceeded for dt_custom_sticker_generations! Evicting old/large entries to free space...", e);
+    console.warn("localStorage quota exceeded for dt_custom_sticker_generations! Evicting old/large entries progressively to free space...", e);
     try {
-      const keys = Object.keys(generations);
-      if (keys.length > 2) {
+      const cloned = { ...generations };
+      const keys = Object.keys(cloned);
+      
+      // Let's attempt to progressively evict older keys one-by-one until it fits perfectly inside the 5MB quota
+      let savedSuccessfully = false;
+      
+      for (let i = 0; i < keys.length; i++) {
+        // Delete the oldest entry
+        delete cloned[keys[i]];
+        
+        try {
+          localStorage.setItem('dt_custom_sticker_generations', JSON.stringify(cloned));
+          savedSuccessfully = true;
+          console.log(`[Storage Resilient] Quota recovered successfully by evicting ${i + 1} older stickers. Kept ${keys.length - (i + 1)} stickers safely.`);
+          break;
+        } catch (innerErr) {
+          // Keep loop going to evict more items if still exceeding
+        }
+      }
+      
+      if (!savedSuccessfully) {
+        // Ultimate fallback: save at least the 8 newest entries instead of just 2
+        const fallbackCount = Math.min(keys.length, 8);
         const reducedGenerations: { [key: string]: string } = {};
-        keys.slice(-2).forEach(k => {
+        keys.slice(-fallbackCount).forEach(k => {
           reducedGenerations[k] = generations[k];
         });
         localStorage.setItem('dt_custom_sticker_generations', JSON.stringify(reducedGenerations));
-        console.log("Successfully saved reduced cache of custom stickers to LocalStorage.");
-      } else {
-        localStorage.removeItem('dt_custom_sticker_generations');
+        console.warn(`[Storage Resilient] Ultimate fallback activated. Only saved the last ${fallbackCount} stickers.`);
       }
     } catch (innerError) {
       console.error("Failed to recover from QuotaExceededError:", innerError);
@@ -62,9 +111,94 @@ export default function App() {
   // Navigation tabs
   const [activeTab, setActiveTab] = useState<'menu_hub' | 'album' | 'board' | 'leaderboard' | 'groups_fixture' | 'flutter' | 'subscription' | 'admin'>('menu_hub');
 
-  // CAPTURA Y PERSISTENCIA DE VISITA POR QR / INVITACIÓN DE USUARIOS
+  // CAPTURA Y PERSISTENCIA DE VISITA POR QR / INVITACIÓN DE USUARIOS / STRIPE SUCCESS
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    
+    // Check Stripe Payment Status callback
+    const paymentStatus = params.get('payment_status');
+    if (paymentStatus === 'success') {
+      const lastPlan = localStorage.getItem('dt_last_intent_plan');
+      const lastCont = localStorage.getItem('dt_last_intent_continent') || 'América';
+      const lastCountry = localStorage.getItem('dt_last_intent_country') || 'Argentina';
+      
+      if (lastPlan) {
+        let pointsToAdd = 0;
+        let desc = '';
+
+        if (lastPlan === 'Pase VIP Elite') {
+          pointsToAdd = 15;
+          desc = `Canje VIP: Continente ${lastCont}`;
+        } else if (lastPlan === 'Plan Scout Básico') {
+          pointsToAdd = 5;
+          desc = `Canje Scout: Selección ${lastCountry}`;
+        }
+
+        setUnlockedLevels(prev => {
+          const nextUnlocked = { ...prev };
+          if (lastPlan === 'Pase VIP Elite') {
+            // Unlocks countries belonging to the chosen continent
+            const allWorldCupCountries = [
+              'México', 'Canadá', 'Brasil', 'Haití', 'Estados Unidos', 'Paraguay', 
+              'Curazao', 'Ecuador', 'Uruguay', 'Argentina', 'Colombia', 'Panamá',
+              'República Checa', 'Bosnia y Herzegovina', 'Suiza', 'Escocia', 'Turquía', 
+              'Alemania', 'Países Bajos', 'Suecia', 'Bélgica', 'España', 
+              'Francia', 'Noruega', 'Austria', 'Portugal', 'Inglaterra', 'Croacia',
+              'Sudáfrica', 'Catar', 'Marruecos', 'Australia', 'Costa de Marfil', 
+              'Japón', 'Túnez', 'Egipto', 'Irán', 'Nueva Zelanda', 'Cabo Verde', 
+              'Arabia Saudita', 'Senegal', 'Irak', 'Argelia', 'Jordania', 
+              'RD Congo', 'Uzbekistán', 'Ghana'
+            ];
+            
+            const targetCountries = allWorldCupCountries.filter(c => {
+              if (lastCont === 'América') {
+                return ['México', 'Canadá', 'Brasil', 'Haití', 'Estados Unidos', 'Paraguay', 'Curazao', 'Ecuador', 'Uruguay', 'Argentina', 'Colombia', 'Panamá'].includes(c);
+              }
+              if (lastCont === 'Europa') {
+                return ['República Checa', 'Bosnia y Herzegovina', 'Suiza', 'Escocia', 'Turquía', 'Alemania', 'Países Bajos', 'Suecia', 'Bélgica', 'España', 'Francia', 'Noruega', 'Austria', 'Portugal', 'Inglaterra', 'Croacia'].includes(c);
+              }
+              // África, Asia y Oceanía
+              return !['México', 'Canadá', 'Brasil', 'Haití', 'Estados Unidos', 'Paraguay', 'Curazao', 'Ecuador', 'Uruguay', 'Argentina', 'Colombia', 'Panamá', 'República Checa', 'Bosnia y Herzegovina', 'Suiza', 'Escocia', 'Turquía', 'Alemania', 'Países Bajos', 'Suecia', 'Bélgica', 'España', 'Francia', 'Noruega', 'Austria', 'Portugal', 'Inglaterra', 'Croacia'].includes(c);
+            });
+
+            targetCountries.forEach(country => {
+              nextUnlocked[country] = { 1: true, 2: true, 3: true };
+            });
+          } else if (lastPlan === 'Plan Scout Básico') {
+            nextUnlocked[lastCountry] = { 1: true, 2: true, 3: true };
+          }
+          localStorage.setItem('scouting_unlocked_levels', JSON.stringify(nextUnlocked));
+          return nextUnlocked;
+        });
+
+        if (lastPlan === 'Plan Scout Básico') {
+          setScoutChosenCountry(lastCountry);
+        } else if (lastPlan === 'Pase VIP Elite') {
+          setVipChosenContinent(lastCont);
+          localStorage.setItem('dt_vip_chosen_continent', lastCont);
+        }
+
+        setPurchasedPoints(prev => prev + pointsToAdd);
+        handleUpdateSubscription(lastPlan);
+
+        // Add transaction to persistent and local history
+        handleAddTransaction(`${desc} (Stripe)`, 0, 'cash');
+
+        // Clear intent states
+        localStorage.removeItem('dt_last_intent_plan');
+        localStorage.removeItem('dt_last_intent_continent');
+        localStorage.removeItem('dt_last_intent_country');
+
+        // Clear search params without reloading
+        const cleanUrl = window.location.protocol + "//" + window.location.host + window.location.pathname;
+        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+
+        setTimeout(() => {
+          alert(`🎉 ¡Pago de Stripe Verificado Correctamente!\n\nSe ha activado tu suscripción a ${lastPlan}.\n${desc} ha sido desbloqueado con éxito y se te han acreditado +${pointsToAdd} puntos de Director Técnico.`);
+        }, 500);
+      }
+    }
+
     const ref = params.get('ref');
     if (ref) {
       const refTrim = ref.trim();
@@ -234,6 +368,26 @@ export default function App() {
     return localStorage.getItem('scout_chosen_country') || '';
   });
 
+  const [vipChosenContinent, setVipChosenContinent] = useState<string>(() => {
+    return localStorage.getItem('dt_vip_chosen_continent') || 'América';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dt_vip_chosen_continent', vipChosenContinent);
+  }, [vipChosenContinent]);
+
+  const [freeChosenCountry, setFreeChosenCountry] = useState<string>(() => {
+    return localStorage.getItem('free_chosen_country') || '';
+  });
+
+  const handleUpdateFreeCountry = (country: string) => {
+    localStorage.setItem('free_chosen_country', country);
+    setFreeChosenCountry(country);
+  };
+
+  const [countryToConfirmFree, setCountryToConfirmFree] = useState<string | null>(null);
+  const [upsellCountry, setUpsellCountry] = useState<string | null>(null);
+
   const handleUpdateScoutCountry = (country: string) => {
     localStorage.setItem('scout_chosen_country', country);
     setScoutChosenCountry(country);
@@ -306,7 +460,11 @@ export default function App() {
   });
 
   const [isLocked, setIsLocked] = useState<boolean>(() => {
-    return !!localStorage.getItem('dt_user_password');
+    return false;
+  });
+
+  const [highTechSkin, setHighTechSkin] = useState<boolean>(() => {
+    return localStorage.getItem('dt_high_tech_skin') !== 'false';
   });
 
   const handleUpdatePassword = (newPassword: string) => {
@@ -326,7 +484,9 @@ export default function App() {
     localStorage.removeItem('dt_user_license');
     localStorage.removeItem('user_subscription');
     localStorage.removeItem('scout_chosen_country');
+    localStorage.removeItem('dt_vip_chosen_continent');
     localStorage.removeItem('dt_user_password');
+    localStorage.removeItem('dt_purchased_points');
 
     setUserId('user_me');
     setUsername('Tú (Director Técnico)');
@@ -335,7 +495,9 @@ export default function App() {
     setUserLicense('');
     setUserSubscription('Ninguna');
     setScoutChosenCountry('');
+    setVipChosenContinent('América');
     setUserPassword('');
+    setPurchasedPoints(0);
     setIsLocked(false);
 
     const standardCode = 'DT-' + Math.floor(1000 + Math.random() * 9000);
@@ -419,7 +581,14 @@ export default function App() {
 
   const [tacticalBoards, setTacticalBoards] = useState<{ [country: string]: UserTacticalBoard }>(() => {
     const saved = localStorage.getItem('scouting_tactical_boards');
-    return saved ? JSON.parse(saved) : {};
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.warn("Error parsing scouting_tactical_boards:", e);
+      }
+    }
+    return {};
   });
 
   const [tempUsername, setTempUsername] = useState<string>('');
@@ -442,6 +611,14 @@ export default function App() {
   const [successfulReferralsCount, setSuccessfulReferralsCount] = useState<number>(() => {
     return Number(localStorage.getItem('dt_user_referral_count') || '0');
   });
+
+  const [purchasedPoints, setPurchasedPoints] = useState<number>(() => {
+    return Number(localStorage.getItem('dt_purchased_points') || '0');
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dt_purchased_points', String(purchasedPoints));
+  }, [purchasedPoints]);
 
   const [isLoginMode, setIsLoginMode] = useState<boolean>(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState<boolean>(false);
@@ -602,8 +779,21 @@ export default function App() {
   // Current active trivia state
   const [activeTrivia, setActiveTrivia] = useState<{ country: string; flag: string; level: number } | null>(null);
 
+  // Guard rule: if user is not registered, they can't access any game tabs, only menu_hub.
+  useEffect(() => {
+    const isRegistered = userId !== 'user_me' && !!userEmail && userEmail.trim().length > 0;
+    if (!isRegistered && activeTab !== 'menu_hub') {
+      setActiveTab('menu_hub');
+      setIsRegistrationOpen(true);
+    }
+  }, [activeTab, userId, userEmail]);
+
   // Sticker custom fal.ai generation state
   const [isGeneratingStickerId, setIsGeneratingStickerId] = useState<string | null>(null);
+
+  // Backup and restore sticker generations states
+  const [showBackupModal, setShowBackupModal] = useState<boolean>(false);
+  const [backupText, setBackupText] = useState<string>("");
 
   // Helper utility: Converts any external image URL to an optimized, compressed WebP Base64 string for instant load times
   const convertUrlToWebP = async (url: string): Promise<string> => {
@@ -867,10 +1057,135 @@ export default function App() {
     });
   };
 
+  const handleExportStickersBackup = () => {
+    try {
+      const saved = localStorage.getItem('dt_custom_sticker_generations') || '{}';
+      const parsed = JSON.parse(saved);
+      const keyCount = Object.keys(parsed).length;
+      if (keyCount === 0) {
+        setAppCustomAlert({
+          title: '⚠️ SIN CROMOS SINCRONIZADOS',
+          message: 'Aún no has sincronizado ningún cromo personalizado utilizando la opción de Fal.ai o copiando enlaces.'
+        });
+        return;
+      }
+
+      // Try automatic clipboard copy
+      let clipboardSuccess = false;
+      try {
+        navigator.clipboard.writeText(saved);
+        clipboardSuccess = true;
+      } catch (clipboardErr) {
+        console.warn('Clipboard write blocked by browser sandbox:', clipboardErr);
+      }
+
+      // Prepopulate and open backup modal so they can copy manually too!
+      setBackupText(saved);
+      setShowBackupModal(true);
+
+      if (clipboardSuccess) {
+        setAppCustomAlert({
+          title: '💾 ¡COPIA DE SEGURIDAD EXPORTADA!',
+          message: `¡Excelente! Se copiaron tus ${keyCount} cromos al portapapeles. Además, abrimos el panel de abajo mostrando tu código por si deseas guardarlo manualmente.`
+        });
+      } else {
+        setAppCustomAlert({
+          title: '💾 PANEL DE RESPALDO GENERADO',
+          message: `Se ha abierto el panel de abajo conteniendo el código codificado de tus ${keyCount} cromos para que lo copies manualmente (ya que el navegador restringió acceso automático al portapapeles).`
+        });
+      }
+    } catch (e: any) {
+      setAppCustomAlert({
+        title: '❌ ERROR EN EXPORTACIÓN',
+        message: `No se pudo exportar la copia: ${e.message}`
+      });
+    }
+  };
+
+  const handleImportStickersBackup = async (inputText: string) => {
+    if (!inputText.trim()) {
+      setAppCustomAlert({
+        title: '⚠️ ENTRADA VACÍA',
+        message: 'Por favor ingresa o pega el texto de respaldo de cromos válido.'
+      });
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(inputText);
+      const keys = Object.keys(parsed);
+      if (keys.length === 0) {
+        throw new Error('El objeto de respaldo está vacío.');
+      }
+
+      const isValid = keys.every(k => typeof k === 'string' && typeof parsed[k] === 'string');
+      if (!isValid) {
+        throw new Error('El formato del archivo de respaldo es inválido.');
+      }
+
+      // Merge or replace
+      const savedStr = localStorage.getItem('dt_custom_sticker_generations') || '{}';
+      const existing = JSON.parse(savedStr);
+      let mergedCount = 0;
+
+      for (const [playerId, imageUrl] of Object.entries(parsed)) {
+        existing[playerId] = imageUrl;
+        mergedCount++;
+        
+        // Push to server database
+        await fetch('/api/stickers/custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId, imageUrl })
+        }).catch(err => console.warn('Sync backup error:', err));
+      }
+
+      safeSaveCustomStickers(existing);
+
+      // Re-trigger playersDB updates
+      setPlayersDB(prev => {
+        const updated = { ...prev };
+        Object.entries(parsed).forEach(([playerId, imageUrl]) => {
+          for (const country of Object.keys(updated)) {
+            const countryList = [...updated[country]];
+            const idx = countryList.findIndex(p => p.id === playerId);
+            if (idx !== -1) {
+              countryList[idx] = { ...countryList[idx], imageUrl: imageUrl as string };
+              updated[country] = countryList;
+              break;
+            }
+          }
+        });
+        return updated;
+      });
+
+      setShowBackupModal(false);
+      setBackupText("");
+
+      setAppCustomAlert({
+        title: '⚡ ¡RESPALDO RESTAURADO CON ÉXITO!',
+        message: `¡Increíble! Hemos procesado y restaurado ${mergedCount} cromos personalizados. Se han registrado e inyectado con éxito tanto en tu almacenamiento local como en el servidor.`
+      });
+
+    } catch (e: any) {
+      setAppCustomAlert({
+        title: '❌ ERROR AL IMPORTAR',
+        message: `El texto ingresado no es válido: ${e.message}. Asegúrate de pegar exactamente el código exportado anteriormente.`
+      });
+    }
+  };
+
   // Sticker Pack state variables
   const [manuallyUnlockedPlayerIds, setManuallyUnlockedPlayerIds] = useState<{ [playerId: string]: boolean }>(() => {
     const saved = localStorage.getItem('scouting_manually_unlocked_ids');
-    return saved ? JSON.parse(saved) : {};
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.warn("Error parsing scouting_manually_unlocked_ids:", e);
+      }
+    }
+    return {};
   });
 
   useEffect(() => {
@@ -1008,6 +1323,7 @@ export default function App() {
         subscription: userSubscription,
         unlockedLevels,
         tacticalBoards,
+        vipChosenContinent,
       };
       if (idx !== -1) {
         db[idx] = { ...db[idx], ...updatedUser };
@@ -1018,7 +1334,7 @@ export default function App() {
     } catch (err) {
       console.error('Error syncing current user to db', err);
     }
-  }, [userEmail, userId, username, userAvatar, userCode, userPassword, userLicense, userSubscription, unlockedLevels, tacticalBoards]);
+  }, [userEmail, userId, username, userAvatar, userCode, userPassword, userLicense, userSubscription, unlockedLevels, tacticalBoards, vipChosenContinent]);
 
   useEffect(() => {
     if (isRegistrationOpen) {
@@ -1034,6 +1350,18 @@ export default function App() {
     }
   }, [isRegistrationOpen, username, userEmail, userAvatar]);
 
+  const isAdmin = userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail';
+
+  const isRegistered = userId !== 'user_me' && !!userEmail && userEmail.trim().length > 0;
+
+  const getCountryContinent = (countryName: string): string => {
+    const america = ['México', 'Canadá', 'Brasil', 'Haití', 'Estados Unidos', 'Paraguay', 'Curazao', 'Ecuador', 'Uruguay', 'Argentina', 'Colombia', 'Panamá'];
+    const europa = ['República Checa', 'Bosnia y Herzegovina', 'Suiza', 'Escocia', 'Turquía', 'Alemania', 'Países Bajos', 'Suecia', 'Bélgica', 'España', 'Francia', 'Noruega', 'Austria', 'Portugal', 'Inglaterra', 'Croacia'];
+    if (america.includes(countryName)) return 'América';
+    if (europa.includes(countryName)) return 'Europa';
+    return 'África, Asia y Oceanía';
+  };
+
   // Dynamic score calculator matching required point formulas:
   // - 1 cromo = 1 pt
   // - Completed country = 5 pt
@@ -1048,22 +1376,34 @@ export default function App() {
       let lvl2 = levels[2] || levels['2'] || false;
       let lvl3 = levels[3] || levels['3'] || false;
       let isCountryCompletedDefault = lvl1 && lvl2 && lvl3;
-      let isCountryCompletedVIP = userSubscription === 'Pase VIP Elite';
+      
+      let isCountryCompletedVIP = userSubscription === 'Pase VIP Elite' && getCountryContinent(country) === vipChosenContinent;
       let isCountryCompletedScout = userSubscription === 'Plan Scout Básico' && scoutChosenCountry === country;
+
+      // Access checks
+      const hasCromoAccess = !isRegistered || 
+        (userSubscription === 'Pase VIP Elite' && getCountryContinent(country) === vipChosenContinent) ||
+        (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === country) ||
+        (userSubscription === 'Ninguna' && freeChosenCountry === country);
 
       let countryCount = 0;
       let limitCromos = 26;
-      if (isCountryCompletedVIP || isCountryCompletedScout) {
-        countryCount = limitCromos;
+
+      if (hasCromoAccess) {
+        if (isCountryCompletedVIP || isCountryCompletedScout) {
+          countryCount = limitCromos;
+        } else {
+          if (lvl1) countryCount += 9;
+          if (lvl2) countryCount += 9;
+          if (lvl3) countryCount += 8;
+        }
       } else {
-        if (lvl1) countryCount += 9;
-        if (lvl2) countryCount += 9;
-        if (lvl3) countryCount += 8;
+        countryCount = 0;
       }
 
       unlockedStickersCount += countryCount;
 
-      if (isCountryCompletedVIP || isCountryCompletedScout || isCountryCompletedDefault) {
+      if ((isCountryCompletedVIP || isCountryCompletedScout || isCountryCompletedDefault) && hasCromoAccess) {
         completedCountriesList.push(country);
       }
     });
@@ -1105,7 +1445,7 @@ export default function App() {
     const bonusScore = completedCountriesList.length * 5;
     const onceScore = totalOnceHits * 10;
     const predictScore = totalScoreHits * 20;
-    const totalScore = stickerScore + bonusScore + onceScore + predictScore + referralPoints;
+    const totalScore = stickerScore + bonusScore + onceScore + predictScore + referralPoints + purchasedPoints;
 
     return {
       unlockedStickersCount,
@@ -1173,11 +1513,42 @@ export default function App() {
     };
 
     syncWithDb();
-  }, [unlockedLevels, userSubscription, userCode, userId, username, userAvatar, currentUserInfo.totalOnceHits, currentUserInfo.totalScoreHits, userLicense, tacticalBoards, userEmail, userReferredByEmail, userCoins, userCashBalance]);
+  }, [unlockedLevels, userSubscription, userCode, userId, username, userAvatar, currentUserInfo.totalOnceHits, currentUserInfo.totalScoreHits, userLicense, tacticalBoards, userEmail, userReferredByEmail, userCoins, userCashBalance, purchasedPoints]);
 
+  const isCountryLockedForUser = (countryName: string): boolean => {
+    if (!isRegistered) return false;
+    
+    // VIP Elite and Scout Básico can access games for all countries, but won't get stickers unless in their selection
+    if (userSubscription === 'Pase VIP Elite' || userSubscription === 'Plan Scout Básico') {
+      return false;
+    }
+    
+    // Check if the country is fully completed/purchased in unlockedLevels
+    const levels = unlockedLevels[countryName];
+    const isCompleted = levels && levels[1] && levels[2] && levels[3];
+    if (isCompleted) return false;
 
+    if (userSubscription === 'Ninguna') {
+      if (freeChosenCountry !== '' && freeChosenCountry !== countryName) {
+        return true;
+      }
+    }
+    return false;
+  };
 
-  const isAdmin = userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail';
+  const handleCountrySelectionClick = (countryName: string) => {
+    if (isRegistered && userSubscription === 'Ninguna') {
+      if (freeChosenCountry === '') {
+        setCountryToConfirmFree(countryName);
+      } else if (freeChosenCountry !== countryName) {
+        setUpsellCountry(countryName);
+      } else {
+        setSelectedCountryName(countryName);
+      }
+    } else {
+      setSelectedCountryName(countryName);
+    }
+  };
 
   const activeCountry = COUNTRIES.find(c => c.name === selectedCountryName) || COUNTRIES[0];
   const activeCountryPlayers = playersDB[activeCountry.name] || [];
@@ -1186,7 +1557,30 @@ export default function App() {
   const getUnlockedPlayersForCountry = (countryName: string): Player[] => {
     const countryPlayers = playersDB[countryName] || [];
     
-    // Check Premium license conditions first
+    // Guest (not registered) user
+    if (!isRegistered) {
+      const levels = unlockedLevels[countryName] || { 1: false, 2: false, 3: false };
+      const lvl1 = levels[1] || levels['1'] || false;
+      const lvl2 = levels[2] || levels['2'] || false;
+      const lvl3 = levels[3] || levels['3'] || false;
+      
+      let unlocked: Player[] = [];
+      if (lvl1) unlocked = [...unlocked, ...countryPlayers.slice(0, 9)];
+      if (lvl2) unlocked = [...unlocked, ...countryPlayers.slice(9, 18)];
+      if (lvl3) unlocked = [...unlocked, ...countryPlayers.slice(18, 26)];
+      return unlocked;
+    }
+
+    // Registered user cromo access check
+    const hasCromoAccess = 
+      (userSubscription === 'Pase VIP Elite' && getCountryContinent(countryName) === vipChosenContinent) ||
+      (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === countryName) ||
+      (userSubscription === 'Ninguna' && freeChosenCountry === countryName);
+
+    if (!hasCromoAccess) {
+      return [];
+    }
+
     if (userSubscription === 'Pase VIP Elite') {
       return countryPlayers;
     }
@@ -1202,19 +1596,16 @@ export default function App() {
     
     let unlocked: Player[] = [];
     if (lvl1) {
-      // Nivel 1 unlocked -> Index 0 to 8
-      unlocked = [...unlocked, ...countryPlayers.slice(0, 9)]; // index backups (9 players)
+      unlocked = [...unlocked, ...countryPlayers.slice(0, 9)];
     }
     if (lvl2) {
-      // Nivel 2 unlocked -> Index 9 to 17
-      unlocked = [...unlocked, ...countryPlayers.slice(9, 18)]; // index key players (9 players)
+      unlocked = [...unlocked, ...countryPlayers.slice(9, 18)];
     }
     if (lvl3) {
-      // Nivel 3 unlocked -> Index 18 to 25
-      unlocked = [...unlocked, ...countryPlayers.slice(18, 26)]; // index stars (8 players)
+      unlocked = [...unlocked, ...countryPlayers.slice(18, 26)];
     }
 
-    // Also include manually unlocked player IDs via pack opening
+    // Include manually unlocked player IDs via pack opening (only if hasCromoAccess)
     countryPlayers.forEach(p => {
       if (manuallyUnlockedPlayerIds[p.id] && !unlocked.some(up => up.id === p.id)) {
         unlocked.push(p);
@@ -1227,32 +1618,58 @@ export default function App() {
   const unlockedCount = getUnlockedPlayersForCountry(activeCountry.name).length;
   const isAlbumComplete = unlockedCount >= activeCountryPlayers.length;
 
+  const hasCromoAccess = !isRegistered || 
+    (userSubscription === 'Pase VIP Elite' && getCountryContinent(activeCountry.name) === vipChosenContinent) ||
+    (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === activeCountry.name) ||
+    (userSubscription === 'Ninguna' && freeChosenCountry === activeCountry.name);
+
   // Handle successful trivia completion
   const handleTriviaSuccess = () => {
     if (!activeTrivia) return;
     const { country, level } = activeTrivia;
 
-    // Add this level to pending trivia packs as a reward
-    setPendingTriviaPacks(prev => {
-      const existing = prev[country] || [];
-      if (!existing.includes(level)) {
-        return {
-          ...prev,
-          [country]: [...existing, level]
-        };
+    // Save level as completed in unlockedLevels
+    setUnlockedLevels(prev => {
+      const next = { ...prev };
+      if (!next[country]) {
+        next[country] = { 1: false, 2: false, 3: false };
       }
-      return prev;
+      next[country][level] = true;
+      localStorage.setItem('scouting_unlocked_levels', JSON.stringify(next));
+      return next;
     });
 
-    setActiveTrivia(null);
+    const hasCromoAccessForCountry = !isRegistered || 
+      (userSubscription === 'Pase VIP Elite' && getCountryContinent(country) === vipChosenContinent) ||
+      (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === country) ||
+      (userSubscription === 'Ninguna' && freeChosenCountry === country);
 
-    // Dynamic high-fidelity smooth scrolling directly to the Envelope Opening Station
-    setTimeout(() => {
-      const targetElement = document.getElementById('shovelling-station-container');
-      if (targetElement) {
-        targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 150);
+    if (hasCromoAccessForCountry) {
+      // Add this level to pending trivia packs as a reward
+      setPendingTriviaPacks(prev => {
+        const existing = prev[country] || [];
+        if (!existing.includes(level)) {
+          return {
+            ...prev,
+            [country]: [...existing, level]
+          };
+        }
+        return prev;
+      });
+
+      setActiveTrivia(null);
+
+      // Dynamic high-fidelity smooth scrolling directly to the Envelope Opening Station
+      setTimeout(() => {
+        const targetElement = document.getElementById('shovelling-station-container');
+        if (targetElement) {
+          targetElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 150);
+    } else {
+      setActiveTrivia(null);
+      alert(`🎉 ¡Examen del Nivel ${level} Completado con Éxito!\n\nHas demostrado tu conocimiento táctico de la selección de ${country}.\n\nComo esta selección pertenece a otra área fuera de tu plan activo de estampas, has jugado en Modo Recreativo. ¡Excelente trabajo acumulando experiencia y demostrando tu liderazgo táctico!`);
+    }
   };
 
   const handleSaveBoard = async (board: UserTacticalBoard) => {
@@ -1406,6 +1823,7 @@ export default function App() {
       localStorage.removeItem('dt_user_password');
       localStorage.removeItem('dt_user_license');
       localStorage.removeItem('user_subscription');
+      localStorage.removeItem('dt_purchased_points');
       
       setUserId('user_me');
       setUsername('Tú (Director Técnico)');
@@ -1413,6 +1831,7 @@ export default function App() {
       setUserEmail('');
       setUserLicense('');
       setUserSubscription('Ninguna');
+      setPurchasedPoints(0);
 
       const standardCode = 'DT-' + Math.floor(1000 + Math.random() * 9000);
       localStorage.setItem('dt_user_code', standardCode);
@@ -1593,6 +2012,13 @@ export default function App() {
         setUserPassword(matchedUser.password);
         setUserLicense(matchedUser.license || '');
         setUserSubscription(matchedUser.subscription || 'Ninguna');
+        if (matchedUser.vipChosenContinent) {
+          setVipChosenContinent(matchedUser.vipChosenContinent);
+          localStorage.setItem('dt_vip_chosen_continent', matchedUser.vipChosenContinent);
+        } else {
+          setVipChosenContinent('América');
+          localStorage.setItem('dt_vip_chosen_continent', 'América');
+        }
 
         if (matchedUser.unlockedLevels) {
           setUnlockedLevels(matchedUser.unlockedLevels);
@@ -1784,6 +2210,13 @@ export default function App() {
       setUserPassword(tempPassword);
       setUserLicense(finalUser.license || '');
       setUserSubscription(finalUser.subscription || 'Ninguna');
+      if (finalUser.vipChosenContinent) {
+        setVipChosenContinent(finalUser.vipChosenContinent);
+        localStorage.setItem('dt_vip_chosen_continent', finalUser.vipChosenContinent);
+      } else {
+        setVipChosenContinent('América');
+        localStorage.setItem('dt_vip_chosen_continent', 'América');
+      }
 
       if (finalUser.unlockedLevels) {
         setUnlockedLevels(finalUser.unlockedLevels);
@@ -1820,7 +2253,14 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050b07] bg-halftone-dots text-slate-100 font-sans flex flex-col antialiased selection:bg-[#EF4444] selection:text-white border-[8px] border-black">
+    <AnimeHighTechSkin isActive={highTechSkin} onToggleActive={() => {
+      setHighTechSkin(prev => {
+        const next = !prev;
+        localStorage.setItem('dt_high_tech_skin', String(next));
+        return next;
+      });
+    }}>
+      <div className="min-h-screen bg-[#000000] bg-halftone-dots text-slate-100 font-sans flex flex-col antialiased selection:bg-[#EF4444] selection:text-white border-[8px] border-black">
       
       {/* Responsive outer board wrapper */}
       <div className="flex flex-col min-h-screen w-full font-sans">
@@ -1830,7 +2270,7 @@ export default function App() {
           <div 
             onClick={() => { setActiveTab('menu_hub'); setActiveTrivia(null); }}
             className="cursor-pointer active:scale-95 transition-all"
-            title="TactikAI - Volver al Menú Principal"
+            title="Héroes del Deporte - Volver al Menú Principal"
           >
             <TactikAiLogo layout="horizontal" />
           </div>
@@ -1881,13 +2321,13 @@ export default function App() {
               <div className="mb-5 flex items-center justify-between select-none">
                 <button
                   onClick={() => { setActiveTab('menu_hub'); setActiveTrivia(null); }}
-                  className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-black border-[3px] border-black font-bangers text-xs uppercase tracking-wider shadow-[3px_3px_0px_#11b782] cursor-pointer flex items-center gap-1.5 rounded-xl transition-all hover:translate-y-0.5 hover:shadow-[1.5px_1.5px_0px_#11b782]"
+                  className="px-3.5 py-1.5 bg-white hover:bg-slate-50 text-black border-[3px] border-black font-bangers text-xs uppercase tracking-wider shadow-[3px_3px_0px_#22c55e] cursor-pointer flex items-center gap-1.5 rounded-xl transition-all hover:translate-y-0.5 hover:shadow-[1.5px_1.5px_0px_#22c55e]"
                 >
                   <span>⬅️ VOLVER AL PANEL GENERAL</span>
                 </button>
-                <div className="hidden sm:flex items-center gap-2 font-mono text-[10px] text-slate-500 bg-[#0b110e] border-[2px] border-black px-2.5 py-1 rounded-lg">
-                  <span className="w-2 h-2 rounded-full bg-[#11b782] animate-pulse" />
-                  <span className="uppercase font-bold text-[#11b782]">DT PANEL: {activeTab === 'groups_fixture' ? 'FIXTURE' : activeTab === 'flutter' ? 'SDK DOCS' : activeTab.toUpperCase()}</span>
+                <div className="hidden sm:flex items-center gap-2 font-mono text-[10px] text-slate-500 bg-[#080c09] border-[2px] border-black px-2.5 py-1 rounded-lg">
+                  <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
+                  <span className="uppercase font-bold text-[#22c55e]">DT PANEL: {activeTab === 'groups_fixture' ? 'FIXTURE' : activeTab === 'flutter' ? 'SDK DOCS' : activeTab.toUpperCase()}</span>
                 </div>
               </div>
             )}
@@ -1915,7 +2355,7 @@ export default function App() {
             {activeTab === 'menu_hub' && (
               <div className="w-full flex flex-col gap-8 select-none" id="menu-hub-content">
                 {/* Header Premium de Bienvenida / Comic Title Card */}
-                <div className="relative overflow-hidden bg-[#0b110e] border-[3.5px] border-black p-6 sm:p-8 rounded-3xl shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="relative overflow-hidden bg-[#080c09] border-[3.5px] border-black p-6 sm:p-8 rounded-3xl shadow-[6px_6px_0px_rgba(0,0,0,1)] flex flex-col md:flex-row items-center justify-between gap-6">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
                   <div className="z-10 flex-1 text-center md:text-left">
                     {isAdmin ? (
@@ -1923,7 +2363,7 @@ export default function App() {
                         👑 ACCESO ADMINISTRADOR ACTIVO
                       </div>
                     ) : (
-                      <div className="inline-flex items-center gap-2 bg-[#11b782] text-black border-2 border-black font-mono text-[9px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-widest mb-3 rotate-[-1deg] shadow-[2px_2px_0px_#000]">
+                      <div className="inline-flex items-center gap-2 bg-[#22c55e] text-black border-2 border-black font-mono text-[9px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-widest mb-3 rotate-[-1deg] shadow-[2px_2px_0px_#000]">
                         ⚽ PERFIL DIRECTOR TÉCNICO
                       </div>
                     )}
@@ -1941,7 +2381,7 @@ export default function App() {
                   {/* Quick stats floating badge combined with user panel from left image */}
                   <div className="z-10 flex flex-col sm:flex-row md:flex-col lg:flex-row items-center gap-5 w-full md:w-auto shrink-0 select-none">
                     {/* Large white Stats Card from right image */}
-                    <div className="bg-white border-[3.5px] border-black p-4 rounded-2xl shadow-[5px_5px_0px_#11b782] rotate-1 hover:rotate-0 transition-transform duration-250 flex flex-col items-center justify-center text-black w-full sm:w-[160px] md:w-full lg:w-[160px] min-h-[110px] shrink-0">
+                    <div className="bg-white border-[3.5px] border-black p-4 rounded-2xl shadow-[5px_5px_0px_#22c55e] rotate-1 hover:rotate-0 transition-transform duration-250 flex flex-col items-center justify-center text-black w-full sm:w-[160px] md:w-full lg:w-[160px] min-h-[110px] shrink-0">
                       <span className="text-2xl">⚡</span>
                       <span className="text-3xl font-bangers tracking-tight leading-none text-black mt-1">
                         {currentUserInfo.unlockedStickersCount} / {COUNTRIES.length * 26}
@@ -1953,10 +2393,10 @@ export default function App() {
 
                     {/* User credentials and Action buttons from left image */}
                     <div className="flex flex-col gap-2.5 w-full sm:w-[240px] md:w-full lg:w-[240px] shrink-0">
-                      {/* 1. Yellow Badge: ⚡ HERO CONVOCADOS ⚡ */}
+                      {/* 1. Yellow Badge: ⚡ HÉROES CONVOCADOS ⚡ */}
                       <div className="w-full text-center">
                         <span className="w-full text-[10px] font-mono bg-[#FDDF2B] text-black px-3 py-1.5 border-[2.5px] border-black font-black uppercase tracking-widest rounded-md rotate-[-0.5deg] inline-block shadow-[2px_2px_0px_#000]">
-                          ⚡ HERO CONVOCADOS ⚡
+                          ⚡ HÉROES CONVOCADOS ⚡
                         </span>
                       </div>
 
@@ -1966,7 +2406,7 @@ export default function App() {
                           setIsRegistrationOpen(true);
                         }}
                         title="Detalles de Perfil (Haz clic para ver y gestionar tu sesión oficial)"
-                        className="w-full cursor-pointer bg-white border-[3px] border-black p-3 rounded-2xl shadow-[4.5px_4.5px_0px_#11b782] flex items-center gap-3 hover:translate-y-0.5 hover:shadow-[2.5px_2.5px_0px_#11b782] transition-all text-black"
+                        className="w-full cursor-pointer bg-white border-[3px] border-black p-3 rounded-2xl shadow-[4.5px_4.5px_0px_#22c55e] flex items-center gap-3 hover:translate-y-0.5 hover:shadow-[2.5px_2.5px_0px_#22c55e] transition-all text-black"
                       >
                         <span className="text-3xl filter drop-shadow-[2px_2px_0px_rgba(0,0,0,0.15)] select-none shrink-0">
                           {userAvatar || '👑'}
@@ -1985,7 +2425,7 @@ export default function App() {
                       {userId !== 'user_me' ? (
                         <button
                           onClick={handleLogout}
-                          className="w-full border-[3px] border-black bg-white hover:bg-slate-50 text-black px-4 py-2 font-sans font-black text-xs uppercase tracking-wider shadow-[3.5px_3.5px_0px_#ff4a5a] hover:translate-y-0.5 hover:shadow-[1.5px_1.5px_0px_#ff4a5a] cursor-pointer flex items-center justify-between gap-2 transition-all rounded-2xl"
+                          className="w-full border-[3px] border-black bg-white hover:bg-slate-50 text-black px-4 py-2 font-sans font-black text-xs uppercase tracking-wider shadow-[3.5px_3.5px_0px_#ef4444] hover:translate-y-0.5 hover:shadow-[1.5px_1.5px_0px_#ef4444] cursor-pointer flex items-center justify-between gap-2 transition-all rounded-2xl"
                         >
                           <span className="font-extrabold text-[11px]">Cerrar Sesión</span>
                           <ChevronRight className="w-4 h-4 text-black shrink-0 stroke-[3.5]" />
@@ -2005,9 +2445,9 @@ export default function App() {
 
 
                 {/* HEROIC COMIC MANUAL: MÉTODO DE JUEGO, PUNTOS Y PREMIOS */}
-                <div className="border-[3.5px] border-black bg-[#0d1612] rounded-3xl p-6 shadow-[8px_8px_0px_#000] relative overflow-hidden" id="epic-how-to-play-manual">
+                <div className="border-[3.5px] border-black bg-[#080c09] rounded-3xl p-6 shadow-[8px_8px_0px_#000] relative overflow-hidden" id="epic-how-to-play-manual">
                   <div className="absolute top-0 right-0 w-48 h-48 bg-[#EF4444]/15 rounded-full blur-3xl pointer-events-none" />
-                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#11b782]/15 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#22c55e]/15 rounded-full blur-3xl pointer-events-none" />
                   
                   {/* Title Header with Action Bubble Badge style */}
                   <div className="flex flex-col md:flex-row items-center gap-4 border-b-[3px] border-black pb-5 mb-6">
@@ -2144,28 +2584,37 @@ export default function App() {
                   <motion.div 
                     whileHover={{ scale: 1.025, y: -4 }}
                     onClick={() => { setActiveTab('album'); }}
-                    className="cursor-pointer group relative overflow-hidden bg-[#11b782] border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px]"
+                    className={`cursor-pointer group relative overflow-hidden border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px] ${
+                      !isRegistered 
+                        ? 'bg-[#14231e] text-slate-400 border-slate-800 opacity-85 hover:opacity-100' 
+                        : 'bg-[#11b782] text-black'
+                    }`}
                   >
+                    {!isRegistered && (
+                      <div className="absolute top-2.5 right-2.5 bg-[#EF4444] text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-black rotate-[2deg] shadow-[2px_2px_0px_#000] z-20">
+                        🔒 REGISTRO REQUERIDO
+                      </div>
+                    )}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
                     <div className="relative z-10 flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="font-mono text-[9px] font-black text-black/70 uppercase tracking-wider mb-1">CINTURÓN 01</div>
-                        <h3 className="font-bangers text-2xl lg:text-3xl tracking-wide text-black uppercase leading-none mb-2">
+                        <div className={`font-mono text-[9px] font-black uppercase tracking-wider mb-1 ${!isRegistered ? 'text-emerald-500/60' : 'text-black/70'}`}>CINTURÓN 01</div>
+                        <h3 className={`font-bangers text-2xl lg:text-3xl tracking-wide uppercase leading-none mb-2 ${!isRegistered ? 'text-slate-300' : 'text-black'}`}>
                            📚 ÁLBUM & COLECCIÓN
                         </h3>
-                        <p className="text-[11px] font-comic font-bold text-black/85 leading-tight max-w-sm">
+                        <p className={`text-[11px] font-comic font-bold leading-tight max-w-sm ${!isRegistered ? 'text-slate-400/80' : 'text-black/85'}`}>
                           Explora las plantillas y los cromos oficiales de las mejores selecciones de América y el mundo. ¡Completa los 3 niveles de trivias por país!
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-black text-[#11b782] border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#005535] group-hover:rotate-6 transition-transform">
+                      <div className={`w-12 h-12 border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl transition-transform group-hover:rotate-6 ${!isRegistered ? 'bg-slate-900 text-slate-500 shadow-[2.5px_2.5px_0px_rgba(0,0,0,0.5)]' : 'bg-black text-[#11b782] shadow-[2.5px_2.5px_0px_#005535]'}`}>
                         📚
                       </div>
                     </div>
                     
-                    <div className="relative z-10 mt-5 pt-3.5 border-t border-black/10 flex items-center justify-between text-black font-mono text-[9px] font-black">
+                    <div className={`relative z-10 mt-5 pt-3.5 border-t flex items-center justify-between font-mono text-[9px] font-black ${!isRegistered ? 'border-slate-800 text-slate-500' : 'border-black/10 text-black'}`}>
                       <div className="flex items-center gap-1">
                         <span>⚡ {currentUserInfo.unlockedStickersCount} CROMOS COL.</span>
-                        <span className="text-black/50">|</span>
+                        <span className={!isRegistered ? 'text-slate-700' : 'text-black/50'}>|</span>
                         <span>🏆 {currentUserInfo.completedCountriesList.length} COMPLETADOS</span>
                       </div>
                       <span className="flex items-center gap-0.5 bg-black text-white px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
@@ -2178,27 +2627,36 @@ export default function App() {
                   <motion.div 
                     whileHover={{ scale: 1.025, y: -4 }}
                     onClick={() => { setActiveTab('groups_fixture'); }}
-                    className="cursor-pointer group relative overflow-hidden bg-white border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px]"
+                    className={`cursor-pointer group relative overflow-hidden border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px] ${
+                      !isRegistered 
+                        ? 'bg-slate-950 text-slate-400 border-slate-850 opacity-85 hover:opacity-100' 
+                        : 'bg-white text-black'
+                    }`}
                   >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-slate-100 rounded-full blur-2xl pointer-events-none" />
+                    {!isRegistered && (
+                      <div className="absolute top-2.5 right-2.5 bg-[#EF4444] text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-black rotate-[2deg] shadow-[2px_2px_0px_#000] z-20">
+                        🔒 REGISTRO REQUERIDO
+                      </div>
+                    )}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-slate-100/5 rounded-full blur-2xl pointer-events-none" />
                     <div className="relative z-10 flex items-start justify-between">
                       <div className="flex-1">
                         <div className="font-mono text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1">CINTURÓN 02</div>
-                        <h3 className="font-bangers text-2xl lg:text-3xl tracking-wide text-black uppercase leading-none mb-2">
+                        <h3 className={`font-bangers text-2xl lg:text-3xl tracking-wide uppercase leading-none mb-2 ${!isRegistered ? 'text-slate-300' : 'text-black'}`}>
                            📅 FIXTURE OFICIAL
                         </h3>
-                        <p className="text-[11px] font-comic font-bold text-gray-700 leading-tight max-w-sm">
+                        <p className={`text-[11px] font-comic font-bold leading-tight max-w-sm ${!isRegistered ? 'text-slate-400/80' : 'text-gray-700'}`}>
                           Consulta el calendario oficial de los grupos del Torneo 2026. Registra tus pronósticos del simulador con los que sumarás puntos.
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-[#EF4444] text-white border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform">
+                      <div className={`w-12 h-12 text-white border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform ${!isRegistered ? 'bg-slate-800 opacity-60' : 'bg-[#EF4444]'}`}>
                         📅
                       </div>
                     </div>
                     
-                    <div className="relative z-10 mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-slate-500 font-mono text-[9px] font-black">
-                      <div className="flex items-center gap-1.5 text-black">
-                        <span className="bg-[#FDDF2B] px-1.5 py-0.5 border border-black text-[8px] uppercase font-bold">AUDITABLE</span>
+                    <div className={`relative z-10 mt-5 pt-3.5 border-t flex items-center justify-between font-mono text-[9px] font-black ${!isRegistered ? 'border-slate-800 text-slate-500' : 'border-slate-100 text-slate-500'}`}>
+                      <div className={`flex items-center gap-1.5 ${!isRegistered ? 'text-slate-500' : 'text-black'}`}>
+                        <span className="bg-[#FDDF2B] px-1.5 py-0.5 border border-black text-[8px] uppercase font-bold text-black">AUDITABLE</span>
                         <span>⚽ 12 PARTIDOS OFICIALES</span>
                       </div>
                       <span className="flex items-center gap-0.5 bg-black text-white px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
@@ -2211,27 +2669,36 @@ export default function App() {
                   <motion.div 
                     whileHover={{ scale: 1.025, y: -4 }}
                     onClick={() => { setActiveTab('board'); }}
-                    className="cursor-pointer group relative overflow-hidden bg-white border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px]"
+                    className={`cursor-pointer group relative overflow-hidden border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px] ${
+                      !isRegistered 
+                        ? 'bg-slate-950 text-slate-400 border-slate-850 opacity-85 hover:opacity-100' 
+                        : 'bg-white text-black'
+                    }`}
                   >
+                    {!isRegistered && (
+                      <div className="absolute top-2.5 right-2.5 bg-[#EF4444] text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-black rotate-[2deg] shadow-[2px_2px_0px_#000] z-20">
+                        🔒 REGISTRO REQUERIDO
+                      </div>
+                    )}
                     <div className="relative z-10 flex items-start justify-between">
                       <div className="flex-1">
                         <div className="font-mono text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1">CINTURÓN 03</div>
-                        <h3 className="font-bangers text-2xl lg:text-3xl tracking-wide text-black uppercase leading-none mb-2">
+                        <h3 className={`font-bangers text-2xl lg:text-3xl tracking-wide uppercase leading-none mb-2 ${!isRegistered ? 'text-slate-300' : 'text-black'}`}>
                            📋 LA PIZARRA D.T.
                         </h3>
-                        <p className="text-[11px] font-comic font-bold text-gray-700 leading-tight max-w-sm">
+                        <p className={`text-[11px] font-comic font-bold leading-tight max-w-sm ${!isRegistered ? 'text-slate-400/80' : 'text-gray-700'}`}>
                           Dibuja tus estrategias arrastrando stickers en una cancha interactiva táctica adaptada a pantallas móviles. ¡Arma tu plantilla para ser campeona!
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-[#11b782] text-black border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform">
+                      <div className={`w-12 h-12 text-black border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform ${!isRegistered ? 'bg-slate-800 text-slate-500 opacity-60' : 'bg-[#11b782]'}`}>
                         📋
                       </div>
                     </div>
                     
-                    <div className="relative z-10 mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-slate-500 font-mono text-[9px] font-black">
-                      <div className="flex items-center gap-1 text-black">
+                    <div className={`relative z-10 mt-5 pt-3.5 border-t flex items-center justify-between font-mono text-[9px] font-black ${!isRegistered ? 'border-slate-800 text-slate-500' : 'border-slate-100 text-slate-500'}`}>
+                      <div className={`flex items-center gap-1 ${!isRegistered ? 'text-slate-500' : 'text-black'}`}>
                         <span className="font-bold">🏟️ TÁCTICA ACTIVA:</span>
-                        <span className="text-emerald-700 font-bold uppercase">{tacticalBoards[0]?.layoutType || "4-3-3 CLÁSICO"}</span>
+                        <span className={`font-bold uppercase ${!isRegistered ? 'text-slate-500' : 'text-emerald-700'}`}>{tacticalBoards[0]?.layoutType || "4-3-3 CLÁSICO"}</span>
                       </div>
                       <span className="flex items-center gap-0.5 bg-black text-white px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
                         ABRIR TÁCTICA <ChevronRight className="w-3 h-3 text-white inline stroke-[3]" />
@@ -2243,28 +2710,37 @@ export default function App() {
                   <motion.div 
                     whileHover={{ scale: 1.025, y: -4 }}
                     onClick={() => { setActiveTab('leaderboard'); }}
-                    className="cursor-pointer group relative overflow-hidden bg-[#FDDF2B] border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px]"
+                    className={`cursor-pointer group relative overflow-hidden border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px] ${
+                      !isRegistered 
+                        ? 'bg-[#211e0e] text-slate-400 border-slate-800 opacity-85 hover:opacity-100' 
+                        : 'bg-[#FDDF2B] text-black'
+                    }`}
                   >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-2xl pointer-events-none" />
+                    {!isRegistered && (
+                      <div className="absolute top-2.5 right-2.5 bg-[#EF4444] text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-black rotate-[2deg] shadow-[2px_2px_0px_#000] z-20">
+                        🔒 REGISTRO REQUERIDO
+                      </div>
+                    )}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl pointer-events-none" />
                     <div className="relative z-10 flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="font-mono text-[9px] font-black text-black/70 uppercase tracking-wider mb-1">CINTURÓN 04</div>
-                        <h3 className="font-bangers text-2xl lg:text-3xl tracking-wide text-black uppercase leading-none mb-2">
+                        <div className={`font-mono text-[9px] font-black uppercase tracking-wider mb-1 ${!isRegistered ? 'text-yellow-600/60' : 'text-black/70'}`}>CINTURÓN 04</div>
+                        <h3 className={`font-bangers text-2xl lg:text-3xl tracking-wide uppercase leading-none mb-2 ${!isRegistered ? 'text-slate-300' : 'text-black'}`}>
                            🏆 LIGAS DE HONOR
                         </h3>
-                        <p className="text-[11px] font-comic font-bold text-black/90 leading-tight max-w-sm">
+                        <p className={`text-[11px] font-comic font-bold leading-tight max-w-sm ${!isRegistered ? 'text-slate-400/80' : 'text-black/90'}`}>
                           Únete a las salas competitivas de coleccionistas de todo el mundo. Compara tus puntos con otros DTs de elite en tiempo real.
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-black text-[#FDDF2B] border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform">
+                      <div className={`w-12 h-12 border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform ${!isRegistered ? 'bg-slate-900 text-slate-500 shadow-[2.5px_2.5px_0px_rgba(0,0,0,0.5)]' : 'bg-black text-[#FDDF2B]'}`}>
                         🏆
                       </div>
                     </div>
                     
-                    <div className="relative z-10 mt-5 pt-3.5 border-t border-black/10 flex items-center justify-between text-black font-mono text-[9px] font-black">
+                    <div className={`relative z-10 mt-5 pt-3.5 border-t flex items-center justify-between font-mono text-[9px] font-black ${!isRegistered ? 'border-slate-800 text-slate-500' : 'border-black/10 text-black'}`}>
                       <div className="flex items-center gap-1.5">
                         <span>⭐ TU PUNTAJE GLOBAL:</span>
-                        <span className="font-black bg-black text-[#FDDF2B] px-1.5 py-0.5 border border-black rounded text-[10px]">{currentUserInfo.totalScore} PTS</span>
+                        <span className={`font-black px-1.5 py-0.5 border rounded text-[10px] ${!isRegistered ? 'bg-slate-900 border-slate-800 text-slate-400' : 'bg-black text-[#FDDF2B] border-black'}`}>{currentUserInfo.totalScore} PTS</span>
                       </div>
                       <span className="flex items-center gap-0.5 bg-black text-white px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
                         VER RANKING <ChevronRight className="w-3 h-3 text-white inline stroke-[3]" />
@@ -2276,34 +2752,43 @@ export default function App() {
                   <motion.div 
                     whileHover={{ scale: 1.025, y: -4 }}
                     onClick={() => { setActiveTab('subscription'); }}
-                    className="cursor-pointer group relative overflow-hidden bg-gradient-to-br from-indigo-900 to-[#0e1713] border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px]"
+                    className={`cursor-pointer group relative overflow-hidden border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px] ${
+                      !isRegistered 
+                        ? 'bg-[#151c2e] text-slate-400 border-slate-800 opacity-85 hover:opacity-100' 
+                        : 'bg-gradient-to-br from-indigo-900 to-[#0e1713] text-white'
+                    }`}
                   >
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#11b782]/10 rounded-full blur-2xl pointer-events-none" />
+                    {!isRegistered && (
+                      <div className="absolute top-2.5 right-2.5 bg-[#EF4444] text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-black rotate-[2deg] shadow-[2px_2px_0px_#000] z-20">
+                        🔒 REGISTRO REQUERIDO
+                      </div>
+                    )}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#11b782]/5 rounded-full blur-2xl pointer-events-none" />
                     <div className="relative z-10 flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="font-mono text-[9px] font-black text-[#11b782] uppercase tracking-wider mb-1">CINTURÓN 05</div>
-                        <h3 className="font-bangers text-2xl lg:text-3xl tracking-wide text-white uppercase leading-none mb-2">
+                        <div className={`font-mono text-[9px] font-black uppercase tracking-wider mb-1 ${!isRegistered ? 'text-indigo-500/50' : 'text-[#11b782]'}`}>CINTURÓN 05</div>
+                        <h3 className={`font-bangers text-2xl lg:text-3xl tracking-wide uppercase leading-none mb-2 ${!isRegistered ? 'text-slate-300' : 'text-white'}`}>
                            💳 PASE VIP ELITE
                         </h3>
-                        <p className="text-[11px] font-comic font-bold text-slate-300 leading-tight max-w-sm">
+                        <p className={`text-[11px] font-comic font-bold leading-tight max-w-sm ${!isRegistered ? 'text-slate-400/80' : 'text-slate-300'}`}>
                           Desbloquea los análisis tácticos detallados de scout, un escudo exclusivo de Director Técnico y sobres de cromos premium sin límites.
                         </p>
                       </div>
-                      <div className="w-12 h-12 bg-white text-black border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform">
+                      <div className={`w-12 h-12 border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform ${!isRegistered ? 'bg-slate-900 text-slate-500 shadow-[2.5px_2.5px_0px_rgba(0,0,0,0.5)]' : 'bg-white text-black'}`}>
                         💳
                       </div>
                     </div>
                     
-                    <div className="relative z-10 mt-5 pt-3.5 border-t border-emerald-950 flex flex-wrap items-center justify-between gap-2 text-slate-400 font-mono text-[9px] font-black">
+                    <div className={`relative z-10 mt-5 pt-3.5 border-t flex flex-wrap items-center justify-between gap-2 font-mono text-[9px] font-black ${!isRegistered ? 'border-slate-800 text-slate-500' : 'border-emerald-950 text-slate-400'}`}>
                       <div className="flex items-center gap-2">
-                        <span className="text-white bg-emerald-800 px-1.5 py-0.5 border border-[#11b782] rounded text-[8.5px] uppercase font-bold tracking-wider">
+                        <span className={`px-1.5 py-0.5 border rounded text-[8.5px] uppercase font-bold tracking-wider ${!isRegistered ? 'bg-slate-900 border-slate-800 text-slate-400' : 'text-white bg-emerald-800 border-[#11b782]'}`}>
                           {userSubscription === 'Ninguna' ? 'ESTÁNDAR GRATIS' : 'PROVEEDOR ACTIVO'}
                         </span>
-                        <span className="text-emerald-400">${userCashBalance.toFixed(2)} USD</span>
-                        <span className="text-amber-400">| {userCoins} 🪙</span>
+                        <span className={!isRegistered ? 'text-slate-500' : 'text-emerald-400'}>${userCashBalance.toFixed(2)} USD</span>
+                        <span className={!isRegistered ? 'text-slate-500' : 'text-amber-400'}>| {userCoins} 🪙</span>
                       </div>
-                      <span className="flex items-center gap-0.5 bg-[#11b782] text-black px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
-                        BILLETERA <ChevronRight className="w-3 h-3 text-black inline stroke-[3]" />
+                      <span className={`flex items-center gap-0.5 px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform ${!isRegistered ? 'bg-slate-900 text-slate-500' : 'bg-[#11b782] text-black'}`}>
+                        BILLETERA <ChevronRight className={`w-3 h-3 inline stroke-[3] ${!isRegistered ? 'text-slate-500' : 'text-black'}`} />
                       </span>
                     </div>
                   </motion.div>
@@ -2408,6 +2893,13 @@ export default function App() {
                       const unlockedCromos = getUnlockedPlayersForCountry(c.name).length;
                       const maxCromos = 26;
                       
+                      const isLocked = isCountryLockedForUser(c.name);
+                      const isMyFreeSelection = isRegistered && userSubscription === 'Ninguna' && freeChosenCountry === c.name;
+                      const hasCromoAccessForThisCountry = !isRegistered || 
+                        (userSubscription === 'Pase VIP Elite' && getCountryContinent(c.name) === vipChosenContinent) ||
+                        (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === c.name) ||
+                        (userSubscription === 'Ninguna' && freeChosenCountry === c.name);
+
                       let completionBadge = '';
                       if (unlockedCromos === maxCromos) completionBadge = '🏆';
                       else if (unlockedCromos > 0) completionBadge = '⚡';
@@ -2415,30 +2907,53 @@ export default function App() {
                       return (
                         <div
                           key={c.code}
-                          onClick={() => setSelectedCountryName(c.name)}
+                          onClick={() => handleCountrySelectionClick(c.name)}
                           className={`flex items-center justify-between p-3 rounded-xl border-[2.5px] transition-all cursor-pointer ${
                             isSelected 
                               ? 'bg-[#10B981] bg-halftone-green border-black text-black font-extrabold shadow-[3px_3px_0px_#000] -translate-y-0.5' 
-                              : 'bg-slate-900/60 border-black text-slate-350 hover:bg-slate-800'
+                              : isLocked
+                                ? 'bg-slate-950/40 border-slate-900 text-slate-500 hover:border-black hover:bg-slate-900/40'
+                                : 'bg-slate-900/60 border-black text-slate-350 hover:bg-slate-800'
                           }`}
                         >
                           <div className="flex items-center gap-2.5">
-                            <span className="text-2xl transform hover:scale-125 transition-transform duration-100">{c.flag}</span>
+                            <span className={`text-2xl transform hover:scale-125 transition-transform duration-100 ${isLocked ? 'grayscale opacity-60' : ''}`}>{c.flag}</span>
                             <div>
-                              <span className={`text-xs block ${isSelected ? 'font-black' : 'font-semibold'}`}>{c.name}</span>
-                              <span className={`text-[9px] font-mono uppercase px-1 rounded ${isSelected ? 'bg-black text-[#10B981] font-bold' : 'text-slate-500 bg-black/40'}`}>
-                                {c.group}
-                              </span>
+                              <span className={`text-xs block ${isSelected ? 'font-black' : 'font-semibold'} ${isLocked ? 'text-slate-500 line-through' : ''}`}>{c.name}</span>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <span className={`text-[9px] font-mono uppercase px-1 rounded ${isSelected ? 'bg-black text-[#10B981] font-bold' : 'text-slate-500 bg-black/40'}`}>
+                                  {c.group}
+                                </span>
+                                {isMyFreeSelection && (
+                                  <span className="text-[8px] bg-emerald-500/10 text-emerald-450 border border-emerald-500/20 px-1 py-0.2 rounded font-black tracking-wider uppercase font-mono">
+                                    ⭐ MI SELECCIÓN
+                                  </span>
+                                )}
+                                {isRegistered && userSubscription !== 'Ninguna' && !hasCromoAccessForThisCountry && (
+                                  <span className="text-[8px] bg-amber-500/10 text-amber-500 border border-amber-500/20 px-1 py-0.2 rounded font-black tracking-wider uppercase font-mono animate-pulse">
+                                    🎮 SÓLO TRIVIA
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {completionBadge && <span className="text-sm animate-bounce">{completionBadge}</span>}
-                            <span className={`text-[10px] font-mono font-bold border rounded-md px-2 py-0.5 ${
-                              isSelected ? 'bg-black text-white border-black' : 'bg-slate-950 text-slate-300 border-slate-800'
-                            }`}>
-                              {unlockedCromos}/{maxCromos} Cromos
-                            </span>
+                            {isLocked ? (
+                              <div className="bg-[#EF4444]/10 text-[#EF4444] border border-[#EF4444]/30 rounded-md px-2 py-0.5 text-[10px] font-mono font-black flex items-center gap-0.5">
+                                <span>🔒</span>
+                                <span className="hidden sm:inline">BLOQUEADO</span>
+                              </div>
+                            ) : (
+                              <>
+                                {completionBadge && <span className="text-sm animate-bounce">{completionBadge}</span>}
+                                <span className={`text-[10px] font-mono font-bold border rounded-md px-2 py-0.5 ${
+                                  isSelected ? 'bg-black text-white border-black' : 'bg-slate-950 text-slate-300 border-slate-800'
+                                }`}>
+                                  {unlockedCromos}/{maxCromos} Cromos
+                                </span>
+                              </>
+                            )}
                           </div>
                         </div>
                       );
@@ -2447,7 +2962,42 @@ export default function App() {
 
                   {/* Album summary info */}
                   <div className="mt-5 border-t-2 border-dashed border-slate-800 pt-4 text-xs font-comic font-bold text-slate-400 flex flex-col gap-2.5">
-                    <p className="leading-relaxed">
+                    {/* CONTROL DE RESPALDO Y PREVENCIÓN DE PÉRDIDAS */}
+                    {isAdmin && (
+                      <div className="bg-slate-950/80 border-2 border-black rounded-xl p-3.5 shadow-[4px_4px_0px_rgba(0,0,0,1)] relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-16 h-16 bg-yellow-500/5 rounded-full blur-xl pointer-events-none" />
+                        <div className="flex items-center gap-1.5 mb-2.5">
+                          <span className="text-[#FDDF2B] animate-pulse">👑</span>
+                          <h4 className="font-bangers text-[12px] text-[#FDDF2B] tracking-wider uppercase">
+                            RESPALDO ANTI-REINICIO DE CROMOS SINCORNIZADOS
+                          </h4>
+                        </div>
+                        <p className="text-[10px] font-comic font-normal text-slate-350 leading-relaxed mb-3">
+                          En entornos de desarrollo y pruebas, los reinicios del servidor pueden restablecer la base de datos temporal si la instancia del contenedor se reconstruye. 
+                          <strong> ¡Protege tu progreso del álbum!</strong> Exporta y restaura todos los cromos que hayas sincronizado de forma ilimitada.
+                        </p>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={handleExportStickersBackup}
+                            className="bg-[#22C55E] hover:bg-[#16A34A] text-black font-bangers text-[11px] tracking-wide uppercase py-1.5 px-2.5 border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all cursor-pointer text-center"
+                          >
+                            💾 COPIAR RESPALDO
+                          </button>
+                          <button
+                            onClick={() => {
+                              setBackupText("");
+                              setShowBackupModal(true);
+                            }}
+                            className="bg-[#EF4444] hover:bg-[#DC2626] text-white font-bangers text-[11px] tracking-wide uppercase py-1.5 px-2.5 border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] active:translate-y-0.5 active:shadow-[1px_1px_0px_#000] transition-all cursor-pointer text-center"
+                          >
+                            📥 RECONECTAR / RESTAURAR
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="leading-relaxed mt-1">
                       Resuelve las trivias dinámicas de fútbol generadas por la IA para recolectar, auditar y armar los squads nacionales históricos.
                     </p>
                     <div className="flex items-center gap-1.5 text-[10px] bg-sky-500/10 text-sky-400 p-2.5 rounded-xl border border-sky-500/15 font-mono">
@@ -2480,111 +3030,124 @@ export default function App() {
                         </p>
                       </div>
 
-                      <div className="text-center bg-[#EF4444] text-white p-4 border-[3px] border-black shadow-[4px_4px_0px_#000] rotate-[1.5deg] min-w-[150px] bg-halftone-red">
-                        <span className="text-[9px] font-mono font-black text-white uppercase block tracking-wider">CROMOS REUNIDOS</span>
-                        <span className="text-4xl font-bangers block tracking-widest text-white leading-none mt-1">
-                          {unlockedCount} / 26
+                      <div className={`text-center p-4 border-[3px] border-black shadow-[4px_4px_0px_#000] rotate-[1.5deg] min-w-[150px] ${
+                        hasCromoAccess 
+                          ? 'bg-[#EF4444] text-white bg-halftone-red animate-fade-in' 
+                          : 'bg-slate-800 text-slate-300'
+                      }`}>
+                        <span className="text-[9px] font-mono font-black uppercase block tracking-wider text-slate-100">
+                          {hasCromoAccess ? 'CROMOS REUNIDOS' : 'ACCESO SIN CROMOS'}
                         </span>
-                        <span className="text-[10px] font-comic block mt-1 font-bold text-white">
-                          {isAlbumComplete ? "¡COMPLETO! 👑" : "SIGUE JUGANDO ⚡"}
+                        <span className="text-4xl font-bangers block tracking-widest leading-none mt-1 text-white">
+                          {hasCromoAccess ? `${unlockedCount} / 26` : '🎮 TRIVIA'}
+                        </span>
+                        <span className="text-[10px] font-comic block mt-1 font-bold text-yellow-300">
+                          {hasCromoAccess 
+                            ? (isAlbumComplete ? "¡COMPLETO! 👑" : "SIGUE JUGANDO ⚡")
+                            : "MODO RECREATIVO"
+                          }
                         </span>
                       </div>
                     </div>
 
                     {/* General Country Progress / Reset Actions */}
-                    <div className="mt-5 p-4 bg-white border-[2.5px] border-black rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[4px_4px_0px_#EF4444] animate-fade-in text-black">
-                      <div className="space-y-1">
-                        {activeCountry.name === "Ecuador" ? (
-                          <>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase font-mono bg-[#10B981] text-white border border-black rotate-[-1deg] bg-halftone-green shadow-sm">
-                              📷 Convocatoria Ecuador Verificada
-                            </span>
-                            <h4 className="font-bangers text-black text-sm tracking-wide flex items-center gap-1.5">
-                              🇪🇨 26 CONVOCADOS OFICIALES AL 100%
-                            </h4>
-                            <p className="text-[11px] font-comic font-medium text-slate-800 leading-relaxed">
-                              Hemos procesado la convocatoria oficial completa de la FEF (<strong className="text-[#EF4444]">Piero Hincapié, Moisés Caicedo, Gonzalo Plata, Pervis Estupiñán, Willian Pacho, Kendry Páez, Jordy Alcívar, Enner Valencia</strong>, etc.) ilustrada en estilo cómic con sus respectivos clubes y parámetros históricos.
-                            </p>
-                          </>
-                        ) : (
-                          <>
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase font-mono bg-[#EF4444] text-white border border-black rotate-[-1deg] bg-halftone-red shadow-sm">
-                              🛠️ Controles de Autogestión ({activeCountry.name})
-                            </span>
-                            <h4 className="font-bangers text-black text-sm tracking-wide flex items-center gap-1.5">
-                              {activeCountry.flag} PROGRESO DE COLECTA Y EXÁMENES TÁCTICOS
-                            </h4>
-                            <p className="text-[11px] font-comic font-medium text-slate-800 leading-relaxed">
-                              Administra el avance de <strong>{activeCountry.name}</strong> para responder nuevamente los niveles de trivia de la IA o desbloquear todo el mazo al instante.
-                            </p>
-                          </>
+                    {(isAdmin || activeCountry.name === "Ecuador") && (
+                      <div className="mt-5 p-4 bg-white border-[2.5px] border-black rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-[4px_4px_0px_#EF4444] animate-fade-in text-black">
+                        <div className="space-y-1">
+                          {activeCountry.name === "Ecuador" ? (
+                            <>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase font-mono bg-[#10B981] text-white border border-black rotate-[-1deg] bg-halftone-green shadow-sm">
+                                📷 Convocatoria Ecuador Verificada
+                              </span>
+                              <h4 className="font-bangers text-black text-sm tracking-wide flex items-center gap-1.5">
+                                🇪🇨 26 CONVOCADOS OFICIALES AL 100%
+                              </h4>
+                              <p className="text-[11px] font-comic font-medium text-slate-800 leading-relaxed">
+                                Hemos procesado la convocatoria oficial completa de la FEF (<strong className="text-[#EF4444]">Piero Hincapié, Moisés Caicedo, Gonzalo Plata, Pervis Estupiñán, Willian Pacho, Kendry Páez, Jordy Alcívar, Enner Valencia</strong>, etc.) ilustrada en estilo cómic con sus respectivos clubes y parámetros históricos.
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase font-mono bg-[#EF4444] text-white border border-black rotate-[-1deg] bg-halftone-red shadow-sm">
+                                🛠️ Controles de Autogestión ({activeCountry.name})
+                              </span>
+                              <h4 className="font-bangers text-black text-sm tracking-wide flex items-center gap-1.5">
+                                {activeCountry.flag} PROGRESO DE COLECTA Y EXÁMENES TÁCTICOS
+                              </h4>
+                              <p className="text-[11px] font-comic font-medium text-slate-800 leading-relaxed">
+                                Administra el avance de <strong>{activeCountry.name}</strong> para responder nuevamente los niveles de trivia de la IA o desbloquear todo el mazo al instante.
+                              </p>
+                            </>
+                          )}
+                        </div>
+                        {isAdmin && (
+                          <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAppCustomConfirm({
+                                  title: `🚨 ¿REINICIAR ${activeCountry.name.toUpperCase()}?`,
+                                  message: `¿Seguro de reiniciar el progreso y la colección de ${activeCountry.name}? Se bloqueará el progreso para que puedas responder las trivias locales de autogestión y ganar las estampas desde cero.`,
+                                  onConfirm: () => {
+                                    // Lock all trivia levels for this country
+                                    setUnlockedLevels(prev => {
+                                      const next = { ...prev };
+                                      next[activeCountry.name] = { 1: false, 2: false, 3: false };
+                                      return next;
+                                    });
+                                    // Reset pending pack notifications
+                                    setPendingTriviaPacks(prev => {
+                                      const next = { ...prev };
+                                      next[activeCountry.name] = [];
+                                      return next;
+                                    });
+                                    // Remove manually unlocked player stickers for this country
+                                    const countryPlayers = playersDB[activeCountry.name] || [];
+                                    setManuallyUnlockedPlayerIds(prev => {
+                                      const next = { ...prev };
+                                      countryPlayers.forEach(p => {
+                                        delete next[p.id];
+                                      });
+                                      return next;
+                                    });
+                                    // Delete tactical lineup configurations for this country
+                                    setTacticalBoards(prev => {
+                                      const next = { ...prev };
+                                      delete next[activeCountry.name];
+                                      return next;
+                                    });
+
+                                    setAppCustomAlert({
+                                      title: `🧹 ${activeCountry.name} Restablecido`,
+                                      message: `¡Excelente! El progreso de ${activeCountry.name} se ha restablecido a cero. Ahora puedes disfrutar y responder sus 3 niveles de trivias para ganar las estampas de forma auditable.`
+                                    });
+                                  }
+                                });
+                              }}
+                              className="bg-[#10B981] hover:bg-emerald-600 text-white border-2 border-black font-bangers text-[10px] tracking-wider uppercase px-3 py-2 rounded-xl shadow-[2px_2px_0px_#000] cursor-pointer text-center bg-halftone-green block active:translate-y-0.5"
+                            >
+                              🧹 Resetear {activeCountry.name === "Ecuador" ? "Ecuador" : "Juego"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUnlockedLevels(prev => ({
+                                  ...prev,
+                                  [activeCountry.name]: { 1: true, 2: true, 3: true }
+                                }));
+                                setAppCustomAlert({
+                                  title: '✨ Colección Activada',
+                                  message: `¡Se han acoplado los 3 niveles de exámenes de expansión y habilitado los stickers de ${activeCountry.name} para tu álbum!`
+                                });
+                              }}
+                              className="bg-[#EF4444] hover:bg-red-700 text-white border-2 border-black font-bangers text-[10px] tracking-wider uppercase px-3 py-2 rounded-xl shadow-[2px_2px_0px_#000] cursor-pointer text-center bg-halftone-red block active:translate-y-0.5"
+                            >
+                              🔓 Auto-Completar
+                            </button>
+                          </div>
                         )}
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAppCustomConfirm({
-                              title: `🚨 ¿REINICIAR ${activeCountry.name.toUpperCase()}?`,
-                              message: `¿Seguro de reiniciar el progreso y la colección de ${activeCountry.name}? Se bloqueará el progreso para que puedas responder las trivias locales de autogestión y ganar las estampas desde cero.`,
-                              onConfirm: () => {
-                                // Lock all trivia levels for this country
-                                setUnlockedLevels(prev => {
-                                  const next = { ...prev };
-                                  next[activeCountry.name] = { 1: false, 2: false, 3: false };
-                                  return next;
-                                });
-                                // Reset pending pack notifications
-                                setPendingTriviaPacks(prev => {
-                                  const next = { ...prev };
-                                  next[activeCountry.name] = [];
-                                  return next;
-                                });
-                                // Remove manually unlocked player stickers for this country
-                                const countryPlayers = playersDB[activeCountry.name] || [];
-                                setManuallyUnlockedPlayerIds(prev => {
-                                  const next = { ...prev };
-                                  countryPlayers.forEach(p => {
-                                    delete next[p.id];
-                                  });
-                                  return next;
-                                });
-                                // Delete tactical lineup configurations for this country
-                                setTacticalBoards(prev => {
-                                  const next = { ...prev };
-                                  delete next[activeCountry.name];
-                                  return next;
-                                });
-
-                                setAppCustomAlert({
-                                  title: `🧹 ${activeCountry.name} Restablecido`,
-                                  message: `¡Excelente! El progreso de ${activeCountry.name} se ha restablecido a cero. Ahora puedes disfrutar y responder sus 3 niveles de trivias para ganar las estampas de forma auditable.`
-                                });
-                              }
-                            });
-                          }}
-                          className="bg-[#10B981] hover:bg-emerald-600 text-white border-2 border-black font-bangers text-[10px] tracking-wider uppercase px-3 py-2 rounded-xl shadow-[2px_2px_0px_#000] cursor-pointer text-center bg-halftone-green block active:translate-y-0.5"
-                        >
-                          🧹 Resetear {activeCountry.name === "Ecuador" ? "Ecuador" : "Juego"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUnlockedLevels(prev => ({
-                              ...prev,
-                              [activeCountry.name]: { 1: true, 2: true, 3: true }
-                            }));
-                            setAppCustomAlert({
-                              title: '✨ Colección Activada',
-                              message: `¡Se han acoplado los 3 niveles de exámenes de expansión y habilitado los stickers de ${activeCountry.name} para tu álbum!`
-                            });
-                          }}
-                          className="bg-[#EF4444] hover:bg-red-700 text-white border-2 border-black font-bangers text-[10px] tracking-wider uppercase px-3 py-2 rounded-xl shadow-[2px_2px_0px_#000] cursor-pointer text-center bg-halftone-red block active:translate-y-0.5"
-                        >
-                          🔓 Auto-Completar
-                        </button>
-                      </div>
-                    </div>
+                    )}
 
                     {/* Trivia Lock statuses in Retropanel format */}
                     <div className="mt-6 border-t-[3px] border-black pt-5">
@@ -2626,7 +3189,10 @@ export default function App() {
                                   {lvl === 1 ? '🎨 Cultura General' : lvl === 2 ? '⏳ Historia Antigua' : '📐 Táctica Avanzada'}
                                 </h5>
                                 <p className="text-[11px] font-comic font-semibold text-slate-700 mt-2 leading-relaxed">
-                                  {lvl === 1 ? 'Recluta banca suplente (+9 cromos)' : lvl === 2 ? 'Recluta jugadores titulares (+9 cromos)' : 'Franquicia y Leyendas (+8 cromos)'}
+                                  {hasCromoAccess 
+                                    ? (lvl === 1 ? 'Recluta banca suplente (+9 cromos)' : lvl === 2 ? 'Recluta jugadores titulares (+9 cromos)' : 'Franquicia y Leyendas (+8 cromos)')
+                                    : (lvl === 1 ? 'Prueba de cultura general (+5 pts de D.T.)' : lvl === 2 ? 'Prueba de historia antigua (+5 pts de D.T.)' : 'Prueba de táctica avanzada (+5 pts de D.T.)')
+                                  }
                                 </p>
                               </div>
                               
@@ -2640,10 +3206,16 @@ export default function App() {
                                     🎁 ¡Sobre listo para abrir abajo!
                                   </span>
                                 ) : isBlocked ? (
-                                  <span className="text-[10px] font-mono text-slate-505 font-bold block">Bloqueado</span>
+                                  <span className="text-[10px] font-mono text-slate-500 font-bold block">Bloqueado</span>
                                 ) : (
                                   <button
-                                    onClick={() => setActiveTrivia({ country: activeCountry.name, flag: activeCountry.flag, level: lvl })}
+                                    onClick={() => {
+                                      if (isCountryLockedForUser(activeCountry.name)) {
+                                        setUpsellCountry(activeCountry.name);
+                                      } else {
+                                        setActiveTrivia({ country: activeCountry.name, flag: activeCountry.flag, level: lvl });
+                                      }
+                                    }}
                                     className="w-full py-2 bg-yellow-400 hover:bg-yellow-300 text-black border-2 border-black font-bangers text-xs tracking-wider uppercase cursor-pointer rounded-lg shadow-[2px_2px_0px_#000]"
                                   >
                                     COMENZAR EXAMEN ⚡
@@ -2847,7 +3419,7 @@ export default function App() {
                                     {p.imageUrl ? (
                                       <div className="relative w-full h-32 rounded-xl overflow-hidden mb-2 border-2 border-black group shadow-sm bg-black">
                                         <img
-                                          src={p.imageUrl}
+                                          src={getSafeImageUrl(p.imageUrl)}
                                           alt={p.realName}
                                           referrerPolicy="no-referrer"
                                           className="w-full h-full object-cover"
@@ -2995,6 +3567,29 @@ export default function App() {
                       })</span>
                     </h3>
 
+                    {!hasCromoAccess && (
+                      <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border-[3px] border-amber-500 text-black shadow-[4px_4px_0px_#000] relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="flex items-start gap-3 text-left">
+                          <span className="text-3xl animate-pulse shrink-0">⚠️</span>
+                          <div>
+                            <h4 className="font-bangers text-base text-amber-600 tracking-wider uppercase leading-none mb-1">
+                              Suscripción Limitada (Modo Recreativo Activo)
+                            </h4>
+                            <p className="text-[11px] font-comic font-bold text-slate-800 leading-relaxed">
+                              Tu plan actual <strong>{userSubscription}</strong> tiene asignada la cobertura de <strong>{userSubscription === 'Pase VIP Elite' ? `Continente: ${vipChosenContinent}` : `Selección: ${scoutChosenCountry}`}</strong>. 
+                              Puedes acceder y jugar las trivias de <strong>{activeCountry.name}</strong> por diversión y puntos, pero <strong>no se desbloquearán cromos</strong> para tu álbum en esta selección.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setActiveTab('subscription')}
+                          className="py-1.5 px-3 bg-[#EF4444] hover:bg-red-600 text-white border-2 border-black font-bangers text-xs uppercase tracking-wider rounded-lg shadow-[2px_2px_0px_#000] cursor-pointer shrink-0"
+                        >
+                          Ampliar Plan ⚡
+                        </button>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5">
                       {(albumPage === 1 
                         ? activeCountryPlayers.slice(0, 9) 
@@ -3046,14 +3641,14 @@ export default function App() {
                               </div>
 
                               <div className="w-full relative z-10">
-                                <div className="text-[9.5px] font-comic font-black text-slate-505 mb-2 leading-tight uppercase">
-                                  Nivel {albumPage} Requerido 🔒
+                                <div className="text-[9.5px] font-comic font-black text-[#EF4444] mb-2 leading-tight uppercase animate-pulse">
+                                  🚫 Sin Cromo en tu Plan
                                 </div>
                                 <button
                                   onClick={() => setActiveTrivia({ country: activeCountry.name, flag: activeCountry.flag, level: albumPage })}
-                                  className="w-full py-2 bg-[#EF4444] hover:bg-neutral-800 hover:text-white text-white font-bangers text-xs tracking-wider uppercase border-2 border-black rounded-lg cursor-pointer shadow-[2px_2px_0px_#000] active:scale-95 transition-all bg-halftone-red"
+                                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white font-bangers text-xs tracking-wider uppercase border-2 border-black rounded-lg cursor-pointer shadow-[2px_2px_0px_#000] active:scale-95 transition-all"
                                 >
-                                  Trivia Lvl {albumPage} ⚡
+                                  Jugar Nivel {albumPage} 🎮
                                 </button>
                               </div>
                             </div>
@@ -3070,6 +3665,7 @@ export default function App() {
                             onGenerateImage={handleGenerateStickerImage}
                             isGenerating={isGeneratingStickerId === p.id}
                             onPasteImageUrl={handlePasteStickerUrl}
+                            isAdmin={isAdmin}
                           />
                         );
                       })}
@@ -3117,7 +3713,7 @@ export default function App() {
                   <span className="text-xs font-semibold text-slate-405 font-mono uppercase">Selección de Trabajo:</span>
                   <select
                     value={selectedCountryName}
-                    onChange={(e) => setSelectedCountryName(e.target.value)}
+                    onChange={(e) => handleCountrySelectionClick(e.target.value)}
                     className="bg-brand-deep text-white text-xs border border-slate-800 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-medium"
                   >
                     {COUNTRIES.map(c => (
@@ -3160,7 +3756,7 @@ export default function App() {
                 unlockedLevels={unlockedLevels}
                 playersDB={playersDB}
                 userBoards={tacticalBoards}
-                onSelectCountry={setSelectedCountryName}
+                onSelectCountry={handleCountrySelectionClick}
                 setActiveTab={setActiveTab}
                 matchSyncKey={matchSyncKey}
               />
@@ -3187,6 +3783,11 @@ export default function App() {
                 paymentHistory={paymentHistory}
                 onAddTransaction={handleAddTransaction}
                 onOpenBonusPack={handleOpenPack}
+                unlockedLevels={unlockedLevels}
+                onSetUnlockedLevels={setUnlockedLevels}
+                onAddPurchasedPoints={(pts: number) => setPurchasedPoints(prev => prev + pts)}
+                vipChosenContinent={vipChosenContinent}
+                onUpdateVipContinent={setVipChosenContinent}
               />
             )}
 
@@ -3423,7 +4024,7 @@ export default function App() {
                       <span className="text-[8px] font-mono text-[#10B981] block -mt-0.5 font-bold">TECNOLOGÍA</span>
                     </div>
                     <div className="bg-slate-900 p-2 border border-black rounded-xl text-center flex flex-col justify-center items-center shadow-[1.5px_1.5px_0px_rgba(0,0,0,1)]">
-                      <span className="font-bangers text-white text-[11px] uppercase tracking-wide">Mano de Dios</span>
+                      <span className="font-bangers text-white text-[11px] uppercase tracking-wide">Guerreros de Luz</span>
                       <span className="text-[8px] font-mono text-red-500 block -mt-0.5 font-bold">ALIANZA</span>
                     </div>
                   </div>
@@ -3459,7 +4060,7 @@ export default function App() {
             {/* General bottom line */}
             <div className="border-t border-slate-900 pt-5 text-center text-[10px] text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between gap-3">
               <div>
-                © 2026 Álbum Trivia Mundial. Creado por <strong>CIG</strong>, Diseño por <strong>Rolando Guerra</strong>, impulsado con IA de vanguardia, servidores de baja latencia y tecnología Google Cloud.
+                © 2026 Álbum Trivia Mundial. Creado por <strong>CIG</strong>, Diseño por <strong>RKLY</strong>, impulsado con IA de vanguardia, servidores de baja latencia y tecnología Google Cloud.
               </div>
               <div className="flex gap-4">
                 <span className="text-gray-500">Admin email: geovannygrk3d@gmail.com</span>
@@ -3478,7 +4079,10 @@ export default function App() {
             }`}
           >
             <Layers className="w-5 h-5 shrink-0" />
-            <span className="text-[9px] font-comic font-black mt-0.5">Álbum</span>
+            <span className="text-[9px] font-comic font-black mt-0.5 flex items-center justify-center gap-0.5">
+              {!isRegistered && <span className="text-[8px] filter saturate-150">🔒</span>}
+              Álbum
+            </span>
           </button>
           <button
             onClick={() => { setActiveTab('groups_fixture'); setActiveTrivia(null); }}
@@ -3487,7 +4091,10 @@ export default function App() {
             }`}
           >
             <Calendar className="w-5 h-5 shrink-0" />
-            <span className="text-[9px] font-comic font-black mt-0.5">Fixture</span>
+            <span className="text-[9px] font-comic font-black mt-0.5 flex items-center justify-center gap-0.5">
+              {!isRegistered && <span className="text-[8px] filter saturate-150">🔒</span>}
+              Fixture
+            </span>
           </button>
           <button
             onClick={() => { setActiveTab('board'); setActiveTrivia(null); }}
@@ -3496,7 +4103,10 @@ export default function App() {
             }`}
           >
             <FolderTree className="w-5 h-5 shrink-0" />
-            <span className="text-[9px] font-comic font-black mt-0.5">Pizarra</span>
+            <span className="text-[9px] font-comic font-black mt-0.5 flex items-center justify-center gap-0.5">
+              {!isRegistered && <span className="text-[8px] filter saturate-150">🔒</span>}
+              Pizarra
+            </span>
           </button>
           <button
             onClick={() => { setActiveTab('leaderboard'); setActiveTrivia(null); }}
@@ -3505,7 +4115,10 @@ export default function App() {
             }`}
           >
             <Trophy className="w-5 h-5 shrink-0" />
-            <span className="text-[9px] font-comic font-black mt-0.5">Ligas</span>
+            <span className="text-[9px] font-comic font-black mt-0.5 flex items-center justify-center gap-0.5">
+              {!isRegistered && <span className="text-[8px] filter saturate-150">🔒</span>}
+              Ligas
+            </span>
           </button>
           <button
             onClick={() => { setActiveTab('subscription'); setActiveTrivia(null); }}
@@ -3514,57 +4127,48 @@ export default function App() {
             }`}
           >
             <CreditCard className="w-5 h-5 shrink-0" />
-            <span className="text-[9px] font-comic font-black mt-0.5">VIP</span>
+            <span className="text-[9px] font-comic font-black mt-0.5 flex items-center justify-center gap-0.5">
+              {!isRegistered && <span className="text-[8px] filter saturate-150">🔒</span>}
+              VIP
+            </span>
           </button>
         </nav>
 
       </div>
 
-      {/* 4. HIGH-FIDELITY GOOGLE-STYLE SIGN IN / REGISTRATION OVERLAY */}
       {isRegistrationOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-sm transition-all animate-fade-in">
-          <div className="relative w-full max-w-[450px] max-h-[92vh] bg-white text-slate-800 border-2 border-black rounded-3xl shadow-[8px_8px_0px_rgba(0,0,0,1)] font-sans flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md transition-all animate-fade-in bg-halftone-dots">
+          {/* Glowing gradient blurs matching background of top-tier comic covers */}
+          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-rose-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+
+          <div className="relative w-full max-w-[460px] max-h-[92vh] bg-[#0c101a] text-white border-[3.5px] border-black rounded-3xl shadow-[8px_8px_0px_#000] font-sans flex flex-col overflow-hidden">
             
-            {/* Modal Header (Fixed) */}
-            <div className="p-6 pb-2 select-none border-b border-slate-100 bg-slate-50/50">
-              {/* Google Word Logo */}
-              <div className="flex justify-center items-center gap-[1.5px] text-[24px] font-sans font-black select-none tracking-tight mb-2">
-                <span className="text-[#4285F4]">G</span>
-                <span className="text-[#EA4335]">o</span>
-                <span className="text-[#FBBC05]">o</span>
-                <span className="text-[#4285F4]">g</span>
-                <span className="text-[#34A853]">l</span>
-                <span className="text-[#EA4335]">e</span>
+            {/* Modal Header (Fixed) with shield/checkmark checkmark badge */}
+            <div className="p-6 pb-3 select-none border-b border-black bg-slate-950/50 text-center relative">
+              <div className="mx-auto w-16 h-16 bg-gradient-to-tr from-amber-500 via-rose-500 to-pink-600 border-[3px] border-black rounded-2xl flex items-center justify-center shadow-[3px_3px_0px_#000] -rotate-3 mb-4 shrink-0">
+                <ShieldCheck className="w-8 h-8 text-white stroke-[2.5]" />
               </div>
 
-              {/* Title & Description of target app */}
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-slate-900 tracking-tight font-comic">
-                  {isRecoveryMode 
-                    ? "Protocolo de Restauración de Contraseña" 
-                    : (isLoginMode ? "Ingreso de Miembro Oficial" : "Acceso con cuenta de Google")
-                  }
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  {isRecoveryMode 
-                    ? "Verificación y desencriptación de credenciales auditable del Torneo 2026"
-                    : (isLoginMode 
-                        ? "Inicia sesión para restaurar tu progreso y tus licencias de sorteo" 
-                        : "Utiliza tu cuenta para vincular tu progreso en Álbum de Trivia de Selecciones 2026"
-                      )
-                  }
-                </p>
-              </div>
+              <h3 className="text-xl font-extrabold text-white tracking-wider uppercase font-sans">
+                PROTEGIDOS TERMINALES
+              </h3>
+              <p className="text-[10.5px] text-slate-400 mt-1 max-w-sm mx-auto leading-relaxed font-comic">
+                {isRecoveryMode 
+                  ? "Protocolo de Restauración de Contraseña" 
+                  : (isLoginMode ? "Conexión de Miembro Oficial de la Copa" : "Registro de Nuevo Director Técnico")
+                }
+              </p>
             </div>
 
             {/* Modal Body (Scrollable) */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[62vh]">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[58vh] custom-scrollbar">
               
-              {/* Toggle Box / Breadcrumbs */}
+              {/* Toggle Box / Mode Selector styled in gorgeous dark tone */}
               {!isRecoveryMode ? (
-                <div className="bg-[#edf3fc] border border-[#1a73e8]/10 rounded-2xl p-3 text-center">
-                  <p className="text-[10px] text-slate-600 font-semibold mb-1">
-                    {isLoginMode ? "¿Eres un miembro nuevo?" : "¿Ya te registraste en este navegador?"}
+                <div className="bg-slate-900 border-2 border-black rounded-2xl p-4 text-center shadow-[4px_4px_0px_#000]">
+                  <p className="text-[10px] text-slate-400 font-bold mb-2 font-mono uppercase tracking-widest">
+                    {isLoginMode ? "¿ERES UN MIEMBRO NUEVO?" : "¿YA TE REGISTRASTE EN ESTE NAVEGADOR?"}
                   </p>
                   <div className="flex flex-col gap-1.5 items-center justify-center">
                     <button
@@ -3574,9 +4178,9 @@ export default function App() {
                         setTempPassword('');
                         setTempConfirmPassword('');
                       }}
-                      className="px-4 py-1.5 bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-bold rounded-lg transition-all cursor-pointer shadow-sm active:scale-95 uppercase tracking-wider"
+                      className="px-5 py-2 bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black text-[10px] font-black rounded-xl transition-all cursor-pointer shadow-[3px_3px_0px_#000] active:translate-y-0.5 uppercase tracking-widest"
                     >
-                      {isLoginMode ? "⚡ Crear una cuenta" : "🔑 Ya soy miembro, ingresar"}
+                      {isLoginMode ? "⚡ Registrar Cuenta de D.T." : "🔑 Ya soy Miembro, Ingresar"}
                     </button>
                     {isLoginMode && (
                       <button
@@ -3587,7 +4191,7 @@ export default function App() {
                           setTempPassword('');
                           setTempConfirmPassword('');
                         }}
-                        className="text-[10.5px] text-[#1a73e8] hover:underline font-bold mt-1"
+                        className="text-[10px] text-amber-400 hover:text-amber-300 hover:underline font-bold mt-2 uppercase tracking-wider font-mono"
                       >
                         ⚙️ ¿Olvidaste tu contraseña? Restaurar de forma segura
                       </button>
@@ -3595,11 +4199,11 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <div className="bg-[#fffbeb] border border-amber-200 rounded-2xl p-3 text-center">
-                  <p className="text-[10.5px] text-amber-800 font-bold mb-1">
+                <div className="bg-[#1e1315] border-2 border-black rounded-2xl p-4 text-center shadow-[4px_4px_0px_#000]">
+                  <p className="text-[10px] text-rose-400 font-bold mb-2 font-mono uppercase tracking-widest">
                     ⚠️ PROCESO DE RECUPERACIÓN SEGURO ACTIVO
                   </p>
-                  <div className="flex justify-center gap-2 mt-1">
+                  <div className="flex justify-center gap-3">
                     <button
                       type="button"
                       onClick={() => {
@@ -3608,7 +4212,7 @@ export default function App() {
                         setTempPassword('');
                         setTempConfirmPassword('');
                       }}
-                      className="px-3 py-1 bg-slate-800 hover:bg-slate-900 text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer"
+                      className="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[9px] font-bold rounded-lg border border-black transition-all cursor-pointer shadow-[2px_2px_0px_#000]"
                     >
                       🔑 Volver al Login
                     </button>
@@ -3620,7 +4224,7 @@ export default function App() {
                         setTempPassword('');
                         setTempConfirmPassword('');
                       }}
-                      className="px-3 py-1 bg-[#1a73e8] hover:bg-[#1557b0] text-white text-[10px] font-bold rounded-lg transition-all cursor-pointer"
+                      className="px-3.5 py-1.5 bg-[#11b782] hover:bg-emerald-500 text-black text-[9px] font-black rounded-lg border border-black transition-all cursor-pointer shadow-[2px_2px_0px_#000]"
                     >
                       ⚡ Registrar Cuenta
                     </button>
@@ -3638,22 +4242,22 @@ export default function App() {
                     setTempAvatar('👑');
                   }}
                   title="Click para autocompletar con tu cuenta de correo activa"
-                  className="w-full bg-[#f8fafd] hover:bg-[#edf3fc] text-[#1a73e8] border border-slate-200 hover:border-[#1a73e8]/30 rounded-full px-4 py-2.5 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98] shadow-sm select-none"
+                  className="w-full bg-[#1e293b] hover:bg-[#334155] text-white border-2 border-black rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:translate-y-0.5 shadow-[3px_3px_0px_rgba(0,0,0,1)] select-none"
                 >
                   <span className="text-base">📧</span>
-                  <span className="truncate">Autocompletar con {userEmail || 'geovannygrk3d@gmail.com'}</span>
+                  <span className="truncate font-mono">Autocompletar con {userEmail || 'geovannygrk3d@gmail.com'}</span>
                 </button>
               )}
 
               <div className="relative flex py-1 items-center select-none">
-                <div className="flex-grow border-t border-slate-200"></div>
-                <span className="flex-shrink mx-3 text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                <div className="flex-grow border-t border-slate-800"></div>
+                <span className="flex-shrink mx-3 text-[9px] text-slate-500 font-bold uppercase tracking-wider font-mono">
                   {isRecoveryMode 
                     ? `Paso: ${recoveryStep === 'verify' ? '1. Verificar Identidad' : '2. Nueva Contraseña'}` 
-                    : (isLoginMode ? "Credenciales de Miembro" : "O introduce los datos")
+                    : (isLoginMode ? "Credenciales de Acceso" : "O escribe tus datos")
                   }
                 </span>
-                <div className="flex-grow border-t border-slate-200"></div>
+                <div className="flex-grow border-t border-slate-800"></div>
               </div>
 
               {/* Fields render */}
@@ -3662,12 +4266,12 @@ export default function App() {
                 {/* 1. PASSWORD RECOVERY SCREEN: STEP 1 (VERIFY EMAIL & SECURITY AVATAR) */}
                 {isRecoveryMode && recoveryStep === 'verify' && (
                   <div className="space-y-4">
-                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl text-amber-900 text-[10px] leading-relaxed">
-                      <strong>💡 ¿Cómo funciona?</strong> Ingresa tu correo electrónico registrado y selecciona el mismo <strong>Escudo de Identidad / Avatar</strong> que elegiste en tu perfil. Si coinciden, el sistema auditable te autorizará a restablecer la clave.
+                    <div className="bg-slate-900 border border-amber-500/30 p-3 rounded-xl text-amber-400 text-[10px] leading-relaxed font-mono">
+                      <strong>💡 ¿Cómo funciona?</strong> Ingresa tu correo registrado y selecciona tu <strong>Escudo/Avatar</strong> elegido. Si coinciden, el sistema auditable te autorizará a restablecer la clave.
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider font-mono">
+                      <label className="text-[10px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
                         Correo electrónico registrado *
                       </label>
                       <input
@@ -3675,7 +4279,7 @@ export default function App() {
                         placeholder="Ingresa tu correo registrado"
                         value={tempEmail}
                         onChange={(e) => setTempEmail(e.target.value)}
-                        className="w-full bg-slate-50/65 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8] font-sans font-bold hover:bg-slate-50/90 transition shadow-[2px_2px_0px_rgba(0,0,0,0.15)]"
+                        className="w-full bg-slate-950/80 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-yellow-400 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)] placeholder:text-gray-600 hover:bg-slate-950 transition"
                         required
                       />
                     </div>
@@ -3684,14 +4288,14 @@ export default function App() {
                       <button
                         type="button"
                         onClick={handleRevealStoredPassword}
-                        className="text-[10.5px] text-[#1a73e8] hover:text-[#1557b0] font-black underline flex items-center gap-1 active:scale-95 transition-all text-right"
+                        className="text-[10px] text-amber-400 hover:text-amber-300 font-black underline flex items-center gap-1 active:scale-95 transition-all text-right font-mono uppercase"
                       >
                         🔑 Revelar contraseña guardada en este navegador
                       </button>
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-extrabold text-slate-500 block mb-1.5 uppercase tracking-wider font-mono">
+                      <label className="text-[10px] font-extrabold text-slate-400 block mb-1.5 uppercase tracking-wider font-mono">
                         Selecciona tu Escudo de Identidad / Avatar de Registro *
                       </label>
                       <div className="grid grid-cols-4 gap-2">
@@ -3704,8 +4308,8 @@ export default function App() {
                               onClick={() => setTempAvatar(emoji)}
                               className={`text-xl py-2 rounded-xl border-2 transition-all cursor-pointer ${
                                 isSelected 
-                                  ? 'bg-[#fffbeb] border-amber-500 text-slate-900 scale-105 shadow-sm font-black' 
-                                  : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-black hover:text-slate-800'
+                                  ? 'bg-amber-400 border-black text-slate-950 scale-105 shadow-[2px_2px_0px_rgba(0,0,0,1)] font-black' 
+                                  : 'bg-slate-950/80 border-black text-slate-400 hover:border-slate-500 hover:text-white'
                               }`}
                             >
                               {emoji}
@@ -3719,14 +4323,14 @@ export default function App() {
 
                 {/* 2. PASSWORD RECOVERY SCREEN: STEP 2 (WRITE NEW PASSWORD) */}
                 {isRecoveryMode && recoveryStep === 'reset' && (
-                  <div className="space-y-4 bg-emerald-50/50 p-4 border border-emerald-100 rounded-2xl">
-                    <div className="text-[10.5px] text-emerald-800 font-bold mb-1 flex items-center gap-1.5">
+                  <div className="space-y-4 bg-slate-900 p-4 border border-black rounded-2xl shadow-[3px_3px_0px_#000]">
+                    <div className="text-[10.5px] text-emerald-400 font-bold mb-1 flex items-center gap-1.5 font-mono">
                       <span>✅ Identidad Verificada para:</span>
-                      <span className="underline italic font-sans text-xs text-slate-900">{tempEmail}</span>
+                      <span className="underline italic text-xs text-white">{tempEmail}</span>
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider font-mono">
+                      <label className="text-[10px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
                         Nueva Contraseña de Acceso *
                       </label>
                       <input
@@ -3734,13 +4338,13 @@ export default function App() {
                         placeholder="Establece nueva contraseña (mínimo 4 caracteres)"
                         value={tempPassword}
                         onChange={(e) => setTempPassword(e.target.value)}
-                        className="w-full bg-slate-50/65 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-sans font-bold hover:bg-slate-50/90 transition shadow-[2px_2px_0px_rgba(0,0,0,0.15)]"
+                        className="w-full bg-slate-950/80 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)] placeholder:text-gray-600 hover:bg-slate-950 transition"
                         required
                       />
                     </div>
 
                     <div>
-                      <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider font-mono">
+                      <label className="text-[10px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
                         Confirmar Nueva Contraseña *
                       </label>
                       <input
@@ -3748,16 +4352,16 @@ export default function App() {
                         placeholder="Escribe la contraseña exactamente igual"
                         value={tempConfirmPassword}
                         onChange={(e) => setTempConfirmPassword(e.target.value)}
-                        className="w-full bg-slate-50/65 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-sans font-bold hover:bg-slate-50/90 transition shadow-[2px_2px_0px_rgba(0,0,0,0.15)]"
+                        className="w-full bg-slate-950/80 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)] placeholder:text-gray-600 hover:bg-slate-950 transition"
                         required
                       />
                       {tempPassword && tempConfirmPassword && tempPassword !== tempConfirmPassword && (
-                        <p className="text-[9.5px] text-[#EF4444] font-bold mt-1 animate-pulse">
+                        <p className="text-[9.5px] text-[#EF4444] font-bold mt-1 animate-pulse font-mono">
                           ❌ Las contraseñas no coinciden
                         </p>
                       )}
                       {tempPassword && tempConfirmPassword && tempPassword === tempConfirmPassword && (
-                        <p className="text-[9.5px] text-emerald-650 font-bold mt-1 flex items-center gap-1">
+                        <p className="text-[9.5px] text-emerald-400 font-bold mt-1 flex items-center gap-1 font-mono">
                           ✅ Las contraseñas coinciden perfectamente
                         </p>
                       )}
@@ -3770,7 +4374,7 @@ export default function App() {
                   <div className="space-y-4">
                     {/* Email address field */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider font-mono">
+                      <label className="text-[10px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
                         Correo electrónico institucional o personal *
                       </label>
                       <input
@@ -3778,10 +4382,10 @@ export default function App() {
                         placeholder="ejemplo@gmail.com"
                         value={tempEmail}
                         onChange={(e) => setTempEmail(e.target.value)}
-                        className="w-full bg-slate-50/65 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8] font-sans font-bold hover:bg-slate-50/90 transition shadow-[2px_2px_0px_rgba(0,0,0,0.15)]"
+                        className="w-full bg-slate-950/80 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-yellow-400 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)] placeholder:text-gray-600 hover:bg-slate-950 transition"
                         required
                       />
-                      <p className="text-[9px] text-slate-500 mt-1.5 leading-snug font-sans">
+                      <p className="text-[9px] text-slate-400 mt-1.5 leading-snug font-mono">
                         {isLoginMode 
                           ? "Ingresa el mismo correo que usaste al registrarte. Admite geovannygrk3d@gmail.com."
                           : "Para habilitar facultades de Administrador Senior, ingresa el correo autenticado geovannygrk3d@gmail.com o geovannygrk3d@gmail"
@@ -3792,7 +4396,7 @@ export default function App() {
                     {/* Username field (Sign Up only) */}
                     {!isLoginMode && (
                       <div>
-                        <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider font-mono">
+                        <label className="text-[10px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
                           Nombre del Director Técnico (D.T.) *
                         </label>
                         <input
@@ -3801,7 +4405,7 @@ export default function App() {
                           maxLength={25}
                           value={tempUsername}
                           onChange={(e) => setTempUsername(e.target.value)}
-                          className="w-full bg-slate-50/65 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8] font-sans font-bold hover:bg-slate-50/90 transition shadow-[2px_2px_0px_rgba(0,0,0,0.15)]"
+                          className="w-full bg-slate-950/80 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-yellow-400 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)] placeholder:text-gray-600 hover:bg-slate-950 transition"
                           required={!isLoginMode}
                         />
                       </div>
@@ -3809,7 +4413,7 @@ export default function App() {
 
                     {/* Password field */}
                     <div>
-                      <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider font-mono">
+                      <label className="text-[10px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
                         {isLoginMode ? "Contraseña *" : "Crear Contraseña *"}
                       </label>
                       <input
@@ -3817,7 +4421,7 @@ export default function App() {
                         placeholder={isLoginMode ? "Ingresa tu contraseña" : "Crea tu contraseña (mínimo 4 caracteres)"}
                         value={tempPassword}
                         onChange={(e) => setTempPassword(e.target.value)}
-                        className="w-full bg-slate-50/65 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-slate-905 focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8] font-sans font-bold hover:bg-slate-50/90 transition shadow-[2px_2px_0px_rgba(0,0,0,0.15)]"
+                        className="w-full bg-slate-950/80 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-yellow-400 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)] placeholder:text-gray-600 hover:bg-slate-950 transition"
                         required
                       />
                     </div>
@@ -3825,7 +4429,7 @@ export default function App() {
                     {/* Confirm Password field (Sign Up only) */}
                     {!isLoginMode && (
                       <div>
-                        <label className="text-[10px] font-extrabold text-slate-500 block mb-1 uppercase tracking-wider font-mono">
+                        <label className="text-[10px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
                           Confirmar Contraseña *
                         </label>
                         <input
@@ -3833,16 +4437,16 @@ export default function App() {
                           placeholder="Repite tu contraseña exactamente"
                           value={tempConfirmPassword}
                           onChange={(e) => setTempConfirmPassword(e.target.value)}
-                          className="w-full bg-slate-50/65 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#1a73e8] focus:border-[#1a73e8] font-sans font-bold hover:bg-slate-50/90 transition shadow-[2px_2px_0px_rgba(0,0,0,0.15)]"
+                          className="w-full bg-slate-950/80 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:ring-2 focus:ring-yellow-400 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)] placeholder:text-gray-600 hover:bg-slate-950 transition"
                           required={!isLoginMode}
                         />
                         {tempPassword && tempConfirmPassword && tempPassword !== tempConfirmPassword && (
-                          <p className="text-[9.5px] text-[#EF4444] font-bold mt-1 animate-pulse">
+                          <p className="text-[9.5px] text-[#EF4444] font-bold mt-1 animate-pulse font-mono">
                             ❌ Las contraseñas no coinciden
                           </p>
                         )}
                         {tempPassword && tempConfirmPassword && tempPassword === tempConfirmPassword && (
-                          <p className="text-[9.5px] text-emerald-650 font-bold mt-1 flex items-center gap-1">
+                          <p className="text-[9.5px] text-emerald-400 font-bold mt-1 flex items-center gap-1 font-mono">
                             ✅ Las contraseñas coinciden perfectamente
                           </p>
                         )}
@@ -3851,11 +4455,11 @@ export default function App() {
 
                     {/* Recommendation Panel (Sign Up only) */}
                     {!isLoginMode && (
-                      <div className="p-3.5 bg-indigo-50/60 border-2 border-indigo-200 rounded-2xl space-y-2">
-                        <label className="text-[10px] font-extrabold text-[#1a73e8] block uppercase tracking-wider font-mono">
+                      <div className="p-3.5 bg-slate-900 border-2 border-black rounded-2xl space-y-2 shadow-[2px_2px_0px_#000]">
+                        <label className="text-[10px] font-extrabold text-amber-400 block uppercase tracking-wider font-mono">
                           🎁 Panel de Recomendación (Opcional)
                         </label>
-                        <p className="text-[9px] text-[#1a73e8]/80 leading-snug font-sans">
+                        <p className="text-[9px] text-slate-400 leading-snug font-sans">
                           Si otro Director Técnico te recomendó conectarte, ingresa su correo registrado abajo. Nota: De acuerdo a los reglamentos oficiales, sólo los directores de planes pagados calificados (Scout o VIP) pueden realizar invitaciones con su correo y recibir estos puntos extra.
                         </p>
                         <input
@@ -3863,7 +4467,7 @@ export default function App() {
                           placeholder="ejemplo@correo.com (El correo de tu amigo)"
                           value={tempReferredByEmail}
                           onChange={(e) => setTempReferredByEmail(e.target.value)}
-                          className="w-full bg-white border-2 border-slate-200 focus:border-[#1a73e8] focus:outline-none rounded-xl px-4 py-2 text-xs text-slate-900 font-sans font-bold transition shadow-sm"
+                          className="w-full bg-slate-950/80 border-2 border-black rounded-xl px-4 py-2 text-xs text-white font-mono placeholder:text-gray-600 focus:border-yellow-400 focus:outline-none transition shadow-sm"
                         />
                       </div>
                     )}
@@ -3871,7 +4475,7 @@ export default function App() {
                     {/* Avatar Picker style (Sign Up only) */}
                     {!isLoginMode && (
                       <div>
-                        <label className="text-[10px] font-extrabold text-slate-500 block mb-1.5 uppercase tracking-wider font-mono">
+                        <label className="text-[10px] font-extrabold text-slate-400 block mb-1.5 uppercase tracking-wider font-mono">
                           Elige tu Escudo de Identidad / Avatar
                         </label>
                         <div className="grid grid-cols-4 gap-2">
@@ -3884,8 +4488,8 @@ export default function App() {
                                 onClick={() => setTempAvatar(emoji)}
                                 className={`text-xl py-2 rounded-xl border-2 transition-all cursor-pointer ${
                                   isSelected 
-                                    ? 'bg-[#f0f4f9] border-[#1a73e8] text-slate-900 scale-105 shadow-sm font-black' 
-                                    : 'bg-slate-50 border-slate-200 text-slate-400 hover:border-black hover:text-slate-800'
+                                    ? 'bg-amber-400 border-black text-slate-950 scale-105 shadow-[2px_2px_0px_rgba(0,0,0,1)] font-black' 
+                                    : 'bg-slate-950/80 border-black text-slate-400 hover:border-slate-500 hover:text-white'
                                 }`}
                               >
                                 {emoji}
@@ -3899,9 +4503,9 @@ export default function App() {
                 )}
 
                 {/* Secure explanation panel */}
-                <div className="bg-[#f0f4f9] border border-[#1a73e8]/20 rounded-2xl p-3.5 text-[10px] text-[#1a73e8] font-semibold leading-relaxed flex items-start gap-2.5">
-                  <ShieldCheck className="w-4 h-4 text-[#1a73e8] shrink-0 mt-0.5" />
-                  <span>
+                <div className="bg-slate-950/80 border-2 border-black rounded-2xl p-3.5 text-[10px] text-emerald-400 font-semibold leading-relaxed flex items-start gap-2.5 shadow-[2px_2px_0px_rgba(0,0,0,1)]">
+                  <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                  <span className="font-mono">
                     La base de datos resguarda de forma segura tu clave y progreso atómico para las auditorías autorizadas de la Copa 2026.
                   </span>
                 </div>
@@ -3910,11 +4514,11 @@ export default function App() {
             </div>
 
             {/* Modal Footer (Fixed at bottom) */}
-            <div className="p-6 pt-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between select-none">
+            <div className="p-6 pt-3 border-t border-black bg-slate-950/80 flex items-center justify-between select-none">
               <button
                 type="button"
                 onClick={() => setIsRegistrationOpen(false)}
-                className="text-xs font-bold text-[#1c1b1f] hover:text-[#1a73e8] hover:bg-slate-100 px-4 py-2 rounded-full transition duration-150 cursor-pointer"
+                className="text-xs font-bold text-slate-400 hover:text-white px-4 py-2 rounded-xl transition duration-150 cursor-pointer"
               >
                 Cancelar
               </button>
@@ -3926,11 +4530,11 @@ export default function App() {
                     form.requestSubmit();
                   }
                 }}
-                className="bg-[#1a73e8] hover:bg-[#1557b0] text-white font-bold text-xs px-6 py-2.5 rounded-full shadow-sm hover:shadow-md active:scale-[0.98] transition duration-150 cursor-pointer uppercase tracking-wider"
+                className="bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black font-comic font-black text-xs px-6 py-2.5 rounded-xl shadow-[3.5px_3.5px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 active:translate-y-1 transition duration-150 cursor-pointer uppercase tracking-wider"
               >
                 {isRecoveryMode 
                   ? (recoveryStep === 'verify' ? "Verificar Identidad 🧠" : "Restablecer y Entrar ⚡") 
-                  : (isLoginMode ? "Iniciar Sesión ⚡" : "Siguiente paso")
+                  : (isLoginMode ? "Iniciar Sesión ⚡" : "Registrar Cuenta 🏆")
                 }
               </button>
             </div>
@@ -3946,87 +4550,178 @@ export default function App() {
         </div>
       )}
 
-      {/* Edit Profile modal removed */}
-
-      {/* 5. GORGEOUS SECURITY LOCK SCREEN FOR SUBSCRIBERS */}
-      {isLocked && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-950 bg-halftone-dots relative select-none animate-fade-in">
-          {/* Neon background blurs */}
-          <div className="absolute top-1/4 left-1/4 w-80 h-80 bg-rose-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
-
-          <div className="relative w-full max-w-[420px] bg-[#0c101a] border-[3px] border-black rounded-3xl p-8 text-center shadow-[8px_8px_0px_#000] font-sans">
+      {/* MODAL 1: CONFIRM FREE SELECTION */}
+      {countryToConfirmFree && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md animate-fade-in bg-halftone-dots">
+          <div className="relative max-w-md w-full bg-[#0a0f0d] border-[4px] border-black rounded-3xl p-6 md:p-8 shadow-[8px_8px_0px_rgba(0,0,0,1)] text-center">
             
-            {/* Header Badge */}
-            <div className="mx-auto w-16 h-16 bg-gradient-to-tr from-amber-500 via-rose-500 to-pink-550 border-[3px] border-black rounded-2xl flex items-center justify-center shadow-[3px_3px_0px_#000] -rotate-3 mb-6">
-              <ShieldCheck className="w-8 h-8 text-white stroke-[2.5]" />
+            <div className="bg-[#11b782] text-black border-2 border-black p-3.5 rotate-[-1deg] shadow-[4px_4px_0px_#000] mb-6">
+              <h3 className="font-bangers text-2xl tracking-wider uppercase">
+                🎯 CONFIRMAR TU SELECCIÓN GRATUITA
+              </h3>
             </div>
 
-            <h3 className="text-xl font-bold text-white tracking-tight uppercase font-comic">
-              Terminal Protegida
-            </h3>
-            <p className="text-xs text-slate-400 mt-2 max-w-sm mx-auto leading-relaxed">
-              Hola, <strong className="text-yellow-400">{username}</strong> ({userCode}). Para acceder a tu álbum y licencias auditadas, por favor ingresa tu contraseña.
+            <div className="text-5xl my-4">
+              {COUNTRIES.find(c => c.name === countryToConfirmFree)?.flag}
+            </div>
+
+            <p className="text-sm text-slate-200 font-comic font-bold leading-relaxed mb-4">
+              Has elegido a <strong className="text-emerald-400">{countryToConfirmFree}</strong> como tu única selección nacional para completar el juego de forma gratuita.
             </p>
 
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                const formEl = e.currentTarget;
-                const inputEl = formEl.elements.namedItem('unlockPassword') as HTMLInputElement;
-                const saved = localStorage.getItem('dt_user_password');
-                if (inputEl && inputEl.value === saved) {
-                  setIsLocked(false);
-                } else {
-                  alert('❌ Contraseña Incorrecta. Acceso denegado a las auditorías del sorteo oficial.');
-                }
-              }}
-              className="mt-6 space-y-4"
-            >
-              <div>
-                <input
-                  name="unlockPassword"
-                  type="password"
-                  placeholder="Introduce tu contraseña"
-                  className="w-full bg-slate-950/80 border-2 border-black rounded-xl px-4 py-3 text-center text-xs text-white placeholder:text-gray-650 focus:outline-none focus:ring-2 focus:ring-yellow-450 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)]"
-                  required
-                  autoFocus
-                />
-              </div>
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-left text-slate-400 space-y-2 mb-6 font-comic leading-relaxed">
+              <p>• Podrás desbloquear sus <strong className="text-white">26 cromos</strong> oficiales.</p>
+              <p>• Podrás superar sus <strong className="text-white">3 niveles de trivias</strong> para ganar puntos.</p>
+              <p>• Las demás selecciones quedarán <strong className="text-red-400">bloqueadas</strong> hasta que adquieras un plan de suscripción VIP o Scout.</p>
+              <p className="text-amber-400 font-bold mt-1">⚠️ Esta decisión es permanente para esta cuenta.</p>
+            </div>
 
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
-                type="submit"
-                className="w-full bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black px-6 py-3 font-comic font-black text-xs uppercase rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] transition hover:translate-y-0.5 active:translate-y-1 cursor-pointer"
-              >
-                🔓 Desbloquear Terminal
-              </button>
-            </form>
-
-            <div className="mt-8 pt-4 border-t border-slate-850/60 flex flex-col items-center gap-1.5">
-              <p className="text-[10px] text-slate-500 font-mono leading-normal">
-                ¿Olvidaste tu contraseña? Puedes cerrar sesión para crear un nuevo usuario.
-              </p>
-              <button
-                type="button"
                 onClick={() => {
-                  setAppCustomConfirm({
-                    title: '🛑 Cerrar Sesión',
-                    message: '¿Seguro de cerrar sesión y re-establecer perfil? Perderás el acceso temporario a los datos en esta terminal.',
-                    onConfirm: () => {
-                      handleLogout();
-                      setIsLocked(false);
-                    }
-                  });
+                  handleUpdateFreeCountry(countryToConfirmFree);
+                  setSelectedCountryName(countryToConfirmFree);
+                  setCountryToConfirmFree(null);
                 }}
-                className="text-[10px] font-bold text-rose-500 hover:text-rose-400 underline cursor-pointer"
+                className="flex-1 py-3 bg-[#11b782] hover:bg-[#10a173] text-black border-2 border-black rounded-xl font-bangers text-sm tracking-wider uppercase shadow-[3px_3px_0px_#000] cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
-                Cerrar Sesión Corriente
+                ¡Sí, confirmar {countryToConfirmFree}! ⚽
+              </button>
+              <button
+                onClick={() => setCountryToConfirmFree(null)}
+                className="py-3 px-5 bg-slate-800 hover:bg-slate-700 text-slate-300 border-2 border-black rounded-xl font-comic text-xs font-bold cursor-pointer"
+              >
+                Cancelar
               </button>
             </div>
 
           </div>
         </div>
       )}
+
+      {/* MODAL 2: UPSELL SUBSCRIPTION PLANS */}
+      {upsellCountry && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-slate-950/95 backdrop-blur-md animate-fade-in bg-halftone-dots">
+          <div className="relative max-w-3xl w-full max-h-[94vh] overflow-y-auto bg-[#0a0f0d] border-[4px] border-black rounded-3xl p-4 sm:p-6 md:p-8 shadow-[8px_8px_0px_rgba(0,0,0,1)] text-center scrollbar-thin scrollbar-thumb-slate-850 scrollbar-track-transparent">
+            
+            <div className="bg-[#EF4444] bg-halftone-red text-white border-2 border-black p-3 md:p-4 rotate-[-1deg] shadow-[4px_4px_0px_#000] mb-4 sm:mb-5">
+              <h3 className="font-bangers text-xl sm:text-2xl md:text-3xl tracking-wide uppercase flex items-center justify-center gap-2">
+                🔒 SELECCIÓN EXCLUSIVA PREMIUM
+              </h3>
+            </div>
+
+            <p className="text-xs sm:text-sm text-slate-300 font-comic font-bold leading-relaxed mb-3 px-1">
+              ¡Hola, Director Técnico! Actualmente estás registrado bajo una cuenta estándar gratis y has fijado tu selección gratuita en <strong className="text-emerald-450">{freeChosenCountry || "Ninguna"}</strong>.
+            </p>
+
+            <p className="text-[11px] sm:text-xs text-slate-400 font-comic leading-relaxed mb-4 sm:mb-6 max-w-2xl mx-auto px-1">
+              Para poder jugar y coleccionar con la selección de <strong className="text-[#EF4444]">{upsellCountry}</strong>, te invitamos cordialmente a suscribirte a una de nuestras prestigiosas licencias de D.T. de Élite:
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-5 sm:mb-6 text-left">
+              
+              {/* PLAN SCOUT */}
+              <div className="bg-slate-950 border-[3px] border-black rounded-2xl p-4 sm:p-5 shadow-[4px_4px_0px_rgba(17,183,130,0.25)] relative overflow-hidden flex flex-col justify-between hover:border-[#11b782] transition-colors">
+                <div>
+                  <h4 className="font-bangers text-lg sm:text-xl text-[#11b782] tracking-wider uppercase mb-1 flex items-center gap-1.5">
+                    🕵️‍♂️ PLAN SCOUT BÁSICO
+                  </h4>
+                  <div className="font-mono text-xs sm:text-sm font-black text-white mb-3">
+                    $5.00 USD <span className="text-[10px] text-slate-500 font-normal">/ Licencia Acceso Único</span>
+                  </div>
+                  <ul className="text-[11px] sm:text-xs text-slate-300 space-y-2 font-comic leading-relaxed mb-4">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-[#11b782] font-black shrink-0">✓</span>
+                      <span>Desbloqueo de <strong>1 país completo</strong> a tu elección (todos sus cromos al instante) 🌟</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-[#11b782] font-black shrink-0">✓</span>
+                      <span>Suma inmediata de <strong>+5 puntos</strong> a tu puntaje general de DT 📈</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-[#11b782] font-black shrink-0">✓</span>
+                      <span>Inscripción de sorteo garantizada si estás en el top el día de la final del torneo ⚽</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-[#11b782] font-black shrink-0">✓</span>
+                      <span>Guardado de pizarras y análisis táctico extendido.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-[#11b782] font-black shrink-0">✓</span>
+                      <span>Acceso prioritario a sorteos y auditorías.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {/* PASE VIP ELITE */}
+              <div className="bg-slate-950 border-[3px] border-amber-500/80 rounded-2xl p-4 sm:p-5 shadow-[4px_4px_0px_#f59e0b] relative overflow-hidden flex flex-col justify-between hover:border-amber-500 transition-colors">
+                <div className="absolute top-0 right-0 bg-amber-500 text-black font-bangers text-[9px] tracking-wider uppercase px-2 py-0.5 rounded-bl-lg">
+                  MÁS RECOMENDADO 🔥
+                </div>
+                <div>
+                  <h4 className="font-bangers text-lg sm:text-xl text-amber-450 tracking-wider uppercase mb-1 flex items-center gap-1.5">
+                    👑 PASE VIP ELITE
+                  </h4>
+                  <div className="font-mono text-xs sm:text-sm font-black text-white mb-3">
+                    $15.00 USD <span className="text-[10px] text-slate-500 font-normal">/ Licencia Acceso Total</span>
+                  </div>
+                  <ul className="text-[11px] sm:text-xs text-slate-300 space-y-2 font-comic leading-relaxed mb-4">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-400 font-black shrink-0">✓</span>
+                      <span>Acceso instantáneo a <strong>todos los países</strong> y todos sus cromos desbloqueados automáticamente 🌎</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-400 font-black shrink-0">✓</span>
+                      <span>Suma inmediata de <strong>+15 puntos</strong> a tu puntaje general de DT 👑</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-400 font-black shrink-0">✓</span>
+                      <span>Inscripción directa, inmediata y garantizada para la gran premiación 🏆</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-400 font-black shrink-0">✓</span>
+                      <span>Corte final de puntuaciones realizado el día <strong>20 de julio de 2026</strong>.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-400 font-black shrink-0">✓</span>
+                      <span>Elegibilidad directa: 1er Lugar: $2.000, 2do Lugar: $1.000, 3er Lugar: $500 USD en efectivo.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-amber-400 font-black shrink-0">✓</span>
+                      <span>Insignia dorada VIP verificada y soporte táctico prioritario.</span>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-1">
+              <button
+                onClick={() => {
+                  setActiveTab('subscription');
+                  setUpsellCountry(null);
+                }}
+                className="flex-1 py-3 bg-yellow-400 hover:bg-[#ffe338] text-black border-2 border-black rounded-xl font-bangers text-base tracking-wider uppercase shadow-[3px_3px_0px_#000] cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all min-h-[44px]"
+              >
+                💥 VER PLANES DE SUSCRIPCIÓN 💳
+              </button>
+              <button
+                onClick={() => setUpsellCountry(null)}
+                className="py-3 px-6 bg-slate-800 hover:bg-slate-700 text-slate-300 border-2 border-black rounded-xl font-comic text-xs font-bold cursor-pointer hover:text-white transition-colors min-h-[44px]"
+              >
+                Cerrar
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Edit Profile modal removed */}
+
+      {/* 5. GORGEOUS SECURITY LOCK SCREEN FOR SUBSCRIBERS REMOVED */}
 
       {appCustomConfirm && (
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-all" id="custom-app-confirm">
@@ -4066,6 +4761,70 @@ export default function App() {
         </div>
       )}
 
+      {/* MODAL DE RESTAURACIÓN / IMPORTACIÓN DE CROMOS */}
+      {showBackupModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in font-comic">
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#0b0f19] border-[3.5px] border-black text-white rounded-2xl w-full max-w-lg shadow-[8px_8px_0px_#000] overflow-hidden"
+          >
+            <div className="bg-[#EF4444] bg-halftone-red text-white p-4 font-bangers text-lg tracking-wider border-b-[3px] border-black flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>🛡️</span>
+                <span>PANEL DE RESPALDO DE CROMOS</span>
+              </div>
+              <button
+                onClick={() => setShowBackupModal(false)}
+                className="text-white hover:text-red-350 font-bold text-xl leading-none bg-transparent border-none outline-none cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-5 space-y-4">
+              <p className="font-comic text-xs font-semibold leading-relaxed text-slate-300">
+                Selecciona y copia tu código JSON de abajo para guardarlo externamente, o pega un código de respaldo anterior y haz clic en <strong>Procesar</strong> para restaurar tus cromos personalizados:
+              </p>
+              
+              <textarea
+                value={backupText}
+                onChange={(e) => setBackupText(e.target.value)}
+                placeholder='Ejemplo: {"uru-1": "data:image/webp;base64,...", "ecu-3": "https://..."}'
+                className="w-full h-44 bg-slate-900 border-2 border-black rounded-xl p-3 text-[10px] font-mono text-[#10B981] placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#10B981] resize-none"
+              />
+              
+              <div className="text-[10px] text-slate-400 leading-snug flex items-start gap-1 p-2 bg-slate-950/40 border border-slate-800 rounded-lg">
+                <span className="text-yellow-400 shrink-0">⚠️</span>
+                <span>
+                  <strong>Nota técnica:</strong> Este proceso fusionará los cromos importados con los que tengas activos y regenerará los enlaces en el servidor para persistirlos sobre cualquier reinicio del sistema de desarrollo.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowBackupModal(false);
+                    setBackupText("");
+                  }}
+                  className="px-4 py-2 border-2 border-black bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold uppercase rounded-xl cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleImportStickersBackup(backupText)}
+                  className="px-5 py-2 border-[2.5px] border-black bg-[#10B981] hover:bg-[#059669] text-black text-xs font-bold uppercase rounded-xl cursor-pointer shadow-[2.5px_2.5px_0px_rgba(0,0,0,1)] active:translate-y-0.5"
+                >
+                  ⚡ Procesar e Inyectar
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {appCustomAlert && (
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-all" id="custom-app-alert">
           <motion.div
@@ -4094,6 +4853,7 @@ export default function App() {
         </div>
       )}
 
-    </div>
+      </div>
+    </AnimeHighTechSkin>
   );
 }

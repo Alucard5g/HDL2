@@ -3,6 +3,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Play, Zap, Shield, Flame, ChevronLeft, ChevronRight, Volume2, Award, RotateCcw } from 'lucide-react';
 import { Player } from '../types';
 
+function getSafeImageUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("data:image/") || url.startsWith("/") || url.startsWith("./")) {
+    return url;
+  }
+  return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+}
+
 interface DigitalStickerCardProps {
   player: Player;
   idx: number;
@@ -10,6 +18,7 @@ interface DigitalStickerCardProps {
   onGenerateImage?: (player: Player) => void;
   isGenerating?: boolean;
   onPasteImageUrl?: (player: Player, url: string) => void;
+  isAdmin?: boolean;
 }
 
 interface ComicPanel {
@@ -21,7 +30,7 @@ interface ComicPanel {
   iconType: 'prep' | 'action' | 'climax';
 }
 
-export const DigitalStickerCard: React.FC<DigitalStickerCardProps> = ({ player, idx, slant, onGenerateImage, isGenerating, onPasteImageUrl }) => {
+export const DigitalStickerCard: React.FC<DigitalStickerCardProps> = ({ player, idx, slant, onGenerateImage, isGenerating, onPasteImageUrl, isAdmin }) => {
   const [isPlayingAction, setIsPlayingAction] = useState(false);
   const [currentPanelIndex, setCurrentPanelIndex] = useState(0);
   const [showLinkInput, setShowLinkInput] = useState(false);
@@ -556,7 +565,7 @@ export const DigitalStickerCard: React.FC<DigitalStickerCardProps> = ({ player, 
             )}
             <img
               ref={imgRef}
-              src={player.imageUrl}
+              src={getSafeImageUrl(player.imageUrl)}
               alt={apodo}
               referrerPolicy="no-referrer"
               loading="lazy"
@@ -574,7 +583,7 @@ export const DigitalStickerCard: React.FC<DigitalStickerCardProps> = ({ player, 
             )}
             
             {/* Permanent/Hover Edit button for existing images */}
-            {onPasteImageUrl && (
+            {isAdmin && onPasteImageUrl && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -635,7 +644,7 @@ export const DigitalStickerCard: React.FC<DigitalStickerCardProps> = ({ player, 
                   (Ilustración Exclusiva en Cola)
                 </span>
                 <div className="flex flex-col gap-1.5 items-center justify-center w-full mt-1.5 px-2">
-                  {onPasteImageUrl && (
+                  {isAdmin && onPasteImageUrl && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

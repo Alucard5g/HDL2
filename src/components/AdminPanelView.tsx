@@ -39,6 +39,14 @@ import {
 import { motion } from 'motion/react';
 import { COUNTRIES, generatePlayersForCountry, MATCH_FIXTURES } from '../data';
 
+function getSafeImageUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("data:image/") || url.startsWith("/") || url.startsWith("./")) {
+    return url;
+  }
+  return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+}
+
 interface ActiveUser {
   id: string;
   username: string;
@@ -114,9 +122,9 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
     if (cleanId.startsWith("UIO") || cleanId.startsWith("GYE")) {
       return { scoutPrice: 5.00, vipPrice: 15.00, currency: '$' };
     } else if (cleanId.startsWith("MAD")) {
-      return { scoutPrice: 10.00, vipPrice: 20.00, currency: '€' };
+      return { scoutPrice: 5.00, vipPrice: 15.00, currency: '€' };
     } else {
-      return { scoutPrice: 9.99, vipPrice: 19.99, currency: '$' };
+      return { scoutPrice: 5.00, vipPrice: 15.00, currency: '$' };
     }
   };
 
@@ -147,8 +155,8 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
   const [perfGeminiModel, setPerfGeminiModel] = useState<string>('gemini-2.5-flash');
   const [perfChatbotUrl, setPerfChatbotUrl] = useState<string>('/api/chat/dynamic');
   const [perfChatbotTemp, setPerfChatbotTemp] = useState<number>(0.75);
-  const [perfPaymentProvider, setPerfPaymentProvider] = useState<string>('stripe_core');
-  const [perfPaymentKey, setPerfPaymentKey] = useState<string>('pk_live_51N9eF2B31Cc989A12efacef7790b');
+  const [perfPaymentProvider, setPerfPaymentProvider] = useState<string>('payphone_ecu');
+  const [perfPaymentKey, setPerfPaymentKey] = useState<string>('payphone_live_key_0912e742');
   const [perfAiParserPrompt, setPerfAiParserPrompt] = useState<string>('');
   const [perfAiParserLoading, setPerfAiParserLoading] = useState<boolean>(false);
   const [perfAiParserMsg, setPerfAiParserMsg] = useState<string>('');
@@ -1349,7 +1357,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                                 <td className="py-3 px-3">
                                   <div className="w-12 h-16 bg-slate-950 rounded-lg overflow-hidden border-2 border-black shadow-[2px_2px_0px_#000] relative">
                                     <img 
-                                      src={imageUrl} 
+                                      src={getSafeImageUrl(imageUrl as string)} 
                                       alt={apodo} 
                                       referrerPolicy="no-referrer"
                                       className="w-full h-full object-cover animate-fade-in"
@@ -2801,7 +2809,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                   <textarea
                     value={perfAiParserPrompt}
                     onChange={(e) => setPerfAiParserPrompt(e.target.value)}
-                    placeholder="Eje: 'Hola, pon la clave de fal en fal_key_prod_9921_abc, para gemini usa AIzaSy_Premium2026 corriendo gemini-2.5-pro, utiliza el endpoint de chatbot /api/chat/dynamic y la pasarela Stripe con key pk_live_stripe947'"
+                    placeholder="Eje: 'Hola, pon la clave de fal en fal_key_prod_9921_abc, para gemini usa AIzaSy_Premium2026 corriendo gemini-2.5-pro, utiliza el endpoint de chatbot /api/chat/dynamic y la pasarela PayPhone con key payphone_live_key_947'"
                     className="w-full bg-slate-900 border-2 border-black text-slate-100 placeholder-slate-700 p-3 rounded-xl text-xs font-mono h-20 focus:outline-none focus:border-yellow-400"
                   />
                 </div>
@@ -2890,21 +2898,17 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                         }
 
                         // Payment credentials extraction
-                        if (txt.includes("stripe")) {
-                          setPerfPaymentProvider("stripe_core");
-                          const match = perfAiParserPrompt.match(/pk_live_[a-zA-Z0-9]+/i) || perfAiParserPrompt.match(/stripe_[a-zA-Z0-9]+/i);
+                        if (txt.includes("payphone")) {
+                          setPerfPaymentProvider("payphone_ecu");
+                          const match = perfAiParserPrompt.match(/payphone_live_[a-zA-Z0-9]+/i) || perfAiParserPrompt.match(/payphone_[a-zA-Z0-9]+/i);
                           if (match) setPerfPaymentKey(match[0]);
-                          logs.push("💳 Pasarela: Detectado Stripe. Public Key registrada.");
-                        } else if (txt.includes("paypal")) {
-                          setPerfPaymentProvider("paypal_express");
-                          const match = perfAiParserPrompt.match(/paypal_[a-zA-Z0-9_]+/i);
-                          if (match) setPerfPaymentKey(match[0]);
-                          logs.push("💳 Pasarela: PayPal Express activada.");
-                        } else if (txt.includes("mercadopago")) {
-                          setPerfPaymentProvider("mercadopago_latam");
-                          const match = perfAiParserPrompt.match(/mp_access_[a-zA-Z0-9_]+/i) || perfAiParserPrompt.match(/mp_[a-zA-Z0-9_]+/i);
-                          if (match) setPerfPaymentKey(match[0]);
-                          logs.push("💳 Pasarela: MercadoPago Latam Node listo.");
+                          logs.push("💳 Pasarela: Detectado PayPhone Ecuador. Token registrado.");
+                        } else if (txt.includes("deuna")) {
+                          setPerfPaymentProvider("deuna_qr");
+                          logs.push("💳 Pasarela: Deuna QR Directo activado.");
+                        } else if (txt.includes("transferencia")) {
+                          setPerfPaymentProvider("transferencia_direct");
+                          logs.push("💳 Pasarela: Transferencia Bancaria Directa.");
                         }
 
                         setPerfAiParserLoading(false);
@@ -3073,9 +3077,9 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                       onChange={(e) => setPerfPaymentProvider(e.target.value)}
                       className="w-full bg-slate-900 border border-slate-800 text-slate-300 font-mono px-2 py-1 text-[10.5px] rounded cursor-pointer"
                     >
-                      <option className="bg-slate-900 text-white" value="stripe_core">Stripe Core VIP</option>
-                      <option className="bg-slate-900 text-white" value="paypal_express">PayPal Express Smart</option>
-                      <option className="bg-slate-900 text-white" value="mercadopago_latam">MercadoPago Latam Node</option>
+                      <option className="bg-slate-900 text-white" value="payphone_ecu">PayPhone Ecuador Live</option>
+                      <option className="bg-slate-900 text-white" value="deuna_qr">Deuna QR Direct</option>
+                      <option className="bg-slate-900 text-white" value="transferencia_direct">Transferencia Bancaria</option>
                     </select>
                   </div>
 

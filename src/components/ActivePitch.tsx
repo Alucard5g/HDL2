@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { Player, UserTacticalBoard, Match, getCountryOfPlay } from '../types';
 import { Eye, Check, RefreshCw, Send, HelpCircle, Save, Info } from 'lucide-react';
 
+function getSafeImageUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  if (url.startsWith("data:image/") || url.startsWith("/") || url.startsWith("./")) {
+    return url;
+  }
+  return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+}
+
 interface ActivePitchProps {
   country: string;
   players: Player[];
@@ -219,7 +227,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
                   {p.imageUrl ? (
                     <div className="w-8 h-8 rounded overflow-hidden border border-amber-500/30 shrink-0">
                       <img
-                        src={p.imageUrl}
+                        src={getSafeImageUrl(p.imageUrl)}
                         alt={p.realName}
                         referrerPolicy="no-referrer"
                         className="w-full h-full object-cover"
@@ -389,7 +397,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
                       <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-slate-900 border-2 border-emerald-400 flex items-center justify-center text-white shadow-xl group-hover:border-white transition-colors overflow-hidden">
                         {pObj.imageUrl ? (
                           <img
-                            src={pObj.imageUrl}
+                            src={getSafeImageUrl(pObj.imageUrl)}
                             alt={pObj.realName}
                             referrerPolicy="no-referrer"
                             className="w-full h-full object-cover"
@@ -484,7 +492,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
                     {scoutDetailsPlayer.imageUrl ? (
                       <div className="relative w-32 h-44 mx-auto rounded-xl border border-amber-500/40 shadow-lg mb-3.5 overflow-hidden group">
                         <img
-                          src={scoutDetailsPlayer.imageUrl}
+                          src={getSafeImageUrl(scoutDetailsPlayer.imageUrl)}
                           alt={scoutDetailsPlayer.realName}
                           referrerPolicy="no-referrer"
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

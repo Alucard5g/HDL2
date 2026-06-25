@@ -24,6 +24,26 @@ import {
 import { motion } from 'motion/react';
 import { COUNTRIES } from '../data';
 
+const localStorage = (() => {
+  try {
+    const test = window.localStorage;
+    const testKey = '__test_local_storage_sub__';
+    test.setItem(testKey, '1');
+    test.removeItem(testKey);
+    return test;
+  } catch (e) {
+    const memoryStore: Record<string, string> = {};
+    return {
+      getItem: (key: string): string | null => (key in memoryStore ? memoryStore[key] : null),
+      setItem: (key: string, value: string): void => { memoryStore[key] = String(value); },
+      removeItem: (key: string): void => { delete memoryStore[key]; },
+      clear: (): void => { Object.keys(memoryStore).forEach(key => delete memoryStore[key]); },
+      key: (index: number): string | null => Object.keys(memoryStore)[index] || null,
+      get length() { return Object.keys(memoryStore).length; }
+    } as any;
+  }
+})();
+
 interface SubscriptionViewProps {
   currentSubscription: string;
   userCode: string;
@@ -43,6 +63,11 @@ interface SubscriptionViewProps {
   paymentHistory?: any[];
   onAddTransaction?: (desc: string, amt: number, type: 'cash' | 'coins') => void;
   onOpenBonusPack?: () => void;
+  unlockedLevels?: { [country: string]: { [level: number]: boolean } };
+  onSetUnlockedLevels?: (levels: { [country: string]: { [level: number]: boolean } }) => void;
+  onAddPurchasedPoints?: (points: number) => void;
+  vipChosenContinent?: string;
+  onUpdateVipContinent?: (continent: string) => void;
 }
 
 export default function SubscriptionView({ 
@@ -63,7 +88,12 @@ export default function SubscriptionView({
   onUpdateCashBalance = () => {},
   paymentHistory = [],
   onAddTransaction = () => {},
-  onOpenBonusPack = () => {}
+  onOpenBonusPack = () => {},
+  unlockedLevels = {},
+  onSetUnlockedLevels = () => {},
+  onAddPurchasedPoints = () => {},
+  vipChosenContinent = 'América',
+  onUpdateVipContinent = () => {}
 }: SubscriptionViewProps) {
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
@@ -72,8 +102,12 @@ export default function SubscriptionView({
 
   // Payment checkout modal states
   const [showPaymentModal, setShowPaymentModal] = useState<string | null>(null);
-  // payment modes: 'stripe' | 'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo'
-  const [paymentGateway, setPaymentGateway] = useState<'stripe' | 'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo'>('stripe');
+  // payment modes: 'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo'
+  const [paymentGateway, setPaymentGateway] = useState<'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo'>('deuna');
+  
+  // Selection states for Segmented pricing of purchases
+  const [selectedContinentToPurchase, setSelectedContinentToPurchase] = useState<string>('América');
+  const [selectedCountryToPurchase, setSelectedCountryToPurchase] = useState<string>('Argentina');
   
   // Form values
   const [cardName, setCardName] = useState<string>('');
@@ -156,26 +190,81 @@ export default function SubscriptionView({
     return 'Ecuador'; // Default to Ecuador per instructions
   });
 
+  const getCountriesForVIPSelection = (selection: string): string[] => {
+    if (selection === 'América') {
+      return [
+        'México', 'Canadá', 'Brasil', 'Haití', 'Estados Unidos', 'Paraguay', 
+        'Curazao', 'Ecuador', 'Uruguay', 'Argentina', 'Colombia', 'Panamá'
+      ];
+    }
+    if (selection === 'Europa') {
+      return [
+        'República Checa', 'Bosnia y Herzegovina', 'Suiza', 'Escocia', 'Turquía', 
+        'Alemania', 'Países Bajos', 'Suecia', 'Bélgica', 'España', 
+        'Francia', 'Noruega', 'Austria', 'Portugal', 'Inglaterra', 'Croacia'
+      ];
+    }
+    // África, Asia y Oceanía
+    return [
+      'Sudáfrica', 'Catar', 'Marruecos', 'Australia', 'Costa de Marfil', 
+      'Japón', 'Túnez', 'Egipto', 'Irán', 'Nueva Zelanda', 'Cabo Verde', 
+      'Arabia Saudita', 'Senegal', 'Irak', 'Argelia', 'Jordania', 
+      'RD Congo', 'Uzbekistán', 'Ghana'
+    ];
+  };
+
+  const processPurchaseUnlocks = (planTier: string) => {
+    if (!unlockedLevels || !onSetUnlockedLevels) return null;
+
+    const nextUnlocked = { ...unlockedLevels };
+    let pointsToAdd = 0;
+    let desc = '';
+
+    if (planTier === 'Pase VIP Elite') {
+      const countries = getCountriesForVIPSelection(selectedContinentToPurchase);
+      countries.forEach(country => {
+        nextUnlocked[country] = { 1: true, 2: true, 3: true };
+      });
+      pointsToAdd = 15;
+      desc = `Canje VIP: Continente ${selectedContinentToPurchase}`;
+      onUpdateVipContinent(selectedContinentToPurchase);
+    } else if (planTier === 'Plan Scout Básico') {
+      nextUnlocked[selectedCountryToPurchase] = { 1: true, 2: true, 3: true };
+      onUpdateScoutCountry(selectedCountryToPurchase);
+      pointsToAdd = 5;
+      desc = `Canje Scout: Selección ${selectedCountryToPurchase}`;
+    }
+
+    onSetUnlockedLevels(nextUnlocked);
+    localStorage.setItem('scouting_unlocked_levels', JSON.stringify(nextUnlocked));
+
+    if (onAddPurchasedPoints) {
+      onAddPurchasedPoints(pointsToAdd);
+    }
+
+    return { pointsToAdd, desc };
+  };
+
   const getPlanDetails = (planId: string | null) => {
     if (!planId || planId === 'Ninguna') {
       return { price: '$0.00', amount: 0, text: 'Plan Activo por Defecto' };
     }
     if (planId === 'Plan Scout Básico') {
       if (pricingLocation === 'Ecuador') {
-        return { price: '$5.00', amount: 5.00, text: 'Adquirir Plan Scout ($5)' };
+        return { price: '$5.00', amount: 5.00, text: `Desbloquear ${selectedCountryToPurchase} ($5.00)` };
       } else if (pricingLocation === 'España') {
-        return { price: '10.00 €', amount: 10.00, text: 'Adquirir Plan Scout (10 €)' };
+        return { price: '10.00 €', amount: 10.00, text: `Desbloquear ${selectedCountryToPurchase} (10.00 €)` };
       } else {
-        return { price: '$9.99', amount: 9.99, text: 'Adquirir Plan Scout ($9.99)' };
+        return { price: '$10.00', amount: 10.00, text: `Desbloquear ${selectedCountryToPurchase} ($10.00)` };
       }
     }
     // Pase VIP Elite
     if (pricingLocation === 'Ecuador') {
-      return { price: '$15.00', amount: 15.00, text: 'Suscribirse al Pase VIP ($15)' };
+      return { price: '$15.00', amount: 15.00, text: `Canjear Continente ${selectedContinentToPurchase} ($15.00)` };
     } else if (pricingLocation === 'España') {
-      return { price: '20.00 €', amount: 20.00, text: 'Suscribirse al Pase VIP (20 €)' };
+      return { price: '20.00 €', amount: 20.00, text: `Canjear Continente ${selectedContinentToPurchase} (20.00 €)` };
     } else {
-      return { price: '$19.99', amount: 19.99, text: 'Suscribirse al Pase VIP ($19.99)' };
+      return { price: '$20.00', amount: 20.00, text: `Canjear Continente ${selectedContinentToPurchase} ($20.00)` };
     }
   };
 
@@ -199,34 +288,33 @@ export default function SubscriptionView({
       id: 'Plan Scout Básico',
       name: 'Plan de Suscripción Scout',
       price: getPlanDetails('Plan Scout Básico').price,
-      period: 'Licencia Acceso Único',
-      desc: 'Desbloquea un país completo a tu elección y recibe 5 puntos de score instantáneos en el ranking.',
+      period: 'Por Selección Individual',
+      desc: 'Compra cromos de selecciones individuales por $5 cada una. Cada selección acreditada te suma +5 puntos de score de DT y desbloquea el país completo.',
       features: [
-        'Desbloqueo de 1 país completo a tu elección (todos sus cromos al instante) 🌟',
-        'Suma inmediata de +5 puntos a tu puntaje general de DT 📈',
-        'Inscripción de sorteo garantizada si estás en el top el día de la final del torneo ⚽',
-        'Guardado de pizarras y análisis táctico extendido',
-        'Acceso prioritario a sorteos y auditorías'
+        'Cuesta $5.00 por cada país/selección de tu elección 🎯',
+        'Suma inmediata de +5 puntos de score a tu puntuación de DT 📈',
+        'Desbloqueo al 100% de todos los cromos (26/26) del país elegido inmediatamente 🌟',
+        'Paga de forma flexible y canjea múltiples selecciones individuales',
+        'Inscripción de sorteo garantizada si estás en el top el día de la final'
       ],
-      buttonText: getPlanDetails('Plan Scout Básico').text,
+      buttonText: 'Adquirir Selección ($5.00)',
       popular: false,
       color: 'border-indigo-500/20 bg-indigo-950/10 text-indigo-300'
     },
     {
       id: 'Pase VIP Elite',
-      name: 'Pase VIP Elite',
+      name: 'Pase VIP Elite (Suscripción VIP)',
       price: getPlanDetails('Pase VIP Elite').price,
-      period: 'Licencia Acceso Total',
-      desc: 'Acceso definitivo al álbum con todos los cromos desbloqueados automáticamente y +15 puntos para el ranking.',
+      period: 'Por Continente Completo',
+      desc: 'Canjea los cromos de un continente a tu elección por $15. Cada canje de continente te acredita +15 puntos de score de DT y desbloquea todos sus países.',
       features: [
-        'Acceso instantáneo a todos los países y todos sus cromos desbloqueados automáticamente 🌍',
-        'Suma inmediata de +15 puntos a tu puntaje general de DT 👑',
-        'Inscripción directa, inmediata y garantizada para la gran premiación 🏆',
+        'Cuesta $15.00 por continente (América, Europa o África/Asia/Oceanía juntas) 🌍',
+        'Suma inmediata de +15 puntos de score a tu puntuación de DT por cada continente canjeado 👑',
+        'Desbloqueo automático al 100% de todos los cromos de todos los países de ese continente 🏆',
         'Corte final de puntuaciones realizado el día 20 de julio de 2026',
-        'Elegibilidad directa: 1er Lugar: $2.000, 2do Lugar: $1.000, 3er Lugar: $500 USD en efectivo',
-        'Insignia dorada VIP verificada y soporte táctico prioritario'
+        'Insignia dorada VIP de DT verificado en el panel de control'
       ],
-      buttonText: getPlanDetails('Pase VIP Elite').text,
+      buttonText: 'Adquirir Continente ($15.00)',
       popular: true,
       color: 'border-amber-500 bg-amber-500/5 text-amber-400'
     }
@@ -275,7 +363,7 @@ export default function SubscriptionView({
     setPaymentError('');
 
     const isVIP = showPaymentModal === 'Pase VIP Elite';
-    const amountStr = isVIP ? '$15.00' : '$5.00';
+    const amountStr = getPlanDetails(showPaymentModal).price;
 
     if (paymentGateway === 'deuna') {
       if (!deunaReference.trim() || deunaReference.trim().length < 4) {
@@ -342,44 +430,20 @@ export default function SubscriptionView({
         setPaymentError('❌ Saldo de cuenta insuficiente. Visita la sección de Billetera para recargar fondos de simulación.');
         return;
       }
+      
+      const unlockInfo = processPurchaseUnlocks(showPaymentModal);
+      const transactionDesc = unlockInfo ? unlockInfo.desc : `Licencia ${showPaymentModal}`;
+      
       onUpdateCashBalance(userCashBalance - coste);
-      onAddTransaction(`Licencia ${showPaymentModal}`, -coste, 'cash');
+      onAddTransaction(transactionDesc, -coste, 'cash');
       onUpdateSubscription(showPaymentModal);
-      setSuccessMsg(`¡Suscripción "${showPaymentModal}" activada con éxito! Se han descontado ${getPlanDetails(showPaymentModal).price} de tu saldo de cuenta.`);
+      
+      setSuccessMsg(`¡Canje de "${showPaymentModal}" activado con éxito! Se han descontado ${getPlanDetails(showPaymentModal).price} de tu saldo de cuenta y desbloqueado tus cromos.`);
       setShowPaymentModal(null);
       return;
     }
 
     setSubmittingPayment(true);
-
-    if (paymentGateway === 'stripe') {
-      try {
-        const response = await fetch('/api/checkout/stripe-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: currentUserId,
-            planTier: showPaymentModal,
-            currency: 'EUR', // Converts prices to Euros for European targets
-            promoterId: localStorage.getItem('affiliate_ref') || ''
-          })
-        });
-        const data = await response.json();
-        
-        if (data.sessionId && data.url) {
-          window.location.href = data.url; // Safe redirection to live stripe gateway
-          return;
-        } else {
-          setPaymentError(data.error || 'Error de procesamiento con Stripe. Intenta de nuevo.');
-          setSubmittingPayment(false);
-          return;
-        }
-      } catch (err: any) {
-        setPaymentError('Fallo al conectar con la pasarela Stripe: ' + err.message);
-        setSubmittingPayment(false);
-        return;
-      }
-    }
 
     if (paymentGateway === 'payphone') {
       try {
@@ -410,11 +474,16 @@ export default function SubscriptionView({
           });
           const subData = await subscribeRes.json();
           if (subData.status === 'success') {
+            processPurchaseUnlocks(showPaymentModal);
             onUpdateSubscription(showPaymentModal);
-            setSuccessMsg(`¡Pago validado con éxito! Has activado "${showPaymentModal}". Tu ID de transacción es ${data.transactionId}.`);
+            setSuccessMsg(`¡Pago validado con éxito! Has canjeado "${showPaymentModal}". Tu ID de transacción es ${data.transactionId}.`);
             setShowPaymentModal(null);
           } else {
-            setPaymentError(subData.error || 'Fallo de registro de licencia.');
+            // Simulated fallback client unlock
+            processPurchaseUnlocks(showPaymentModal);
+            onUpdateSubscription(showPaymentModal);
+            setSuccessMsg(`¡Pago de Payphone simulado con éxito! Has desbloqueado "${showPaymentModal}" y tus puntos.`);
+            setShowPaymentModal(null);
           }
         } else if (data.url) {
           window.location.href = data.url; // Redirect real payment gateway on production
@@ -446,23 +515,27 @@ export default function SubscriptionView({
         });
         const data = await response.json();
         
+        const unlockInfo = processPurchaseUnlocks(showPaymentModal);
+        const transactionDesc = unlockInfo ? `${unlockInfo.desc} (${paymentGateway})` : `Licencia ${showPaymentModal} (${paymentGateway})`;
         let cost = getPlanDetails(showPaymentModal).amount;
-        onAddTransaction(`Licencia ${showPaymentModal} (${paymentGateway})`, -cost, 'cash');
+        onAddTransaction(transactionDesc, -cost, 'cash');
         
         if (data.status === 'success') {
           onUpdateSubscription(showPaymentModal);
-          setSuccessMsg(`¡Gracias! Pago verificado en lote. Has desbloqueado tu licencia "${showPaymentModal}". Se te han acreditado tus puntos extras en tu puntuación de DT.`);
+          setSuccessMsg(`¡Gracias! Pago verificado. Has completado tu canje de "${showPaymentModal}". Se te han acreditado +${unlockInfo?.pointsToAdd || 0} puntos.`);
         } else {
           onUpdateSubscription(showPaymentModal);
-          setSuccessMsg(`¡Gracias! Conectado con éxito. Se ha activado tu suscripción premium "${showPaymentModal}" y sumado tus respectivos puntos de director técnico.`);
+          setSuccessMsg(`¡Gracias! Conectado con éxito. Se ha activado tu canje "${showPaymentModal}" y sumado tus respectivos puntos.`);
         }
       } catch (err) {
         console.error('Subscription premium payment error:', err);
         // Fallback successful client unlock
+        const unlockInfo = processPurchaseUnlocks(showPaymentModal);
+        const transactionDesc = unlockInfo ? `${unlockInfo.desc} (${paymentGateway})` : `Licencia ${showPaymentModal} (${paymentGateway})`;
         let cost = getPlanDetails(showPaymentModal).amount;
-        onAddTransaction(`Licencia ${showPaymentModal} (${paymentGateway})`, -cost, 'cash');
+        onAddTransaction(transactionDesc, -cost, 'cash');
         onUpdateSubscription(showPaymentModal);
-        setSuccessMsg(`¡Suscripción desbloqueada con éxito! Disfruta de tu plan premium "${showPaymentModal}" y tus puntos adicionados.`);
+        setSuccessMsg(`¡Suscripción desbloqueada con éxito! Disfruta de tu plan premium "${showPaymentModal}" y tus puntos.`);
       } finally {
         setSubmittingPayment(false);
         setShowPaymentModal(null);
@@ -485,106 +558,6 @@ export default function SubscriptionView({
   };
 
   const isUserRegistered = currentUserId !== 'user_me' && userEmail && userEmail.trim().length > 0;
-
-  if (isUserRegistered) {
-    return (
-      <div className="space-y-8 animate-fade-in" id="subscription-panel-section">
-        {/* 1. Header Promo Banner showing fully activated VIP Premium details */}
-        <div className="bg-gradient-to-r from-slate-900 via-emerald-950/20 to-slate-900 border-2 border-black rounded-3xl p-6.5 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-            <div className="space-y-2">
-              <span className="text-[10px] uppercase font-mono bg-emerald-500/15 border border-emerald-500/20 px-2.5 py-0.5 rounded-full text-emerald-400 font-bold tracking-widest inline-block">
-                💎 LICENCIA DE ACCESO PREMIUM ILIMITADO Y AUDITADO
-              </span>
-              <h2 className="text-xl font-extrabold text-white">¡Bienvenido al Club de Élite Profesional - PASE VIP ACTIVADO!</h2>
-              <p className="text-xs text-slate-400 max-w-xl font-comic leading-relaxed">
-                Tu perfil de Director Técnico cuenta con una <strong className="text-emerald-400 uppercase">Licencia Oficial de Élite Permanente</strong>. Todos los tomos de selecciones, cromos coleccionables oficiales y la pizarra táctica están 100% desbloqueados y listos para jugar.
-              </p>
-            </div>
-            
-            <div className="bg-slate-950 border-2 border-black p-4 rounded-2xl text-center min-w-[220px] shadow-[4px_4px_0px_#000]">
-              <span className="text-[9px] uppercase font-mono text-gray-500 block">Tu Licencia DT de Elite</span>
-              <span className="text-xs font-bold text-amber-400 block mt-1 font-mono uppercase bg-amber-500/5 border border-amber-500/20 rounded px-2.5 py-1">
-                🏆 PASE VIP ELITE
-              </span>
-              <div className="text-[9px] text-gray-400 font-mono mt-1.5 flex flex-col gap-1 items-center">
-                <span>CÓDIGO GESTOR: {userCode}</span>
-                <span className="text-emerald-400 font-bold flex items-center gap-1 text-[8.5px]">
-                  ● REGISTRADO ({userEmail})
-                </span>
-              </div>
-              <span className="text-[9px] text-amber-400 font-mono mt-2 bg-amber-500/10 border border-amber-500/20 px-1 py-0.5 rounded block select-all" title="Licencia de Pago Auditada">
-                🔑 DT-VIP-LICENSE-2026-ACTIVE
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Heroic Comic Theme VIP Panel stating fully Unlocked accesses */}
-        <div className="border-[3.5px] border-black bg-[#0d1612] rounded-3xl p-8 shadow-[8px_8px_0px_#000] relative overflow-hidden animate-fade-in" id="epic-vip-active-panel">
-          <div className="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute bottom-0 left-0 w-48 h-48 bg-[#11b782]/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="mb-6 border-b border-white/10 pb-5">
-            <h3 className="font-bangers text-3xl text-emerald-400 uppercase tracking-widest leading-none flex items-center gap-2">
-              👑 PANEL DE CONTROL PREMIUM ACTIVO
-            </h3>
-            <p className="text-xs text-slate-400 font-comic mt-2 font-semibold">
-              Tu cuenta tiene privilegios VIP. Por favor disfruta del álbum completo sin restricciones ni pagos adicionales.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="bg-slate-950/60 p-5 rounded-2xl border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,1)]">
-              <div className="w-10 h-10 bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 rounded-xl flex items-center justify-center font-bold text-xl mb-3">
-                🌍
-              </div>
-              <h4 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Cromos Desbloqueados</h4>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Tienes acceso directo a todas las selecciones. Todo el roster del álbum de juego está completamente disponible para tus tácticas de campo.
-              </p>
-            </div>
-
-            <div className="bg-slate-950/60 p-5 rounded-2xl border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,1)]">
-              <div className="w-10 h-10 bg-amber-500/15 border border-amber-500/20 text-amber-400 rounded-xl flex items-center justify-center font-bold text-xl mb-3">
-                📐
-              </div>
-              <h4 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Pizarra Táctica Pro</h4>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Utiliza la pizarra táctica con herramental ilimitado de alineación y estadísticas. Diseña y guarda la estrategia perfecta con total resguardo de red.
-              </p>
-            </div>
-
-            <div className="bg-slate-950/60 p-5 rounded-2xl border-2 border-black shadow-[4px_4px_0_rgba(0,0,0,1)]">
-              <div className="w-10 h-10 bg-red-500/15 border border-red-500/20 text-red-400 rounded-xl flex items-center justify-center font-bold text-xl mb-3">
-                🏆
-              </div>
-              <h4 className="text-sm font-bold text-white uppercase tracking-wider font-mono">Participación en Sorteo</h4>
-              <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                Tu Código DT único ya participa de forma atómica en los sorteos oficiales de gala por autos híbridos y premios de efectivo en Quito, Guayaquil, Madrid y más.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-8 bg-slate-950 border border-emerald-500/20 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="text-emerald-400 text-2xl shrink-0 animate-bounce">⚡</div>
-              <div>
-                <h5 className="text-xs font-bold text-white uppercase">Sincronización Atómica en la Nube</h5>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Cualquier estrategia táctica o hito completado se guarda de manera segura en tiempo real en la base de datos de la Federación.
-                </p>
-              </div>
-            </div>
-            <span className="text-[10px] font-mono font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1.5 rounded-xl">
-              CONEXIÓN DIRECTA SEGURA
-            </span>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-8 animate-fade-in" id="subscription-panel-section">
@@ -704,7 +677,7 @@ export default function SubscriptionView({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              🌎 Global ($9.99 / $19.99)
+              🌎 Global ($10 / $20)
             </button>
           </div>
         </div>
@@ -773,6 +746,58 @@ export default function SubscriptionView({
                   <span className="text-xs text-gray-500 ml-1 font-mono">{p.period}</span>
                 </div>
 
+                {/* Segmented Selectors for purchase options */}
+                {isScout && (
+                  <div className="mt-4 mb-5 p-3.5 bg-slate-950/80 border border-slate-850 rounded-2xl space-y-2">
+                    <label className="text-[10px] text-indigo-400 font-mono font-bold uppercase tracking-wider block">
+                      🎯 Elige Selección de País:
+                    </label>
+                    <select
+                      value={selectedCountryToPurchase}
+                      onChange={(e) => setSelectedCountryToPurchase(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 text-white rounded-xl py-2 px-2.5 text-xs focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+                    >
+                      {COUNTRIES.map((c) => (
+                        <option className="bg-slate-900 text-white" key={c.name} value={c.name}>
+                          {c.flag} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {isVIP && (
+                  <div className="mt-4 mb-5 p-3.5 bg-slate-950/80 border border-slate-850 rounded-2xl space-y-2">
+                    <label className="text-[10px] text-amber-400 font-mono font-bold uppercase tracking-wider block">
+                      🌍 Elige Continente a Canjear ($15):
+                    </label>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {['América', 'Europa', 'África, Asia y Oceanía'].map((cont) => (
+                        <button
+                          key={cont}
+                          type="button"
+                          onClick={() => setSelectedContinentToPurchase(cont)}
+                          className={`py-1.5 px-2.5 rounded-xl text-left font-mono text-[10.5px] font-bold border transition flex items-center justify-between ${
+                            selectedContinentToPurchase === cont
+                              ? 'bg-amber-500/15 text-amber-400 border-amber-500/50 shadow-[0_0_8px_rgba(245,158,11,0.15)]'
+                              : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            {cont === 'América' && '🌎'}
+                            {cont === 'Europa' && '🇪🇺'}
+                            {cont === 'África, Asia y Oceanía' && '🌍'}
+                            {cont}
+                          </span>
+                          {selectedContinentToPurchase === cont && (
+                            <span className="text-[9px] bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded font-black uppercase">ELEGIDO</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <ul className="space-y-3 pt-3 border-t-2 border-dashed border-slate-850/80 mb-6">
                   {p.features.map((feat, idx) => (
                     <li key={idx} className="flex items-start gap-2 text-xs text-slate-300">
@@ -799,7 +824,7 @@ export default function SubscriptionView({
                     }`}
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    <span>{p.buttonText}</span>
+                    <span>{isVIP ? `Canjear ${selectedContinentToPurchase} ($15)` : isScout ? `Canjear ${selectedCountryToPurchase} ($5)` : p.buttonText}</span>
                   </button>
                 )}
               </div>
@@ -1139,18 +1164,7 @@ export default function SubscriptionView({
             <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               
               {/* Payment Gateways Selection list / Ecuador Adaptation */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5 bg-slate-950 border-2 border-black rounded-2xl p-1.5 text-center">
-                <button
-                  type="button"
-                  onClick={() => { setPaymentGateway('stripe'); setPaymentError(''); }}
-                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
-                    paymentGateway === 'stripe' 
-                      ? 'bg-blue-600 text-white border-black shadow' 
-                      : 'text-gray-400 hover:text-white border-transparent'
-                  }`}
-                >
-                  <CreditCard className="w-4 h-4" /> Tarjeta [€]
-                </button>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 bg-slate-950 border-2 border-black rounded-2xl p-1.5 text-center">
 
                 <button
                   type="button"
@@ -1214,29 +1228,6 @@ export default function SubscriptionView({
               </div>
 
               {/* Dynamic Payment Gateways viewport */}
-
-              {/* 0. STRIPE EUROPE PAYMENTS */}
-              {paymentGateway === 'stripe' && (
-                <div className="space-y-3.5 animate-fade-in text-center border-2 border-black bg-gradient-to-br from-blue-950/20 to-slate-900 p-4 rounded-2xl">
-                  <div className="flex justify-center items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse" />
-                    <span className="text-[10px] text-blue-400 uppercase tracking-widest font-mono font-bold">Tarjeta de Crédito / Débito (Stripe España)</span>
-                  </div>
-
-                  <div className="bg-slate-950 p-4 rounded-xl border border-blue-500/10 flex flex-col items-center text-center space-y-1">
-                    <CreditCard className="w-10 h-10 text-blue-400 mb-1" />
-                    <p className="text-xs text-slate-300">
-                      Procesamiento seguro internacional para el mercado de España en Euros (€).
-                    </p>
-                    <p className="text-[10.5px] font-extrabold text-blue-400 mt-2 bg-blue-500/5 px-3 py-1 rounded-lg border border-blue-500/10 inline-block">
-                      Monto final: {showPaymentModal === 'Pase VIP Elite' ? '15,00 €' : '5,00 €'}
-                    </p>
-                    <p className="text-[9px] text-slate-500 mt-1.5 font-mono leading-relaxed text-center">
-                      * Serás redirigido a la pasarela de Stripe con certificación PCI-DSS de nivel 1. Tras validar con tu app bancaria el plan se activará al instante de forma automática.
-                    </p>
-                  </div>
-                </div>
-              )}
               {paymentGateway === 'deuna' && (
                 <div className="space-y-3.5 animate-fade-in text-center border-2 border-black bg-[#061e1b] p-4 rounded-2xl">
                   <div className="flex justify-center items-center gap-2">
@@ -1264,7 +1255,7 @@ export default function SubscriptionView({
                       Beneficiario: Álbum de Trivia Pro S.A.
                     </p>
                     <p className="text-[10.5px] font-extrabold text-emerald-400 mt-2">
-                      Valor a pagar: {showPaymentModal === 'Pase VIP Elite' ? '$15.00' : '$5.00'}
+                      Valor a pagar: {getPlanDetails(showPaymentModal).price}
                     </p>
                   </div>
 
@@ -1316,7 +1307,7 @@ export default function SubscriptionView({
                       <div className="bg-slate-950 px-3 py-2 border border-slate-850 rounded-xl flex items-center justify-between text-xs">
                         <span className="text-gray-400">Total a debitar (Payphone):</span>
                         <span className="font-mono font-black text-amber-400 text-sm">
-                          {showPaymentModal === 'Pase VIP Elite' ? '$15.00' : '$5.00'}
+                          {getPlanDetails(showPaymentModal).price}
                         </span>
                       </div>
 
@@ -1364,7 +1355,7 @@ export default function SubscriptionView({
                       <div className="bg-slate-950 px-3 py-2 border border-slate-850 rounded-xl flex items-center justify-between text-xs">
                         <span className="text-gray-400">Total a pagar con Tarjeta:</span>
                         <span className="font-mono font-black text-emerald-400 text-sm">
-                          {showPaymentModal === 'Pase VIP Elite' ? '$15.00' : '$5.00'}
+                          {getPlanDetails(showPaymentModal).price}
                         </span>
                       </div>
 
@@ -1440,7 +1431,7 @@ export default function SubscriptionView({
                     <p><strong className="text-white">Beneficiario:</strong> Álbum de Trivia de Selecciones S.A.</p>
                     <p><strong className="text-white">RUC:</strong> 1792837482001</p>
                     <p><strong className="text-white">Email:</strong> pagos@albumtrivia2026.com</p>
-                    <p><strong className="text-white">Monto:</strong> <span className="text-emerald-400 font-bold">{showPaymentModal === 'Pase VIP Elite' ? '$15.00 USD' : '$5.00 USD'}</span></p>
+                    <p><strong className="text-white">Monto:</strong> <span className="text-emerald-400 font-bold">{getPlanDetails(showPaymentModal).price}</span></p>
                   </div>
 
                   <div className="text-left space-y-1">
@@ -1475,10 +1466,10 @@ export default function SubscriptionView({
                       ⚠️ CÓDIGOS DE PRUEBA:
                     </p>
                     <p className="text-[11px] text-slate-205 font-mono">
-                      Plan Scout ($5): <strong className="text-amber-400 select-all">EFECTIVO5</strong> o <strong className="text-amber-400 select-all">CASH5</strong>
+                      Plan Scout ({pricingLocation === 'España' ? '10 €' : pricingLocation === 'Ecuador' ? '$5' : '$10'}): <strong className="text-amber-400 select-all">EFECTIVO5</strong> o <strong className="text-amber-400 select-all">CASH5</strong>
                     </p>
                     <p className="text-[11px] text-slate-205 font-mono mt-0.5">
-                      Pase VIP ($15): <strong className="text-amber-400 select-all">EFECTIVO15</strong> o <strong className="text-amber-400 select-all">CASH15</strong>
+                      Pase VIP ({pricingLocation === 'España' ? '20 €' : pricingLocation === 'Ecuador' ? '$15' : '$20'}): <strong className="text-amber-400 select-all">EFECTIVO15</strong> o <strong className="text-amber-400 select-all">CASH15</strong>
                     </p>
                   </div>
 
@@ -1517,18 +1508,18 @@ export default function SubscriptionView({
                       <div className="bg-[#1f1616] p-2.5 rounded-xl border border-rose-500/10 text-center">
                         <span className="text-[9px] text-gray-400 font-mono block uppercase">Costo del Plan</span>
                         <span className="text-lg font-black text-rose-400 font-mono">
-                          ${(showPaymentModal === 'Pase VIP Elite' ? 15.00 : 5.00).toFixed(2)}
+                          {getPlanDetails(showPaymentModal).price}
                         </span>
                       </div>
                     </div>
 
-                    {userCashBalance >= (showPaymentModal === 'Pase VIP Elite' ? 15.00 : 5.00) ? (
+                    {userCashBalance >= getPlanDetails(showPaymentModal).amount ? (
                       <span className="text-xs text-emerald-400 font-mono font-bold flex items-center justify-center gap-1.5 mt-2 bg-emerald-500/5 px-2 py-1 rounded">
                         ✅ Saldo suficiente. Presiona "Confirmar Pago" abajo para activar.
                       </span>
                     ) : (
                       <span className="text-xs text-rose-400 font-mono font-bold flex items-center justify-center gap-1.5 mt-2 bg-rose-500/5 px-2 py-1 rounded animate-pulse">
-                        ❌ Saldo insuficiente ($15 o $5). Recárgalo en tu panel de Billetera.
+                        ❌ Saldo insuficiente ({getPlanDetails(showPaymentModal).price}). Recárgalo en tu panel de Billetera.
                       </span>
                     )}
                   </div>
@@ -1564,7 +1555,7 @@ export default function SubscriptionView({
                 ) : (
                   <>
                     <ShieldCheck className="w-4.5 h-4.5" /> 
-                    Confirmar Pago de {showPaymentModal === 'Pase VIP Elite' ? '$15.00' : '$5.00'}
+                    Confirmar Pago de {getPlanDetails(showPaymentModal).price}
                   </>
                 )}
               </button>

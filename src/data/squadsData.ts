@@ -324,54 +324,56 @@ export function getFactualPlayers(countryName: string): any[] | null {
       }
     } else if (countryName === "Ecuador") {
       if (realName === "Enner Valencia") {
-        customImageUrl = "/src/assets/images/ecuador_valencia_1781178905191.jpg";
+        customImageUrl = "/src/assets/images/valencia_sticker_1781178272322.png";
       } else if (realName === "Moises Caicedo") {
-        customImageUrl = "/src/assets/images/ecuador_caicedo_1781178919841.jpg";
+        customImageUrl = "/src/assets/images/caicedo_sticker_1781178285081.png";
       } else if (realName === "Piero Hincapie") {
-        customImageUrl = "/src/assets/images/ecuador_hincapie_1781178936224.jpg";
+        customImageUrl = "/src/assets/images/hincapie_sticker_1781178296373.png";
       } else if (realName === "Pervis Estupinan") {
-        customImageUrl = "/src/assets/images/ecuador_estupinan_1781178951152.jpg";
+        customImageUrl = "/src/assets/images/estupinan_sticker_1781178308826.png";
       } else if (realName === "Kendry Paez") {
-        customImageUrl = "/src/assets/images/ecuador_paez_1781178965800.jpg";
+        customImageUrl = "/src/assets/images/paez_sticker_1781178321218.png";
       } else if (realName === "Gonzalo Plata") {
-        customImageUrl = "/src/assets/images/ecuador_plata_1781178977053.jpg";
+        customImageUrl = "/src/assets/images/plata_sticker_1781178333457.png";
       } else if (realName === "Willian Pacho") {
-        customImageUrl = "/src/assets/images/ecuador_pacho_1781178990762.jpg";
+        customImageUrl = "/src/assets/images/pacho_sticker_1781178346564.png";
       } else if (realName === "Felix Torres") {
-        customImageUrl = "/src/assets/images/ecuador_pacho_1781178990762.jpg";
+        customImageUrl = "/src/assets/images/pacho_sticker_1781178346564.png";
       } else if (realName === "Michael Estrada") {
-        customImageUrl = "/src/assets/images/ecuador_valencia_1781178905191.jpg";
+        customImageUrl = "/src/assets/images/valencia_sticker_1781178272322.png";
       } else if (realName === "Romario Ibarra") {
-        customImageUrl = "/src/assets/images/ecuador_caicedo_1781178919841.jpg";
+        customImageUrl = "/src/assets/images/caicedo_sticker_1781178285081.png";
       } else if (realName === "H. Galindez" || realName === "Moises Ramirez" || realName === "Gonzalo Valle") {
-        customImageUrl = "/src/assets/images/ecuador_galindez_1781179006101.jpg";
+        customImageUrl = "/src/assets/images/galindez_sticker_1781178360351.png";
       } else {
         // Rotated high-fidelity comic images by position
         if (cleanPos === "GK") {
-          customImageUrl = "/src/assets/images/ecuador_galindez_1781179006101.jpg";
+          customImageUrl = "/src/assets/images/galindez_sticker_1781178360351.png";
         } else if (cleanPos === "DF") {
           const alternations = [
-            "/src/assets/images/ecuador_hincapie_1781178936224.jpg",
-            "/src/assets/images/ecuador_estupinan_1781178951152.jpg",
-            "/src/assets/images/ecuador_pacho_1781178990762.jpg"
+            "/src/assets/images/hincapie_sticker_1781178296373.png",
+            "/src/assets/images/estupinan_sticker_1781178308826.png",
+            "/src/assets/images/pacho_sticker_1781178346564.png"
           ];
           customImageUrl = alternations[index % alternations.length];
         } else if (cleanPos === "MF") {
           const alternations = [
-            "/src/assets/images/ecuador_caicedo_1781178919841.jpg",
-            "/src/assets/images/ecuador_paez_1781178965800.jpg"
+            "/src/assets/images/caicedo_sticker_1781178285081.png",
+            "/src/assets/images/paez_sticker_1781178321218.png"
           ];
           customImageUrl = alternations[index % alternations.length];
         } else {
           // FW
           const alternations = [
-            "/src/assets/images/ecuador_valencia_1781178905191.jpg",
-            "/src/assets/images/ecuador_plata_1781178977053.jpg"
+            "/src/assets/images/valencia_sticker_1781178272322.png",
+            "/src/assets/images/plata_sticker_1781178333457.png"
           ];
           customImageUrl = alternations[index % alternations.length];
         }
       }
     }
+
+
 
     // Define unique specifications requested: nickname, descriptiveTitle, shirtNumber, and actionAnimation properties
     let nickname = realName;
