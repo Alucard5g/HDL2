@@ -2357,8 +2357,8 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Mundial Scouting Album running on standard port: http://localhost:${PORT}`);
-  });
+    console.log(`Mundial Scouting Album running on port ${PORT}...`);
+});
 }
 
 // Fallback trivia if Gemini doesn't answer or is not set up
