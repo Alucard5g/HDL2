@@ -1,7 +1,11 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
+import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 import Stripe from "stripe";
@@ -11,7 +15,7 @@ import { getPregeneratedTrivia } from "./src/data/triviaData";
 dotenv.config();
 
 // Default values if envs are missing
-const PORT = process.env.PORT || 8080;
+const PORT = 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Initialize GoogleGenAI client lazily or safely
@@ -71,7 +75,7 @@ async function generateContentWithRetry(
         
         if (isDepleted) {
           isGeminiQuotaDepleted = true;
-          console.error("[Gemini API Quota Depleted] Detected terminal billing depletion or rate quota exhaustion. Disabling Gemini calls globally and falling back immediately to client-safe offline modes.");
+          console.warn("[Gemini API Quota Depleted] Detected terminal billing depletion or rate quota exhaustion. Disabling Gemini calls globally and falling back immediately to client-safe offline modes.");
           throw err;
         }
 
@@ -105,14 +109,38 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // Resilient helper to resolve data file paths in dev and bundled production mode
+  function resolveDataPath(filename: string): string {
+    const pathsToTry = [
+      path.join(process.cwd(), "src/data", filename),
+      path.join(__dirname, "../src/data", filename),
+      path.join(__dirname, "src/data", filename),
+      path.join(__dirname, "data", filename),
+    ];
+    for (const p of pathsToTry) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+    // Fallback standard path and ensure parent path exists
+    const defaultPath = path.join(process.cwd(), "src/data", filename);
+    const dir = path.dirname(defaultPath);
+    if (!fs.existsSync(dir)) {
+      try {
+        fs.mkdirSync(dir, { recursive: true });
+      } catch (e) {}
+    }
+    return defaultPath;
+  }
+
   // Initialize CUSTOM_STICKERS_DB from filesystem to persist manually associated stickers across restarts
-  const customStickersPath = path.join(process.cwd(), "src/data/customStickers.json");
+  const customStickersPath = resolveDataPath("customStickers.json");
   let CUSTOM_STICKERS_DB: Record<string, string> = {};
   try {
     if (fs.existsSync(customStickersPath)) {
       const content = fs.readFileSync(customStickersPath, "utf-8");
       CUSTOM_STICKERS_DB = JSON.parse(content);
-      console.log(`[Sticker Sync DB] Loaded ${Object.keys(CUSTOM_STICKERS_DB).length} custom sticker mappings from server file.`);
+      console.log(`[Sticker Sync DB] Loaded ${Object.keys(CUSTOM_STICKERS_DB).length} custom sticker mappings from server file: ${customStickersPath}`);
     } else {
       console.log("[Sticker Sync DB] Mappings file not found, initializing empty DB.");
     }
@@ -121,13 +149,13 @@ async function startServer() {
   }
 
   // Initialize CUSTOM_MATCHES_DB from filesystem to persist administrator results across restarts
-  const customMatchesPath = path.join(process.cwd(), "src/data/customMatches.json");
+  const customMatchesPath = resolveDataPath("customMatches.json");
   let CUSTOM_MATCHES_DB: Record<string, { golesLocal: number, golesVisitante: number, jugado: boolean }> = {};
   try {
     if (fs.existsSync(customMatchesPath)) {
       const content = fs.readFileSync(customMatchesPath, "utf-8");
       CUSTOM_MATCHES_DB = JSON.parse(content);
-      console.log(`[Matches Sync DB] Loaded ${Object.keys(CUSTOM_MATCHES_DB).length} custom modified match fixtures from server file.`);
+      console.log(`[Matches Sync DB] Loaded ${Object.keys(CUSTOM_MATCHES_DB).length} custom modified match fixtures from server file: ${customMatchesPath}`);
     } else {
       console.log("[Matches Sync DB] Custom matches file not found, initializing empty DB.");
     }
@@ -136,19 +164,19 @@ async function startServer() {
   }
 
   // Initialize BLOG_POSTS_DB and SUGGESTIONS_DB from filesystem
-  const blogPostsPath = path.join(process.cwd(), "src", "data", "blogPosts.json");
+  const blogPostsPath = resolveDataPath("blogPosts.json");
   let BLOG_POSTS_DB: any[] = [];
   try {
     if (fs.existsSync(blogPostsPath)) {
       const content = fs.readFileSync(blogPostsPath, "utf-8");
       BLOG_POSTS_DB = JSON.parse(content);
-      console.log(`[Blog DB] Loaded ${BLOG_POSTS_DB.length} blog posts from server file.`);
+      console.log(`[Blog DB] Loaded ${BLOG_POSTS_DB.length} blog posts from server file: ${blogPostsPath}`);
     }
   } catch (e: any) {
     console.error("[Blog DB Error] Loading fallback empty blog posts:", e);
   }
 
-  const suggestionsPath = path.join(process.cwd(), "src", "data", "suggestions.json");
+  const suggestionsPath = resolveDataPath("suggestions.json");
   let SUGGESTIONS_DB: any[] = [];
   try {
     if (fs.existsSync(suggestionsPath)) {
@@ -395,9 +423,14 @@ async function startServer() {
 
   // API Route: Proxy an image to bypass CORS and allow client-side canvas WebP conversion
   app.get("/api/proxy-image", async (req, res) => {
-    const imageUrl = req.query.url;
+    let imageUrl = req.query.url;
     if (!imageUrl || typeof imageUrl !== "string") {
       return res.status(400).send("Falta el parámetro 'url'.");
+    }
+
+    // Resilience: Correct any accidental 'fal.zmedia' to 'fal.media' or 'v3b.fal.zmedia' to 'v3.fal.media'
+    if (imageUrl.includes("fal.zmedia")) {
+      imageUrl = imageUrl.replace("fal.zmedia", "fal.media");
     }
 
     try {
@@ -556,8 +589,14 @@ No violes derechos de autor. Utiliza descripciones artísticas, tácticas y futb
 
       const reportText = response.text?.trim() || "";
       res.json({ report: reportText });
-    } catch (error) {
-      console.error("Error generating scout report:", error);
+    } catch (error: any) {
+      const errMsg = error?.message || String(error);
+      if (errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("credits are depleted")) {
+        isGeminiQuotaDepleted = true;
+        console.warn("[Gemini API Quota Check] No prepayment credits remaining or quota limit reached in scout report.");
+      } else {
+        console.warn("[Gemini API Warning] Error generating scout report, falling back:", errMsg);
+      }
       res.json({
         report: `${playerName} es un ${position} moderno con un juego enfocado en la intensidad y el equilibrio táctico. Su calificación de ${rating} refleja un alto potencial colectivo y grandes garantías técnicas para ${country}.`
       });
@@ -751,7 +790,13 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
         hoursRemaining = parsed.hoursRemaining !== undefined ? parsed.hoursRemaining : hoursRemaining;
         reason = parsed.reason || reason;
       } catch (err: any) {
-        console.error("Error orquestando validación con Gemini:", err);
+        const errMsg = err?.message || String(err);
+        if (errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("credits are depleted")) {
+          isGeminiQuotaDepleted = true;
+          console.warn("[Gemini API Quota Check] No prepayment credits remaining or quota limit reached in schedule validation.");
+        } else {
+          console.warn("[Gemini API Warning] Error in schedule validation with Gemini, using local fallback:", errMsg);
+        }
       }
     }
 
@@ -876,7 +921,13 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
           });
         }
       } catch (err: any) {
-        console.error("Error orquestando sincronización de marcadores con Gemini Search Grounding:", err);
+        const errMsg = err?.message || String(err);
+        if (errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("credits are depleted")) {
+          isGeminiQuotaDepleted = true;
+          console.warn("[Gemini API Quota Check] No prepayment credits remaining or quota limit reached in prediction sync.");
+        } else {
+          console.warn("[Gemini API Warning] Error in prediction sync with Gemini, using local fallback:", errMsg);
+        }
       }
     }
 
@@ -957,7 +1008,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     return totalPoints;
   }
 
-  const registeredUsersPath = path.join(process.cwd(), "src", "data", "registeredUsers.json");
+  const registeredUsersPath = resolveDataPath("registeredUsers.json");
   
   function saveUsersToDisk() {
     try {
