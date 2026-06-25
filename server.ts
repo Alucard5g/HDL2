@@ -15,7 +15,7 @@ import { getPregeneratedTrivia } from "./src/data/triviaData";
 dotenv.config();
 
 // Default values if envs are missing
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Initialize GoogleGenAI client lazily or safely
