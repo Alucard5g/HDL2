@@ -548,25 +548,25 @@ export default function App() {
   };
 
   const [userId, setUserId] = useState<string>(() => {
-    return localStorage.getItem('dt_user_id') || 'usr_admin';
+    return localStorage.getItem('dt_user_id') || 'user_me';
   });
 
   const [username, setUsername] = useState<string>(() => {
-    return localStorage.getItem('dt_username') || 'Administrador Senior';
+    return localStorage.getItem('dt_username') || 'Invitado (Director Técnico)';
   });
 
   const [userEmail, setUserEmail] = useState<string>(() => {
-    return localStorage.getItem('dt_user_email') || 'geovannygrk3d@gmail.com';
+    return localStorage.getItem('dt_user_email') || '';
   });
 
   const [userAvatar, setUserAvatar] = useState<string>(() => {
-    return localStorage.getItem('dt_user_avatar') || '👑';
+    return localStorage.getItem('dt_user_avatar') || '⚽';
   });
 
   const [userCode, setUserCode] = useState<string>(() => {
     let code = localStorage.getItem('dt_user_code');
     if (!code) {
-      code = 'DT-ADMIN';
+      code = 'DT-' + Math.floor(1000 + Math.random() * 9000);
       localStorage.setItem('dt_user_code', code);
     }
     return code;
@@ -574,8 +574,12 @@ export default function App() {
 
   const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean>(false);
 
+  const isAdmin = userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail';
+
+  const isRegistered = userId !== 'user_me' && !!userEmail && userEmail.trim().length > 0;
+
   // State
-  const [selectedCountryName, setSelectedCountryName] = useState<string>('Argentina');
+  const [selectedCountryName, setSelectedCountryName] = useState<string>('Ecuador');
   const [albumPage, setAlbumPage] = useState<number>(1);
 
   useEffect(() => {
@@ -823,14 +827,12 @@ export default function App() {
   // Current active trivia state
   const [activeTrivia, setActiveTrivia] = useState<{ country: string; flag: string; level: number } | null>(null);
 
-  // Guard rule: if user is not registered, they can't access any game tabs, only menu_hub.
+  // Guard rule: if user is not admin, protect administrative tabs from unauthorized access.
   useEffect(() => {
-    const isRegistered = userId !== 'user_me' && !!userEmail && userEmail.trim().length > 0;
-    if (!isRegistered && activeTab !== 'menu_hub') {
+    if (!isAdmin && (activeTab === 'admin' || activeTab === 'flutter')) {
       setActiveTab('menu_hub');
-      setIsRegistrationOpen(true);
     }
-  }, [activeTab, userId, userEmail]);
+  }, [activeTab, isAdmin]);
 
   // Sticker custom fal.ai generation state
   const [isGeneratingStickerId, setIsGeneratingStickerId] = useState<string | null>(null);
@@ -1394,10 +1396,6 @@ export default function App() {
     }
   }, [isRegistrationOpen, username, userEmail, userAvatar]);
 
-  const isAdmin = userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail';
-
-  const isRegistered = userId !== 'user_me' && !!userEmail && userEmail.trim().length > 0;
-
   const getCountryContinent = (countryName: string): string => {
     const america = ['México', 'Canadá', 'Brasil', 'Haití', 'Estados Unidos', 'Paraguay', 'Curazao', 'Ecuador', 'Uruguay', 'Argentina', 'Colombia', 'Panamá'];
     const europa = ['República Checa', 'Bosnia y Herzegovina', 'Suiza', 'Escocia', 'Turquía', 'Alemania', 'Países Bajos', 'Suecia', 'Bélgica', 'España', 'Francia', 'Noruega', 'Austria', 'Portugal', 'Inglaterra', 'Croacia'];
@@ -1492,7 +1490,9 @@ export default function App() {
     const bonusScore = completedCountriesList.length * 5;
     const onceScore = totalOnceHits * 10;
     const predictScore = totalScoreHits * 20;
-    const totalScore = stickerScore + bonusScore + onceScore + predictScore + referralPoints + purchasedPoints;
+    const totalScore = isRegistered 
+      ? (stickerScore + bonusScore + onceScore + predictScore + referralPoints + purchasedPoints)
+      : 0;
 
     return {
       unlockedStickersCount,
@@ -1564,7 +1564,9 @@ export default function App() {
   }, [unlockedLevels, userSubscription, userCode, userId, username, userAvatar, currentUserInfo.totalOnceHits, currentUserInfo.totalScoreHits, userLicense, tacticalBoards, userEmail, userReferredByEmail, userCoins, userCashBalance, purchasedPoints]);
 
   const isCountryLockedForUser = (countryName: string): boolean => {
-    if (!isRegistered) return false;
+    if (!isRegistered) {
+      return countryName !== 'Ecuador';
+    }
     
     // VIP Elite and Scout Básico can access games for all countries, but won't get stickers unless in their selection
     if (userSubscription === 'Pase VIP Elite' || userSubscription === 'Plan Scout Básico') {
@@ -1585,6 +1587,16 @@ export default function App() {
   };
 
   const handleCountrySelectionClick = (countryName: string) => {
+    if (!isRegistered) {
+      if (countryName !== 'Ecuador') {
+        alert('📢 MODO INVITADO LIMITADO\n\nComo invitado, solo puedes observar y jugar con la Selección de Ecuador. Por favor, regístrate de forma 100% gratuita para coleccionar y jugar con las 32 selecciones del Mundial y registrar tu puntaje.');
+        setIsRegistrationOpen(true);
+        return;
+      }
+      setSelectedCountryName(countryName);
+      return;
+    }
+
     if (isRegistered && userSubscription === 'Ninguna') {
       if (freeChosenCountry === '') {
         setCountryToConfirmFree(countryName);
@@ -1607,6 +1619,9 @@ export default function App() {
     
     // Guest (not registered) user
     if (!isRegistered) {
+      if (countryName !== 'Ecuador') {
+        return [];
+      }
       const levels = unlockedLevels[countryName] || { 1: false, 2: false, 3: false };
       const lvl1 = levels[1] || levels['1'] || false;
       const lvl2 = levels[2] || levels['2'] || false;
@@ -2430,6 +2445,23 @@ export default function App() {
               </div>
             )}
             
+            {!isRegistered && activeTab !== 'menu_hub' && (
+              <div 
+                onClick={() => setIsRegistrationOpen(true)}
+                className="cursor-pointer mb-5 bg-[#FDDF2B] text-black border-[3.5px] border-black p-3.5 rounded-2xl shadow-[5px_5px_0px_#000] flex flex-col sm:flex-row items-center justify-between gap-3 font-comic font-bold text-xs hover:translate-y-0.5 hover:shadow-[3px_3px_0px_#000] transition-all rotate-[-0.5deg]"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">⚠️</span>
+                  <span>
+                    <strong>MODO SIMULACIÓN (INVITADO):</strong> Estás jugando y observando únicamente con la selección de <strong>Ecuador</strong> de forma gratuita. Tus puntos no se registrarán en el ranking oficial. ¡Haz clic aquí para registrarte de forma 100% gratuita y desbloquear las 32 selecciones!
+                  </span>
+                </div>
+                <span className="bg-black text-white text-[10px] px-2.5 py-1 rounded border border-black font-bangers uppercase tracking-wider shrink-0">
+                  REGISTRARME GRATIS ⚡
+                </span>
+              </div>
+            )}
+            
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTrivia ? 'trivia' : activeTab}
@@ -3005,10 +3037,11 @@ export default function App() {
                       const isContinentChosen = (cont: string) => vipChosenContinent && vipChosenContinent.split(',').map(s => s.trim().toUpperCase()).includes(cont.toUpperCase());
                       const isCountryChosen = (cName: string) => scoutChosenCountry && scoutChosenCountry.split(',').map(s => s.trim().toUpperCase()).includes(cName.toUpperCase());
 
-                      const hasCromoAccessForThisCountry = !isRegistered || 
-                        (userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(c.name))) ||
-                        (userSubscription === 'Plan Scout Básico' && isCountryChosen(c.name)) ||
-                        (userSubscription === 'Ninguna' && freeChosenCountry === c.name);
+                      const hasCromoAccessForThisCountry = !isRegistered 
+                        ? (c.name === 'Ecuador')
+                        : ((userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(c.name))) ||
+                           (userSubscription === 'Plan Scout Básico' && isCountryChosen(c.name)) ||
+                           (userSubscription === 'Ninguna' && freeChosenCountry === c.name));
 
                       let completionBadge = '';
                       if (unlockedCromos === maxCromos) completionBadge = '🏆';
@@ -3320,6 +3353,15 @@ export default function App() {
                                 ) : (
                                   <button
                                     onClick={() => {
+                                      if (!isRegistered) {
+                                        if (activeCountry.name !== 'Ecuador') {
+                                          alert('📢 SE REQUIERE REGISTRO\n\nLas trivias de otros países son exclusivas para directores registrados. Por favor, regístrate de forma 100% gratuita.');
+                                          setIsRegistrationOpen(true);
+                                        } else {
+                                          setActiveTrivia({ country: activeCountry.name, flag: activeCountry.flag, level: lvl });
+                                        }
+                                        return;
+                                      }
                                       if (isCountryLockedForUser(activeCountry.name)) {
                                         setUpsellCountry(activeCountry.name);
                                       } else {
