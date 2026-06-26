@@ -359,7 +359,7 @@ export default function App() {
 
   // User Profile & premium licensing parameters
   const [userSubscription, setUserSubscription] = useState<string>(() => {
-    return localStorage.getItem('user_subscription') || 'Ninguna';
+    return localStorage.getItem('user_subscription') || 'Pase VIP Elite';
   });
   const [userLicense, setUserLicense] = useState<string>(() => {
     return localStorage.getItem('dt_user_license') || '';
@@ -376,6 +376,12 @@ export default function App() {
     localStorage.setItem('dt_vip_chosen_continent', vipChosenContinent);
   }, [vipChosenContinent]);
 
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    if (document.documentElement) document.documentElement.scrollTop = 0;
+    if (document.body) document.body.scrollTop = 0;
+  }, [activeTab]);
+
   const [freeChosenCountry, setFreeChosenCountry] = useState<string>(() => {
     return localStorage.getItem('free_chosen_country') || '';
   });
@@ -389,8 +395,33 @@ export default function App() {
   const [upsellCountry, setUpsellCountry] = useState<string | null>(null);
 
   const handleUpdateScoutCountry = (country: string) => {
-    localStorage.setItem('scout_chosen_country', country);
-    setScoutChosenCountry(country);
+    if (!country) return;
+    setScoutChosenCountry(prev => {
+      if (!prev) {
+        localStorage.setItem('scout_chosen_country', country);
+        return country;
+      }
+      const existing = prev.split(',').map(s => s.trim().toUpperCase());
+      if (existing.includes(country.toUpperCase())) return prev;
+      const next = prev + ', ' + country;
+      localStorage.setItem('scout_chosen_country', next);
+      return next;
+    });
+  };
+
+  const handleUpdateVipContinent = (continent: string) => {
+    if (!continent) return;
+    setVipChosenContinent(prev => {
+      if (!prev) {
+        localStorage.setItem('dt_vip_chosen_continent', continent);
+        return continent;
+      }
+      const existing = prev.split(',').map(s => s.trim().toUpperCase());
+      if (existing.includes(continent.toUpperCase())) return prev;
+      const next = prev + ', ' + continent;
+      localStorage.setItem('dt_vip_chosen_continent', next);
+      return next;
+    });
   };
 
   // Wallet & virtual currency balances (Ecuador simulation)
@@ -508,15 +539,15 @@ export default function App() {
   };
 
   const [userId, setUserId] = useState<string>(() => {
-    return localStorage.getItem('dt_user_id') || 'user_me';
+    return localStorage.getItem('dt_user_id') || 'usr_admin';
   });
 
   const [username, setUsername] = useState<string>(() => {
-    return localStorage.getItem('dt_username') || 'Tú (Director Técnico)';
+    return localStorage.getItem('dt_username') || 'Administrador Senior';
   });
 
   const [userEmail, setUserEmail] = useState<string>(() => {
-    return localStorage.getItem('dt_user_email') || '';
+    return localStorage.getItem('dt_user_email') || 'geovannygrk3d@gmail.com';
   });
 
   const [userAvatar, setUserAvatar] = useState<string>(() => {
@@ -526,7 +557,7 @@ export default function App() {
   const [userCode, setUserCode] = useState<string>(() => {
     let code = localStorage.getItem('dt_user_code');
     if (!code) {
-      code = 'DT-' + Math.floor(1000 + Math.random() * 9000);
+      code = 'DT-ADMIN';
       localStorage.setItem('dt_user_code', code);
     }
     return code;
@@ -1377,13 +1408,16 @@ export default function App() {
       let lvl3 = levels[3] || levels['3'] || false;
       let isCountryCompletedDefault = lvl1 && lvl2 && lvl3;
       
-      let isCountryCompletedVIP = userSubscription === 'Pase VIP Elite' && getCountryContinent(country) === vipChosenContinent;
-      let isCountryCompletedScout = userSubscription === 'Plan Scout Básico' && scoutChosenCountry === country;
+      const isContinentChosen = (cont: string) => vipChosenContinent && vipChosenContinent.split(',').map(s => s.trim().toUpperCase()).includes(cont.toUpperCase());
+      const isCountryChosen = (c: string) => scoutChosenCountry && scoutChosenCountry.split(',').map(s => s.trim().toUpperCase()).includes(c.toUpperCase());
+
+      let isCountryCompletedVIP = userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(country));
+      let isCountryCompletedScout = userSubscription === 'Plan Scout Básico' && isCountryChosen(country);
 
       // Access checks
       const hasCromoAccess = !isRegistered || 
-        (userSubscription === 'Pase VIP Elite' && getCountryContinent(country) === vipChosenContinent) ||
-        (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === country) ||
+        (userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(country))) ||
+        (userSubscription === 'Plan Scout Básico' && isCountryChosen(country)) ||
         (userSubscription === 'Ninguna' && freeChosenCountry === country);
 
       let countryCount = 0;
@@ -1571,21 +1605,25 @@ export default function App() {
       return unlocked;
     }
 
+    const isContinentChosen = (cont: string) => vipChosenContinent && vipChosenContinent.split(',').map(s => s.trim().toUpperCase()).includes(cont.toUpperCase());
+    const isCountryChosen = (c: string) => scoutChosenCountry && scoutChosenCountry.split(',').map(s => s.trim().toUpperCase()).includes(c.toUpperCase());
+
     // Registered user cromo access check
     const hasCromoAccess = 
-      (userSubscription === 'Pase VIP Elite' && getCountryContinent(countryName) === vipChosenContinent) ||
-      (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === countryName) ||
+      isAdmin ||
+      (userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(countryName))) ||
+      (userSubscription === 'Plan Scout Básico' && isCountryChosen(countryName)) ||
       (userSubscription === 'Ninguna' && freeChosenCountry === countryName);
 
     if (!hasCromoAccess) {
       return [];
     }
 
-    if (userSubscription === 'Pase VIP Elite') {
+    if (isAdmin || (userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(countryName)))) {
       return countryPlayers;
     }
     
-    if (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === countryName) {
+    if (userSubscription === 'Plan Scout Básico' && isCountryChosen(countryName)) {
       return countryPlayers;
     }
 
@@ -1618,9 +1656,12 @@ export default function App() {
   const unlockedCount = getUnlockedPlayersForCountry(activeCountry.name).length;
   const isAlbumComplete = unlockedCount >= activeCountryPlayers.length;
 
-  const hasCromoAccess = !isRegistered || 
-    (userSubscription === 'Pase VIP Elite' && getCountryContinent(activeCountry.name) === vipChosenContinent) ||
-    (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === activeCountry.name) ||
+  const isContinentChosen = (cont: string) => vipChosenContinent && vipChosenContinent.split(',').map(s => s.trim().toUpperCase()).includes(cont.toUpperCase());
+  const isCountryChosen = (c: string) => scoutChosenCountry && scoutChosenCountry.split(',').map(s => s.trim().toUpperCase()).includes(c.toUpperCase());
+
+  const hasCromoAccess = !isRegistered || isAdmin || 
+    (userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(activeCountry.name))) ||
+    (userSubscription === 'Plan Scout Básico' && isCountryChosen(activeCountry.name)) ||
     (userSubscription === 'Ninguna' && freeChosenCountry === activeCountry.name);
 
   // Handle successful trivia completion
@@ -1639,9 +1680,9 @@ export default function App() {
       return next;
     });
 
-    const hasCromoAccessForCountry = !isRegistered || 
-      (userSubscription === 'Pase VIP Elite' && getCountryContinent(country) === vipChosenContinent) ||
-      (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === country) ||
+    const hasCromoAccessForCountry = !isRegistered || isAdmin || 
+      (userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(country))) ||
+      (userSubscription === 'Plan Scout Básico' && isCountryChosen(country)) ||
       (userSubscription === 'Ninguna' && freeChosenCountry === country);
 
     if (hasCromoAccessForCountry) {
@@ -2895,9 +2936,12 @@ export default function App() {
                       
                       const isLocked = isCountryLockedForUser(c.name);
                       const isMyFreeSelection = isRegistered && userSubscription === 'Ninguna' && freeChosenCountry === c.name;
+                      const isContinentChosen = (cont: string) => vipChosenContinent && vipChosenContinent.split(',').map(s => s.trim().toUpperCase()).includes(cont.toUpperCase());
+                      const isCountryChosen = (cName: string) => scoutChosenCountry && scoutChosenCountry.split(',').map(s => s.trim().toUpperCase()).includes(cName.toUpperCase());
+
                       const hasCromoAccessForThisCountry = !isRegistered || 
-                        (userSubscription === 'Pase VIP Elite' && getCountryContinent(c.name) === vipChosenContinent) ||
-                        (userSubscription === 'Plan Scout Básico' && scoutChosenCountry === c.name) ||
+                        (userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(c.name))) ||
+                        (userSubscription === 'Plan Scout Básico' && isCountryChosen(c.name)) ||
                         (userSubscription === 'Ninguna' && freeChosenCountry === c.name);
 
                       let completionBadge = '';
@@ -3549,6 +3593,61 @@ export default function App() {
 
                   {/* GRID OF CROMOS: Unlocked are shiny stamps, Locked are dotted blue blueprints */}
                   <div>
+                    {isAdmin && (
+                      <div className="mb-6 p-4 bg-indigo-950/90 border-4 border-indigo-500 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-4 text-white shadow-[6px_6px_0px_#000]">
+                        <div className="text-left">
+                          <span className="text-[9px] bg-indigo-600 px-2 py-0.5 rounded-full text-white font-mono font-black uppercase tracking-wider inline-block mb-1.5 border border-black">
+                            ⚡ PANEL DE ACCESO ADMIN
+                          </span>
+                          <h4 className="text-sm font-bangers tracking-wider uppercase text-yellow-400">Control Instantáneo de Cromos ({activeCountry.name})</h4>
+                          <p className="text-[10.5px] text-slate-350 font-comic font-semibold mt-1">Como administrador del sistema, puedes forzar la convalidación, adición o vaciado instantáneo de stickers para pruebas de visualización.</p>
+                        </div>
+                        <div className="flex flex-row gap-2 w-full sm:w-auto shrink-0">
+                          <button
+                            onClick={() => {
+                              setManuallyUnlockedPlayerIds(prev => {
+                                const next = { ...prev };
+                                activeCountryPlayers.forEach(p => {
+                                  next[p.id] = true;
+                                });
+                                return next;
+                              });
+                              setAppCustomAlert({
+                                title: '🔓 DESBLOQUEO EXITOSO',
+                                message: `Se han añadido de forma segura los 26 coleccionables tácticos de ${activeCountry.name} a tu colección.`
+                              });
+                            }}
+                            className="flex-1 sm:flex-none py-2 px-4 bg-emerald-500 hover:bg-emerald-400 text-black border-2 border-black font-bangers text-xs uppercase tracking-wider rounded-lg shadow-[2px_2px_0px_#000] cursor-pointer hover:scale-105 active:scale-95 transition-all text-center"
+                          >
+                            🔓 Desbloquear Todos (26/26)
+                          </button>
+                          <button
+                            onClick={() => {
+                              setManuallyUnlockedPlayerIds(prev => {
+                                const next = { ...prev };
+                                activeCountryPlayers.forEach(p => {
+                                  delete next[p.id];
+                                });
+                                return next;
+                              });
+                              setUnlockedLevels(prev => {
+                                const next = { ...prev };
+                                next[activeCountry.name] = { 1: false, 2: false, 3: false };
+                                return next;
+                              });
+                              setAppCustomAlert({
+                                title: '🔒 ÁLBUM LIMPIO',
+                                message: `Se han removido los stickers de ${activeCountry.name} para recrear el estado de juego desde cero.`
+                              });
+                            }}
+                            className="flex-1 sm:flex-none py-2 px-4 bg-[#EF4444] hover:bg-red-600 text-white border-2 border-black font-bangers text-xs uppercase tracking-wider rounded-lg shadow-[2px_2px_0px_#000] cursor-pointer hover:scale-105 active:scale-95 transition-all text-center"
+                          >
+                            🔒 Bloquear Todos
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     <h3 className="font-bangers text-xl text-[#10B981] tracking-wider mb-4 flex items-center gap-2 uppercase">
                       <Award className="w-5 h-5 text-[#10B981]" />
                       <span>ESTAMPAS REUNIDAS EN HOJA {albumPage} ({
@@ -3641,15 +3740,35 @@ export default function App() {
                               </div>
 
                               <div className="w-full relative z-10">
-                                <div className="text-[9.5px] font-comic font-black text-[#EF4444] mb-2 leading-tight uppercase animate-pulse">
-                                  🚫 Sin Cromo en tu Plan
-                                </div>
+                                {!hasCromoAccess ? (
+                                  <div className="text-[9.5px] font-comic font-black text-[#EF4444] mb-2 leading-tight uppercase animate-pulse">
+                                    🚫 Sin Cromo en tu Plan
+                                  </div>
+                                ) : (
+                                  <div className="text-[9.5px] font-comic font-black text-amber-500 mb-2 leading-tight uppercase">
+                                    🔒 Cromo Bloqueado
+                                  </div>
+                                )}
                                 <button
                                   onClick={() => setActiveTrivia({ country: activeCountry.name, flag: activeCountry.flag, level: albumPage })}
                                   className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white font-bangers text-xs tracking-wider uppercase border-2 border-black rounded-lg cursor-pointer shadow-[2px_2px_0px_#000] active:scale-95 transition-all"
                                 >
                                   Jugar Nivel {albumPage} 🎮
                                 </button>
+                                {isAdmin && (
+                                  <button
+                                    onClick={() => {
+                                      setManuallyUnlockedPlayerIds(prev => ({ ...prev, [p.id]: true }));
+                                      setAppCustomAlert({
+                                        title: '🔓 CROMO AÑADIDO',
+                                        message: `Has desbloqueado el cromo de ${p.realName} (${p.name}) para el álbum.`
+                                      });
+                                    }}
+                                    className="w-full mt-2 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black border-2 border-black font-bangers text-[10.5px] uppercase tracking-wider rounded-lg shadow-[2px_2px_0px_#000] cursor-pointer"
+                                  >
+                                    ➕ AÑADIR CROMO
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -3787,7 +3906,7 @@ export default function App() {
                 onSetUnlockedLevels={setUnlockedLevels}
                 onAddPurchasedPoints={(pts: number) => setPurchasedPoints(prev => prev + pts)}
                 vipChosenContinent={vipChosenContinent}
-                onUpdateVipContinent={setVipChosenContinent}
+                onUpdateVipContinent={handleUpdateVipContinent}
               />
             )}
 
@@ -4064,7 +4183,6 @@ export default function App() {
               </div>
               <div className="flex gap-4">
                 <span className="text-gray-500">Admin email: geovannygrk3d@gmail.com</span>
-                <span className="text-slate-500">Contacto: roly3d@hotmail.com | roly3d.rg@gmail.com</span>
               </div>
             </div>
           </footer>

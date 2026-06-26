@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && node -e \"const fs = require('fs'); const path = require('path'); const copyDir = (src, dest) => { if (!fs.existsSync(src)) return; fs.mkdirSync(dest, { recursive: true }); fs.readdirSync(src).forEach(file => { const sPath = path.join(src, file); const dPath = path.join(dest, file); if (fs.statSync(sPath).isDirectory()) { copyDir(sPath, dPath); } else { fs.copyFileSync(sPath, dPath); } }); }; copyDir('src/data', 'dist/data'); copyDir('src/assets', 'dist/src/assets');\"",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit"

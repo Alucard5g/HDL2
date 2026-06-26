@@ -34,7 +34,9 @@ import {
   Zap,
   Image,
   Rss,
-  MessageSquare
+  MessageSquare,
+  Ticket,
+  Key
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { COUNTRIES, generatePlayersForCountry, MATCH_FIXTURES } from '../data';
@@ -171,6 +173,84 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
   const [newSubReference, setNewSubReference] = useState<string>('');
   const [newSubAmount, setNewSubAmount] = useState<string>('15.00');
   const [newSubPromoterId, setNewSubPromoterId] = useState<string>('');
+
+  // Estados para Generación de Códigos Manuales de Suscripción/Cortesías
+  const [courtesyCodesList, setCourtesyCodesList] = useState<Record<string, { planTier: string, isUsed: boolean, usedBy?: string, usedAt?: string, createdAt: string }>>({});
+  const [loadingCourtesyCodes, setLoadingCourtesyCodes] = useState<boolean>(false);
+  const [newCourtesyCode, setNewCourtesyCode] = useState<string>('');
+  const [newCourtesyPlan, setNewCourtesyPlan] = useState<string>('Pase VIP Elite');
+
+  const fetchCourtesyCodes = async () => {
+    setLoadingCourtesyCodes(true);
+    try {
+      const response = await fetch('/api/admin/courtesy-codes');
+      const data = await response.json();
+      if (data.status === 'success') {
+        setCourtesyCodesList(data.codes || {});
+      }
+    } catch (err) {
+      console.warn('Error fetching courtesy codes:', err);
+    } finally {
+      setLoadingCourtesyCodes(false);
+    }
+  };
+
+  const handleCreateCourtesyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('/api/admin/courtesy-codes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code: newCourtesyCode,
+          planTier: newCourtesyPlan
+        })
+      });
+      const data = await response.json();
+      if (response.ok && data.status === 'success') {
+        setSuccessMsg(`¡Código "${data.code}" creado con éxito para "${newCourtesyPlan}"!`);
+        setNewCourtesyCode('');
+        fetchCourtesyCodes();
+        setTimeout(() => setSuccessMsg(''), 4000);
+      } else {
+        setCustomAlert({
+          title: 'Error al generar código',
+          message: data.error || 'No se pudo crear el código de cortesía.'
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      setCustomAlert({
+        title: 'Error de Red',
+        message: err.message
+      });
+    }
+  };
+
+  const handleDeleteCourtesyCode = async (code: string) => {
+    setCustomConfirm({
+      title: '⚠️ ¿ELIMINAR CÓDIGO DE CORTESÍA?',
+      message: `¿Estás seguro de que deseas eliminar permanentemente el código "${code}"? Los usuarios ya no podrán usarlo para activaciones.`,
+      onConfirm: async () => {
+        try {
+          const response = await fetch('/api/admin/courtesy-codes/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+          });
+          const data = await response.json();
+          if (data.status === 'success') {
+            setSuccessMsg(`Código "${code}" eliminado con éxito.`);
+            fetchCourtesyCodes();
+            setTimeout(() => setSuccessMsg(''), 4000);
+          }
+        } catch (err) {
+          console.error(err);
+        }
+        setCustomConfirm(null);
+      }
+    });
+  };
 
   const fetchSubscriptionsList = async (isSilent = false) => {
     if (!isSilent) setLoadingSubscriptions(true);
@@ -459,6 +539,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
     fetchAffiliateStats();
     if (currentSubTab === 'subscriptions') {
       fetchSubscriptionsList();
+      fetchCourtesyCodes();
     }
     if (currentSubTab === 'blog_admin') {
       fetchBlogPosts();
@@ -3405,104 +3486,220 @@ app.post('/api/webhooks/fal', async (req, res) => {
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
-            {/* Formulario de Registro de Suscripción Manual (Alta) */}
-            <div className="bg-slate-900 border-3 border-black rounded-3xl p-5 shadow-[5px_5px_0px_#000] space-y-4 h-fit">
-              <h4 className="font-bangers text-lg text-white uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
-                <PlusCircle className="w-5 h-5 text-yellow-400" /> CREAR / CERTIFICAR SUSCRIPCIÓN EN BD
-              </h4>
-              <p className="text-xs font-comic text-slate-450 leading-normal">
-                Genera de forma manual un recibo de suscripción seguro para convalidar pagos en efectivo recibidos por Deuna, cupones prepagos o depósito bancario. Esto otorgará al Director Técnico el estatus premium de forma inmediata en la tabla general.
-              </p>
+            {/* COLUMNA 1: ALTAS & CÓDIGOS DE CORTESÍA */}
+            <div className="space-y-6">
+              {/* Formulario de Registro de Suscripción Manual (Alta) */}
+              <div className="bg-slate-900 border-3 border-black rounded-3xl p-5 shadow-[5px_5px_0px_#000] space-y-4 h-fit">
+                <h4 className="font-bangers text-lg text-white uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
+                  <PlusCircle className="w-5 h-5 text-yellow-400" /> CREAR / CERTIFICAR SUSCRIPCIÓN EN BD
+                </h4>
+                <p className="text-xs font-comic text-slate-450 leading-normal">
+                  Genera de forma manual un recibo de suscripción seguro para convalidar pagos en efectivo recibidos por Deuna, cupones prepagos o depósito bancario. Esto otorgará al Director Técnico el estatus premium de forma inmediata en la tabla general.
+                </p>
 
-              <form onSubmit={handleCreateSubscriptionLog} className="space-y-3.5 pt-2">
-                <div>
-                  <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Director Técnico Beneficiario *</label>
-                  <select
-                    value={newSubUserId}
-                    onChange={(e) => setNewSubUserId(e.target.value)}
-                    className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2.5 rounded-xl font-mono focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="">-- SELECCIONAR DT REGISTRADO --</option>
-                    {usersList.map(u => (
-                      <option key={u.id} value={u.id}>
-                        {u.username} ({u.gameCode}) - {u.subscription || 'Sin Plan'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+                <form onSubmit={handleCreateSubscriptionLog} className="space-y-3.5 pt-2">
                   <div>
-                    <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Plan a Licenciar *</label>
+                    <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Director Técnico Beneficiario *</label>
                     <select
-                      value={newSubPlanTier}
-                      onChange={(e) => setNewSubPlanTier(e.target.value)}
-                      className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none"
+                      value={newSubUserId}
+                      onChange={(e) => setNewSubUserId(e.target.value)}
+                      className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2.5 rounded-xl font-mono focus:outline-none focus:border-purple-500"
+                    >
+                      <option value="">-- SELECCIONAR DT REGISTRADO --</option>
+                      {usersList.map(u => (
+                        <option key={u.id} value={u.id}>
+                          {u.username} ({u.gameCode}) - {u.subscription || 'Sin Plan'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Plan a Licenciar *</label>
+                      <select
+                        value={newSubPlanTier}
+                        onChange={(e) => setNewSubPlanTier(e.target.value)}
+                        className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none"
+                      >
+                        <option value="Plan Scout Básico">Plan Scout Básico</option>
+                        <option value="Pase VIP Elite">Pase VIP Elite</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Medio / Pasarela *</label>
+                      <select
+                        value={newSubGateway}
+                        onChange={(e) => setNewSubGateway(e.target.value)}
+                        className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none"
+                      >
+                        <option value="Deuna">Deuna</option>
+                        <option value="Banco Wire Transfer">Transferencia Bancaria</option>
+                        <option value="Cupón Manual">Cupón Manual</option>
+                        <option value="Stripe Core">Stripe Core</option>
+                        <option value="PayPhone API">Payphone Core</option>
+                        <option value="Administrador Directo">Administración</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Monto Cobrado (USD) *</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={newSubAmount}
+                        onChange={(e) => setNewSubAmount(e.target.value)}
+                        className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none font-mono"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Código Promotora Link (Opc.)</label>
+                      <input
+                        type="text"
+                        placeholder="MAD_CARLOS"
+                        value={newSubPromoterId}
+                        onChange={(e) => setNewSubPromoterId(e.target.value)}
+                        className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none font-mono placeholder:text-gray-700"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Referencia de Pago bancario / Recibo *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="DEUNA-TX-84192, DEP_CHQ_009"
+                      value={newSubReference}
+                      onChange={(e) => setNewSubReference(e.target.value)}
+                      className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2.5 rounded-xl focus:outline-none font-mono placeholder:text-gray-700"
+                    />
+                    <p className="text-[9px] text-gray-500 font-mono mt-1">Inserta ID del comprobante para evitar duplicidad de solicitudes.</p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bangers text-sm uppercase py-3 border-2 border-black rounded-2xl tracking-widest shadow-[3px_3px_0px_#000] cursor-pointer transition active:translate-y-0.5 active:shadow-[1px_1px_0px_#000]"
+                  >
+                    Confirmar Alta y Emitir Licencia
+                  </button>
+                </form>
+              </div>
+
+              {/* Generador de Códigos Manuales de Suscripción (Cortesías / Efectivo) */}
+              <div className="bg-slate-900 border-3 border-black rounded-3xl p-5 shadow-[5px_5px_0px_#000] space-y-4">
+                <h4 className="font-bangers text-lg text-white uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-800 pb-2">
+                  <Ticket className="w-5 h-5 text-yellow-400" /> CREADOR DE CÓDIGOS DE CORTESÍA / EFECTIVO
+                </h4>
+                <p className="text-xs font-comic text-slate-455 leading-normal">
+                  Crea códigos de activación prepago para convalidar pagos offline o cortesías. Los Directores Técnicos ingresarán estos códigos en la pasarela de Efectivo.
+                </p>
+
+                <form onSubmit={handleCreateCourtesyCode} className="space-y-3 pt-1">
+                  <div>
+                    <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Código de Activación (Opcional)</label>
+                    <input
+                      type="text"
+                      placeholder="Vacío para autogeneración"
+                      value={newCourtesyCode}
+                      onChange={(e) => setNewCourtesyCode(e.target.value)}
+                      className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none font-mono uppercase placeholder:text-gray-700"
+                    />
+                    <span className="text-[8.5px] text-gray-500 font-mono block mt-0.5 leading-none">Ej: COPA-VIP-CORTESIA. Si se omite, se creará uno aleatorio.</span>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Plan a Vincular *</label>
+                    <select
+                      value={newCourtesyPlan}
+                      onChange={(e) => setNewCourtesyPlan(e.target.value)}
+                      className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none font-mono"
                     >
                       <option value="Plan Scout Básico">Plan Scout Básico</option>
                       <option value="Pase VIP Elite">Pase VIP Elite</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Medio / Pasarela *</label>
-                    <select
-                      value={newSubGateway}
-                      onChange={(e) => setNewSubGateway(e.target.value)}
-                      className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none"
+
+                  <button
+                    type="submit"
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bangers text-sm uppercase py-2.5 border-2 border-black rounded-xl tracking-widest shadow-[2px_2px_0px_#000] cursor-pointer transition active:translate-y-0.5 active:shadow-[1px_1px_0px_#000]"
+                  >
+                    ⚡ Generar Cupón de Licencia
+                  </button>
+                </form>
+
+                {/* Listado de Códigos Activos */}
+                <div className="border-t border-slate-800 pt-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] font-mono uppercase font-black text-slate-450">CÓDIGOS EMITIDOS ACTIVOS</span>
+                    <button
+                      type="button"
+                      onClick={fetchCourtesyCodes}
+                      className="text-[9px] font-mono text-cyan-400 hover:underline flex items-center gap-1"
                     >
-                      <option value="Deuna">Deuna</option>
-                      <option value="Banco Wire Transfer">Transferencia Bancaria</option>
-                      <option value="Cupón Manual">Cupón Manual</option>
-                      <option value="Stripe Core">Stripe Core</option>
-                      <option value="PayPhone API">Payphone Core</option>
-                      <option value="Administrador Directo">Administración</option>
-                    </select>
+                      <RefreshCw className="w-2.5 h-2.5" /> Recargar
+                    </button>
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Monto Cobrado (USD) *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={newSubAmount}
-                      onChange={(e) => setNewSubAmount(e.target.value)}
-                      className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Código Promotora Link (Opc.)</label>
-                    <input
-                      type="text"
-                      placeholder="MAD_CARLOS"
-                      value={newSubPromoterId}
-                      onChange={(e) => setNewSubPromoterId(e.target.value)}
-                      className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2 rounded-xl focus:outline-none font-mono placeholder:text-gray-700"
-                    />
-                  </div>
-                </div>
+                  {loadingCourtesyCodes ? (
+                    <p className="text-xs text-slate-550 italic font-mono text-center py-2 animate-pulse">Cargando códigos...</p>
+                  ) : Object.keys(courtesyCodesList).length === 0 ? (
+                    <p className="text-xs text-slate-550 italic font-mono text-center py-4 bg-slate-950 rounded-xl border border-dashed border-slate-800">
+                      No hay códigos de cortesía activos creados aún.
+                    </p>
+                  ) : (
+                    <div className="max-h-[220px] overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                      {(Object.entries(courtesyCodesList) as [string, any][]).map(([code, details]) => (
+                        <div 
+                          key={code} 
+                          className={`p-2.5 rounded-xl border-2 border-black flex flex-col gap-1.5 transition ${
+                            details.isUsed 
+                              ? 'bg-rose-950/10 border-rose-950/40 opacity-70' 
+                              : 'bg-slate-950 hover:bg-slate-905'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="text-xs font-mono font-bold text-yellow-400 select-all cursor-copy" title="Hacer doble clic para copiar">
+                              🔑 {code}
+                            </span>
+                            
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCourtesyCode(code)}
+                              className="text-slate-500 hover:text-red-400 p-1 rounded-md transition"
+                              title="Eliminar este cupón de licencia"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
 
-                <div>
-                  <label className="text-[10px] font-mono uppercase font-black text-slate-400 block mb-1">Referencia de Pago bancario / Recibo *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="DEUNA-TX-84192, DEP_CHQ_009"
-                    value={newSubReference}
-                    onChange={(e) => setNewSubReference(e.target.value)}
-                    className="w-full bg-slate-950 border-2 border-black text-xs text-white p-2.5 rounded-xl focus:outline-none font-mono placeholder:text-gray-700"
-                  />
-                  <p className="text-[9px] text-gray-500 font-mono mt-1">Inserta ID del comprobante para evitar duplicidad de solicitudes.</p>
+                          <div className="flex justify-between items-center text-[10px] font-mono text-slate-400">
+                            <span>Plan: <strong className="text-white">{details.planTier === "Plan Scout Básico" ? "Scout" : "VIP"}</strong></span>
+                            <span>
+                              {details.isUsed ? (
+                                <span className="text-red-400 bg-red-950/20 px-1.5 py-0.5 rounded text-[9px] uppercase border border-red-900/30 font-bold">
+                                  Canjeado por: {details.usedBy || "Usuario"}
+                                </span>
+                              ) : (
+                                <span className="text-emerald-400 bg-emerald-950/20 px-1.5 py-0.5 rounded text-[9px] uppercase border border-emerald-900/30 font-bold">
+                                  Disponible
+                                </span>
+                              )}
+                            </span>
+                          </div>
+                          {details.isUsed && details.usedAt && (
+                            <span className="text-[8.5px] font-mono text-slate-500 block leading-none">
+                              Canjeado el: {new Date(details.usedAt).toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-
-                <button
-                  type="submit"
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bangers text-sm uppercase py-3 border-2 border-black rounded-2xl tracking-widest shadow-[3px_3px_0px_#000] cursor-pointer transition active:translate-y-0.5 active:shadow-[1px_1px_0px_#000]"
-                >
-                  Confirmar Alta y Emitir Licencia
-                </button>
-              </form>
+              </div>
             </div>
 
             {/* Listado Principal de Auditoría de Licencias y Suscripciones (Ancho 2/3) */}

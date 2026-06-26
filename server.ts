@@ -204,6 +204,22 @@ async function startServer() {
     console.error("[Suggestions DB Error] Loading fallback empty suggestions:", e);
   }
 
+  // Initialize CUSTOM_SUBSCRIPTION_CODES_DB from filesystem to persist manually associated codes
+  const customSubCodesPath = resolveDataPath("customSubscriptionCodes.json");
+  let CUSTOM_SUBSCRIPTION_CODES_DB: Record<string, { planTier: string, isUsed: boolean, usedBy?: string, usedAt?: string, createdAt: string }> = {};
+  try {
+    if (fs.existsSync(customSubCodesPath)) {
+      const content = fs.readFileSync(customSubCodesPath, "utf-8");
+      CUSTOM_SUBSCRIPTION_CODES_DB = JSON.parse(content);
+      console.log(`[Subscription Codes DB] Loaded ${Object.keys(CUSTOM_SUBSCRIPTION_CODES_DB).length} custom subscription codes from server file: ${customSubCodesPath}`);
+    } else {
+      console.log("[Subscription Codes DB] Mappings file not found, initializing empty DB.");
+      fs.writeFileSync(customSubCodesPath, JSON.stringify(CUSTOM_SUBSCRIPTION_CODES_DB, null, 2), "utf-8");
+    }
+  } catch (e: any) {
+    console.error("[Subscription Codes DB Error] Loaded fallback empty mappings:", e);
+  }
+
   // ==========================================================================
   // HIGH-SECURITY DEFENSE LAYERS (INPUT SANITIZATION, RATE LIMITING, AUDITING)
   // Designed for zero-trust live global production environment
@@ -1351,6 +1367,101 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     }
   });
 
+  // API 1.47a: Get custom subscription courtesy codes for administrative control
+  app.get("/api/admin/courtesy-codes", (req, res) => {
+    res.json({ status: "success", codes: CUSTOM_SUBSCRIPTION_CODES_DB });
+  });
+
+  // API 1.47b: Generate/Save custom subscription courtesy codes
+  app.post("/api/admin/courtesy-codes", (req, res) => {
+    const { code, planTier } = req.body;
+    if (!planTier) {
+      return res.status(400).json({ error: "Falta el parámetro 'planTier'." });
+    }
+    
+    let targetCode = code ? code.trim().toUpperCase() : "";
+    if (!targetCode) {
+      const prefix = planTier === "Plan Scout Básico" ? "SCOUT" : "VIP";
+      const randStr = Math.random().toString(36).substring(2, 8).toUpperCase();
+      targetCode = `CORT-${prefix}-${randStr}`;
+    }
+    
+    if (CUSTOM_SUBSCRIPTION_CODES_DB[targetCode]) {
+      return res.status(400).json({ error: "El código de suscripción o cortesía especificado ya existe." });
+    }
+    
+    CUSTOM_SUBSCRIPTION_CODES_DB[targetCode] = {
+      planTier,
+      isUsed: false,
+      createdAt: new Date().toISOString()
+    };
+    
+    try {
+      fs.writeFileSync(customSubCodesPath, JSON.stringify(CUSTOM_SUBSCRIPTION_CODES_DB, null, 2), "utf-8");
+    } catch (e: any) {
+      console.error("[Subscription Codes Save Error]:", e);
+    }
+    
+    res.json({ status: "success", code: targetCode, entry: CUSTOM_SUBSCRIPTION_CODES_DB[targetCode] });
+  });
+
+  // API 1.47c: Delete courtesy code
+  app.post("/api/admin/courtesy-codes/delete", (req, res) => {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: "Falta el parámetro 'code'." });
+    }
+    const targetCode = code.trim().toUpperCase();
+    if (CUSTOM_SUBSCRIPTION_CODES_DB[targetCode]) {
+      delete CUSTOM_SUBSCRIPTION_CODES_DB[targetCode];
+      try {
+        fs.writeFileSync(customSubCodesPath, JSON.stringify(CUSTOM_SUBSCRIPTION_CODES_DB, null, 2), "utf-8");
+      } catch (e) {}
+    }
+    res.json({ status: "success" });
+  });
+
+  // API 1.47d: Validate cash or courtesy activation code
+  app.post("/api/user/validate-code", (req, res) => {
+    const { code, planTier } = req.body;
+    if (!code) {
+      return res.json({ valid: false, error: "Por favor, ingresa el código de activación." });
+    }
+    const targetCode = code.trim().toUpperCase();
+    const targetPlan = planTier || "";
+    
+    // Check custom subscription codes DB
+    if (CUSTOM_SUBSCRIPTION_CODES_DB[targetCode]) {
+      const entry = CUSTOM_SUBSCRIPTION_CODES_DB[targetCode];
+      if (entry.isUsed) {
+        return res.json({ valid: false, error: "Este código de cortesía/efectivo ya ha sido canjeado por otro usuario." });
+      }
+      if (targetPlan && entry.planTier !== targetPlan) {
+        return res.json({ 
+          valid: false, 
+          error: `Este código de cortesía está destinado para el "${entry.planTier}", pero estás solicitando canjear el "${targetPlan}".` 
+        });
+      }
+      return res.json({ valid: true, customCode: true, planTier: entry.planTier });
+    }
+    
+    // Fallback simulated codes (without showing suggestions)
+    if (targetPlan === "Plan Scout Básico") {
+      if (targetCode === "EFECTIVO5" || targetCode === "CASH5") {
+        return res.json({ valid: true, simulated: true, planTier: "Plan Scout Básico" });
+      }
+    } else if (targetPlan === "Pase VIP Elite" || targetPlan === "Pase VIP Mundialista") {
+      if (targetCode === "EFECTIVO15" || targetCode === "CASH15") {
+        return res.json({ valid: true, simulated: true, planTier: "Pase VIP Elite" });
+      }
+    }
+    
+    return res.json({ 
+      valid: false, 
+      error: "Código inválido o inexistente. Pídele al administrador un código de cortesía o convalidación válido." 
+    });
+  });
+
   // API 1.48: Get custom match results across users and devices for global synchronization
   app.get("/api/matches/custom", (req, res) => {
     res.json({ status: "success", matches: CUSTOM_MATCHES_DB });
@@ -1605,6 +1716,19 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     let user = REGISTERED_USERS.find(u => u.id === targetUserId);
     if (user) {
       user.subscription = planTier || "Ninguna";
+      
+      // Mark custom code as used if it was validated
+      const usedCode = reference ? reference.trim().toUpperCase() : "";
+      if (usedCode && CUSTOM_SUBSCRIPTION_CODES_DB[usedCode]) {
+        CUSTOM_SUBSCRIPTION_CODES_DB[usedCode].isUsed = true;
+        CUSTOM_SUBSCRIPTION_CODES_DB[usedCode].usedBy = user.username || targetUserId;
+        CUSTOM_SUBSCRIPTION_CODES_DB[usedCode].usedAt = new Date().toISOString();
+        try {
+          fs.writeFileSync(customSubCodesPath, JSON.stringify(CUSTOM_SUBSCRIPTION_CODES_DB, null, 2), "utf-8");
+        } catch (e) {}
+        console.log(`[Subscription Code Redeemed] Code ${usedCode} marked as used by user ${user.username}`);
+      }
+
       let finalLicense = licenseCode || "";
       if (licenseCode) {
         user.licenseCode = licenseCode;
@@ -2213,8 +2337,23 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
       : path.join(process.cwd(), "dist");
 
     // Explicitly expose src/assets if it exists for assets to load properly in production
-    if (fs.existsSync(path.join(process.cwd(), "src/assets"))) {
-      app.use("/src/assets", express.static(path.join(process.cwd(), "src/assets")));
+    const possibleAssetsPaths = [
+      path.join(process.cwd(), "src/assets"),
+      path.join(__dirname, "src/assets"),
+      path.join(__dirname, "../src/assets"),
+    ];
+    let assetsPath = "";
+    for (const p of possibleAssetsPaths) {
+      if (fs.existsSync(p)) {
+        assetsPath = p;
+        break;
+      }
+    }
+    if (assetsPath) {
+      app.use("/src/assets", express.static(assetsPath));
+      console.log(`[Assets Router] Serving static /src/assets from: ${assetsPath}`);
+    } else {
+      console.warn("[Assets Router] Warning: Could not find /src/assets folder to serve!");
     }
     app.use(express.static(distPath));
     app.get("*", (req, res) => {

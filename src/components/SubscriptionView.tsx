@@ -103,7 +103,7 @@ export default function SubscriptionView({
   // Payment checkout modal states
   const [showPaymentModal, setShowPaymentModal] = useState<string | null>(null);
   // payment modes: 'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo'
-  const [paymentGateway, setPaymentGateway] = useState<'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo'>('deuna');
+  const [paymentGateway, setPaymentGateway] = useState<'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo'>('efectivo');
   
   // Selection states for Segmented pricing of purchases
   const [selectedContinentToPurchase, setSelectedContinentToPurchase] = useState<string>('América');
@@ -122,6 +122,7 @@ export default function SubscriptionView({
   const [deunaReference, setDeunaReference] = useState<string>('');
   const [bankReference, setBankReference] = useState<string>('');
   const [cashCodeVal, setCashCodeVal] = useState<string>('');
+  const [transferCodeVal, setTransferCodeVal] = useState<string>('');
   
   const [submittingPayment, setSubmittingPayment] = useState<boolean>(false);
   const [paymentError, setPaymentError] = useState<string>('');
@@ -399,8 +400,33 @@ export default function SubscriptionView({
         }
       }
     } else if (paymentGateway === 'transferencia') {
-      if (!bankReference.trim() || bankReference.trim().length < 5) {
-        setPaymentError('Ingresa el número de referencia, comprobante o secuencial de tu transferencia bancaria de la cooperativa o banco.');
+      if (!bankReference.trim() || bankReference.trim().length < 4) {
+        setPaymentError('Por favor, ingresa el número de comprobante o referencia de tu transferencia al Banco de Guayaquil.');
+        return;
+      }
+      const code = transferCodeVal.trim().toUpperCase();
+      if (!code) {
+        setPaymentError('Por favor, ingresa el código de activación proporcionado por el administrador para convalidar tu transferencia.');
+        return;
+      }
+      
+      // Validate the code asynchronously against the server database
+      try {
+        const response = await fetch('/api/user/validate-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            planTier: showPaymentModal
+          })
+        });
+        const data = await response.json();
+        if (!data.valid) {
+          setPaymentError(data.error || 'Código de activación de transferencia inválido o ya canjeado.');
+          return;
+        }
+      } catch (err: any) {
+        setPaymentError('Error al conectar con la pasarela de validación: ' + err.message);
         return;
       }
     } else if (paymentGateway === 'efectivo') {
@@ -410,17 +436,24 @@ export default function SubscriptionView({
         return;
       }
       
-      // Let's add fun simulation validations for cash codes!
-      if (isVIP) {
-        if (code !== 'EFECTIVO15' && code !== 'CASH15' && code.length < 6) {
-          setPaymentError('Código física inválido para este plan. Prueba usando el código de prueba: "EFECTIVO15" o "CASH15".');
+      // Validate the code asynchronously against the server database
+      try {
+        const response = await fetch('/api/user/validate-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            planTier: showPaymentModal
+          })
+        });
+        const data = await response.json();
+        if (!data.valid) {
+          setPaymentError(data.error || 'Código inválido o ya canjeado.');
           return;
         }
-      } else {
-        if (code !== 'EFECTIVO5' && code !== 'CASH5' && code.length < 5) {
-          setPaymentError('Código física inválido para este plan. Prueba usando el código de prueba: "EFECTIVO5" o "CASH5".');
-          return;
-        }
+      } catch (err: any) {
+        setPaymentError('Error al conectar con la pasarela de validación: ' + err.message);
+        return;
       }
     }
 
@@ -509,7 +542,7 @@ export default function SubscriptionView({
             userId: currentUserId,
             planTier: showPaymentModal,
             gateway: paymentGateway,
-            reference: deunaReference || bankReference || cashCodeVal,
+            reference: paymentGateway === 'transferencia' ? transferCodeVal : (deunaReference || bankReference || cashCodeVal),
             promoterId: localStorage.getItem('affiliate_ref') || ''
           })
         });
@@ -520,12 +553,22 @@ export default function SubscriptionView({
         let cost = getPlanDetails(showPaymentModal).amount;
         onAddTransaction(transactionDesc, -cost, 'cash');
         
+        const referenceVal = deunaReference || bankReference || cashCodeVal;
+        const isTransfer = paymentGateway === 'transferencia';
         if (data.status === 'success') {
           onUpdateSubscription(showPaymentModal);
-          setSuccessMsg(`¡Gracias! Pago verificado. Has completado tu canje de "${showPaymentModal}". Se te han acreditado +${unlockInfo?.pointsToAdd || 0} puntos.`);
+          if (isTransfer) {
+            setSuccessMsg(`¡Transferencia y Código Verificados! El comprobante al Banco de Guayaquil (#${referenceVal}) ha sido convalidado exitosamente con el código del administrador. Tu plan "${showPaymentModal}" se ha activado.`);
+          } else {
+            setSuccessMsg(`¡Gracias! Código verificado. Has completado tu canje de "${showPaymentModal}". Se te han acreditado +${unlockInfo?.pointsToAdd || 0} puntos.`);
+          }
         } else {
           onUpdateSubscription(showPaymentModal);
-          setSuccessMsg(`¡Gracias! Conectado con éxito. Se ha activado tu canje "${showPaymentModal}" y sumado tus respectivos puntos.`);
+          if (isTransfer) {
+            setSuccessMsg(`¡Transferencia y Código Verificados! El comprobante al Banco de Guayaquil (#${referenceVal}) ha sido convalidado exitosamente con el código del administrador. Tu plan "${showPaymentModal}" se ha activado.`);
+          } else {
+            setSuccessMsg(`¡Gracias! Conectado con éxito. Se ha activado tu canje "${showPaymentModal}" y sumado tus respectivos puntos.`);
+          }
         }
       } catch (err) {
         console.error('Subscription premium payment error:', err);
@@ -636,76 +679,6 @@ export default function SubscriptionView({
         </div>
       )}
 
-      {/* Dynamic Location & Promoter Rate Adaptor Panel */}
-      <div className="bg-[#0f172a] border-2 border-black rounded-3xl p-5 shadow-[4px_4px_0px_rgba(0,0,0,1)] space-y-3">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div>
-            <span className="text-[9px] font-mono text-emerald-400 font-bold uppercase tracking-widest block bg-emerald-500/10 px-2.5 py-0.5 rounded border border-emerald-500/15 w-fit">
-              📌 Tasa Tarifaria Oficial por Región
-            </span>
-            <h3 className="text-sm font-bold text-white mt-1">Tarificación de Promotores de Calle Autorizados</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Los promotores autorizados de Ecuador y España cuentan con tasas especiales reguladas. Selecciona tu región para cotizar:
-            </p>
-          </div>
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 shrink-0">
-            <button
-              onClick={() => setPricingLocation('Ecuador')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition font-mono ${
-                pricingLocation === 'Ecuador'
-                  ? 'bg-emerald-600 text-white border border-emerald-500/20'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              🇪🇨 Ecuador ($5 / $15)
-            </button>
-            <button
-              onClick={() => setPricingLocation('España')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition font-mono ${
-                pricingLocation === 'España'
-                  ? 'bg-indigo-600 text-white border border-indigo-500/20'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              🇪🇸 España (10€ / 20€)
-            </button>
-            <button
-              onClick={() => setPricingLocation('Internacional')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition font-mono ${
-                pricingLocation === 'Internacional'
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              🌎 Global ($10 / $20)
-            </button>
-          </div>
-        </div>
-
-        {/* Dynamic badge if sponsor is active */}
-        {localStorage.getItem('affiliate_ref') && (
-          <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-between text-xs text-slate-350">
-            <div className="flex items-center gap-2">
-              <span className="text-emerald-400">✨</span>
-              <span>
-                Promotor de Referencia Activo: <strong className="text-emerald-400 font-mono select-all uppercase">{localStorage.getItem('affiliate_ref')}</strong> 
-                {pricingLocation === 'Ecuador' && ' (Ciudad: Quito/Guayaquil, Ecuador. Precio Reducido Aplicado)'}
-                {pricingLocation === 'España' && ' (Ciudad: Madrid, España. Precio Especial en Euros € Aplicado)'}
-              </span>
-            </div>
-            <button 
-              onClick={() => {
-                localStorage.removeItem('affiliate_ref');
-                window.location.reload();
-              }}
-              className="text-[10px] text-rose-400 hover:underline font-mono bg-transparent border-none cursor-pointer"
-            >
-              [Eliminar Referencia]
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* 3. Plans comparison cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {plans.map((p) => {
@@ -809,7 +782,75 @@ export default function SubscriptionView({
               </div>
 
               <div className="mt-6">
-                {isActive ? (
+                {isVIP ? (
+                  (() => {
+                    const continentsList = vipChosenContinent ? vipChosenContinent.split(',').map(s => s.trim().toUpperCase()) : [];
+                    const isSelectedContPurchased = continentsList.includes(selectedContinentToPurchase.toUpperCase());
+                    
+                    if (isSelectedContPurchased) {
+                      return (
+                        <div className="space-y-2">
+                          <div className="w-full py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider rounded-xl bg-slate-850 border-2 border-slate-800 text-emerald-400 flex items-center justify-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-emerald-400" /> {selectedContinentToPurchase} Desbloqueado 🏆
+                          </div>
+                          {currentSubscription !== 'Pase VIP Elite' && (
+                            <button
+                              onClick={() => handlePlanSelection(p.id)}
+                              className="w-full py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-amber-500 text-slate-950 hover:bg-amber-400 border-2 border-black shadow-[2.5px_2.5px_0px_#000] cursor-pointer"
+                            >
+                              Activar Pase VIP Elite
+                            </button>
+                          )}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <button
+                          onClick={() => handlePlanSelection(p.id)}
+                          disabled={purchaseLoading !== null}
+                          className="w-full py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 relative border-2 border-black shadow-[2.5px_2.5px_0px_#000] bg-gradient-to-r from-amber-500 to-yellow-450 text-slate-950 hover:bg-amber-400 active:translate-y-0.5"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Adquirir {selectedContinentToPurchase} ($15) 🇪🇺</span>
+                        </button>
+                      );
+                    }
+                  })()
+                ) : isScout ? (
+                  (() => {
+                    const countriesList = scoutChosenCountry ? scoutChosenCountry.split(',').map(s => s.trim().toUpperCase()) : [];
+                    const isSelectedCountryPurchased = countriesList.includes(selectedCountryToPurchase.toUpperCase());
+                    
+                    if (isSelectedCountryPurchased) {
+                      return (
+                        <div className="space-y-2">
+                          <div className="w-full py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider rounded-xl bg-slate-850 border-2 border-slate-800 text-emerald-400 flex items-center justify-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-emerald-400" /> {selectedCountryToPurchase} Desbloqueado 🏆
+                          </div>
+                          {currentSubscription !== 'Plan Scout Básico' && (
+                            <button
+                              onClick={() => handlePlanSelection(p.id)}
+                              className="w-full py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white border-2 border-black shadow-[2.5px_2.5px_0px_#000] cursor-pointer"
+                            >
+                              Activar Plan Scout Básico
+                            </button>
+                          )}
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <button
+                          onClick={() => handlePlanSelection(p.id)}
+                          disabled={purchaseLoading !== null}
+                          className="w-full py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 relative border-2 border-black shadow-[2.5px_2.5px_0px_#000] bg-indigo-600 hover:bg-indigo-500 text-white active:translate-y-0.5"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Adquirir {selectedCountryToPurchase} ($5) 🎯</span>
+                        </button>
+                      );
+                    }
+                  })()
+                ) : isActive ? (
                   <div className="w-full py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider rounded-xl bg-slate-850 border-2 border-slate-800 text-emerald-400 flex items-center justify-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-400" /> Plan Activo Actual
                   </div>
@@ -817,14 +858,10 @@ export default function SubscriptionView({
                   <button
                     onClick={() => handlePlanSelection(p.id)}
                     disabled={purchaseLoading !== null || p.id === 'Ninguna'}
-                    className={`w-full py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 relative border-2 border-black shadow-[2.5px_2.5px_0px_#000] active:translate-y-0.5 ${
-                      isVIP 
-                        ? 'bg-gradient-to-r from-amber-500 to-yellow-450 text-slate-950 hover:bg-amber-400' 
-                        : 'bg-indigo-600 hover:bg-indigo-500 text-white'
-                    }`}
+                    className="w-full py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 relative border-2 border-black shadow-[2.5px_2.5px_0px_#000] bg-indigo-600 hover:bg-indigo-500 text-white active:translate-y-0.5"
                   >
                     <CreditCard className="w-3.5 h-3.5" />
-                    <span>{isVIP ? `Canjear ${selectedContinentToPurchase} ($15)` : isScout ? `Canjear ${selectedCountryToPurchase} ($5)` : p.buttonText}</span>
+                    <span>{p.buttonText}</span>
                   </button>
                 )}
               </div>
@@ -907,12 +944,7 @@ export default function SubscriptionView({
           </div>
         )}
 
-        <div className="bg-slate-950/50 border border-slate-850 p-3 rounded-xl flex items-start gap-2 mt-3">
-          <Info className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-          <div className="text-[10px] text-gray-400 leading-normal">
-            Pasarela de simulación comercial con soporte para Ecuador (Deuna, Payphone, Transferencias) totalmente funcional.
-          </div>
-        </div>
+
       </div>
 
       {/* SECCIÓN SOLIDARIA: DEPORTISTAS POR LA INFANCIA */}
@@ -1164,67 +1196,32 @@ export default function SubscriptionView({
             <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               
               {/* Payment Gateways Selection list / Ecuador Adaptation */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 bg-slate-950 border-2 border-black rounded-2xl p-1.5 text-center">
+              <div className="grid grid-cols-2 gap-2 bg-slate-950 border-2 border-black rounded-2xl p-1.5 text-center">
 
                 <button
                   type="button"
-                  onClick={() => { setPaymentGateway('deuna'); setPaymentError(''); }}
-                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
-                    paymentGateway === 'deuna' 
-                      ? 'bg-teal-500 text-black border-black shadow' 
+                  onClick={() => { setPaymentGateway('efectivo'); setPaymentError(''); }}
+                  className={`py-2.5 px-2 text-[11px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 border ${
+                    paymentGateway === 'efectivo' 
+                      ? 'bg-rose-500 text-black border-black shadow font-bold' 
                       : 'text-gray-400 hover:text-white border-transparent'
                   }`}
                 >
-                  <QrCode className="w-4 h-4" /> Deuna
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { setPaymentGateway('payphone'); setPaymentError(''); }}
-                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
-                    paymentGateway === 'payphone' 
-                      ? 'bg-amber-500 text-slate-950 border-black shadow' 
-                      : 'text-gray-400 hover:text-white border-transparent'
-                  }`}
-                >
-                  <Smartphone className="w-4 h-4" /> Payphone
+                  <Coins className="w-5 h-5" /> Código de Activación
                 </button>
 
                 <button
                   type="button"
                   onClick={() => { setPaymentGateway('transferencia'); setPaymentError(''); }}
-                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
+                  className={`py-2.5 px-2 text-[11px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 border ${
                     paymentGateway === 'transferencia' 
-                      ? 'bg-indigo-600 text-white border-black shadow' 
+                      ? 'bg-indigo-600 text-white border-black shadow font-bold' 
                       : 'text-gray-400 hover:text-white border-transparent'
                   }`}
                 >
-                  <Building className="w-4 h-4" /> Transfer
+                  <Building className="w-5 h-5" /> Transferencia Bancaria
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => { setPaymentGateway('efectivo'); setPaymentError(''); }}
-                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
-                    paymentGateway === 'efectivo' 
-                      ? 'bg-rose-500 text-black border-black shadow' 
-                      : 'text-gray-400 hover:text-white border-transparent'
-                  }`}
-                >
-                  <Coins className="w-4 h-4" /> Efectivo
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { setPaymentGateway('saldo'); setPaymentError(''); }}
-                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
-                    paymentGateway === 'saldo' 
-                      ? 'bg-emerald-500 text-black border-black shadow' 
-                      : 'text-gray-400 hover:text-white border-transparent'
-                  }`}
-                >
-                  <Award className="w-4 h-4" /> Mi Saldo
-                </button>
               </div>
 
               {/* Dynamic Payment Gateways viewport */}
@@ -1425,25 +1422,36 @@ export default function SubscriptionView({
                   </div>
 
                   <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-800 space-y-1.5 text-xs text-slate-350 select-all font-mono">
-                    <p><strong className="text-white">Banco:</strong> Banco Pichincha (Ecuador)</p>
-                    <p><strong className="text-white">Tipo de Cuenta:</strong> Corriente</p>
-                    <p><strong className="text-white">Número de Cuenta:</strong> 2100456123</p>
-                    <p><strong className="text-white">Beneficiario:</strong> Álbum de Trivia de Selecciones S.A.</p>
-                    <p><strong className="text-white">RUC:</strong> 1792837482001</p>
-                    <p><strong className="text-white">Email:</strong> pagos@albumtrivia2026.com</p>
-                    <p><strong className="text-white">Monto:</strong> <span className="text-emerald-400 font-bold">{getPlanDetails(showPaymentModal).price}</span></p>
+                    <p><strong className="text-white">Banco:</strong> Banco de Guayaquil</p>
+                    <p><strong className="text-white">Número de Cuenta:</strong> 56399432</p>
+                    <p><strong className="text-white">Beneficiario:</strong> Rolando Guerra</p>
+                    <p><strong className="text-white">Cédula:</strong> 1722491949</p>
+                    <p><strong className="text-white">Monto a Transferir:</strong> <span className="text-emerald-400 font-bold">{getPlanDetails(showPaymentModal).price}</span></p>
                   </div>
 
-                  <div className="text-left space-y-1">
-                    <label className="text-[10px] text-indigo-400 font-mono uppercase tracking-wider block font-bold">Concepto / Número de Documento / Referencia de Transferencia</label>
-                    <input
-                      type="text"
-                      placeholder="Ej: Secuencial, número de comprobante o clave"
-                      value={bankReference}
-                      onChange={(e) => setBankReference(e.target.value)}
-                      className="w-full bg-slate-950 border-2 border-black rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono"
-                    />
-                    <span className="text-[9.5px] text-gray-500 block italic leading-tight">* El abono será auditado dinámicamente en menos de 5 minutos.</span>
+                  <div className="text-left space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-indigo-400 font-mono uppercase tracking-wider block font-bold">Número de Comprobante / Referencia de Transferencia</label>
+                      <input
+                        type="text"
+                        placeholder="Ingrese el número de comprobante o secuencial de transferencia..."
+                        value={bankReference}
+                        onChange={(e) => setBankReference(e.target.value)}
+                        className="w-full bg-slate-950 border-2 border-black rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-center"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-yellow-400 font-mono uppercase tracking-wider block font-bold">Código de Validación / Activación (Proporcionado por el Administrador)</label>
+                      <input
+                        type="text"
+                        placeholder="Ej: EFECTIVO15 o el código generado por el Administrador..."
+                        value={transferCodeVal}
+                        onChange={(e) => setTransferCodeVal(e.target.value)}
+                        className="w-full bg-slate-950 border-2 border-black rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono uppercase text-center"
+                      />
+                      <span className="text-[9.5px] text-amber-300 block font-bold italic leading-tight">* Se requiere un código válido provisto por el administrador para convalidar y activar tu transferencia al instante.</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1452,32 +1460,23 @@ export default function SubscriptionView({
               {paymentGateway === 'efectivo' && (
                 <div className="space-y-3.5 animate-fade-in bg-rose-950/20 border-2 border-black p-4 rounded-2xl">
                   <div className="text-center">
-                    <span className="text-[10px] text-rose-450 uppercase tracking-widest font-mono font-bold block mb-1">ACTIVACIÓN FÍSICA EN EFECTIVO</span>
+                    <span className="text-[10px] text-rose-450 uppercase tracking-widest font-mono font-bold block mb-1">ACTIVACIÓN FÍSICA / CORTESÍA EN EFECTIVO</span>
                     <p className="text-xs text-slate-300">
-                      Habilite su pase mediante un cupón impreso de caja o vale emitido en efectivo en puntos físicos:
+                      Habilite su plan premium ingresando un código válido de activación o cortesía:
                     </p>
                   </div>
 
                   <div className="bg-slate-950 p-3.5 rounded-xl border border-rose-500/15 text-center">
                     <p className="text-xs text-slate-400">
-                      Si realizó su pago offline en tiendas habilitadas de álbumes, ingrese el código táctil impreso en su recibo oficial para desbloqueo atómico.
-                    </p>
-                    <p className="text-[10px] text-rose-400 font-mono mt-2 uppercase">
-                      ⚠️ CÓDIGOS DE PRUEBA:
-                    </p>
-                    <p className="text-[11px] text-slate-205 font-mono">
-                      Plan Scout ({pricingLocation === 'España' ? '10 €' : pricingLocation === 'Ecuador' ? '$5' : '$10'}): <strong className="text-amber-400 select-all">EFECTIVO5</strong> o <strong className="text-amber-400 select-all">CASH5</strong>
-                    </p>
-                    <p className="text-[11px] text-slate-205 font-mono mt-0.5">
-                      Pase VIP ({pricingLocation === 'España' ? '20 €' : pricingLocation === 'Ecuador' ? '$15' : '$20'}): <strong className="text-amber-400 select-all">EFECTIVO15</strong> o <strong className="text-amber-400 select-all">CASH15</strong>
+                      Si realizó su pago offline en tiendas físicas o recibió un código de cortesía directo del administrador, ingrese el código de licencia oficial a continuación para su activación inmediata en el álbum táctico.
                     </p>
                   </div>
 
                   <div className="text-left space-y-1">
-                    <label className="text-[10px] text-rose-400 font-mono uppercase tracking-wider block font-bold">Código del Cupón de Caja</label>
+                    <label className="text-[10px] text-rose-400 font-mono uppercase tracking-wider block font-bold">Código de Activación / Cortesía</label>
                     <input
                       type="text"
-                      placeholder="Ej: EFECTIVO5, CASH15..."
+                      placeholder="Ingrese su código de cortesía o efectivo..."
                       value={cashCodeVal}
                       onChange={(e) => setCashCodeVal(e.target.value)}
                       className="w-full bg-slate-950 border-2 border-black rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:ring-1 focus:ring-rose-500 font-mono uppercase text-center"
