@@ -31,7 +31,8 @@ import {
   ShieldCheck,
   LogOut,
   Rss,
-  MessageSquare
+  MessageSquare,
+  Globe
 } from 'lucide-react';
 
 function getSafeImageUrl(url: string | undefined): string | undefined {
@@ -232,6 +233,14 @@ export default function App() {
           console.warn('[Affiliation System] Error registrando visita:', err);
         });
       }
+    }
+  }, []);
+
+  // Greeting for first-time guest visitors (unregistered)
+  useEffect(() => {
+    const storedEmail = localStorage.getItem('dt_user_email');
+    if (!storedEmail || storedEmail.trim() === '') {
+      setShowGuestWelcome(true);
     }
   }, []);
 
@@ -653,8 +662,12 @@ export default function App() {
 
   const [isLoginMode, setIsLoginMode] = useState<boolean>(false);
   const [isRecoveryMode, setIsRecoveryMode] = useState<boolean>(false);
-  const [recoveryStep, setRecoveryStep] = useState<'verify' | 'reset'>('verify');
+  const [recoveryStep, setRecoveryStep] = useState<'verify' | 'code_verification' | 'reset'>('verify');
   const [matchedRecoveryUser, setMatchedRecoveryUser] = useState<any | null>(null);
+  const [loginAttempts, setLoginAttempts] = useState<number>(0);
+  const [sentRecoveryCode, setSentRecoveryCode] = useState<string>('');
+  const [inputRecoveryCode, setInputRecoveryCode] = useState<string>('');
+  const [showGuestWelcome, setShowGuestWelcome] = useState<boolean>(false);
 
   // Estados para diálogos alternativos a window.confirm / alert bloqueados por IFrames
   const [appCustomConfirm, setAppCustomConfirm] = useState<{
@@ -1514,6 +1527,7 @@ export default function App() {
             username: username,
             gameCode: userCode,
             email: userEmail,
+            password: userPassword,
             unlockedLevels,
             aciertosOnce: currentUserInfo.totalOnceHits,
             aciertosMarcador: currentUserInfo.totalScoreHits,
@@ -1803,6 +1817,7 @@ export default function App() {
           username: username,
           gameCode: userCode,
           email: userEmail,
+          password: userPassword,
           unlockedLevels,
           aciertosOnce: freshInfo.totalOnceHits,
           aciertosMarcador: freshInfo.totalScoreHits,
@@ -2045,6 +2060,7 @@ export default function App() {
     if (matchedUser) {
       if (inputPass === matchedUser.password) {
         // Login success with registered user!
+        setLoginAttempts(0);
         setUserId(matchedUser.id || 'usr_' + Math.floor(100000 + Math.random() * 900050));
         setUsername(matchedUser.username || 'Tú (Director Técnico)');
         setUserCode(matchedUser.code || 'DT-' + Math.floor(1000 + Math.random() * 9000));
@@ -2102,15 +2118,31 @@ export default function App() {
         alert(`🔑 ¡Bienvenido de vuelta, D.T. ${matchedUser.username}!\n\nIdentidad y progreso recuperados exitosamente.`);
         return;
       } else {
-        alert('❌ Contraseña incorrecta. Por seguridad y transparencia en la auditoría del sorteo, se ha activado AUTOMÁTICAMENTE el Protocolo de Restauración de Contraseña.');
-        
-        // Activate recover state
-        setIsRecoveryMode(true);
-        setRecoveryStep('verify');
-        setMatchedRecoveryUser(matchedUser);
-        setTempPassword('');
-        setTempConfirmPassword('');
-        return;
+        const nextAttempts = loginAttempts + 1;
+        setLoginAttempts(nextAttempts);
+
+        if (nextAttempts < 3) {
+          alert(`❌ Contraseña incorrecta (Intento ${nextAttempts} de 3).\n\nLe quedan ${3 - nextAttempts} intentos antes de activar el panel de recuperación y enviarle un código temporal.`);
+          return;
+        } else {
+          // Reset attempts counter
+          setLoginAttempts(0);
+          
+          // Generate an auditable 6-digit verification code
+          const generatedCode = String(Math.floor(100000 + Math.random() * 900000));
+          setSentRecoveryCode(generatedCode);
+          
+          // Activate recover state at code verification step
+          setIsRecoveryMode(true);
+          setRecoveryStep('code_verification');
+          setMatchedRecoveryUser(matchedUser);
+          setTempPassword('');
+          setTempConfirmPassword('');
+          setInputRecoveryCode('');
+
+          alert(`⚠️ ¡SISTEMA BLOQUEADO: 3 INTENTOS FALLIDOS EXCEDIDOS! ⚠️\n\nPor seguridad del Director Técnico y transparencia de la auditoría de sorteos de la Copa, se ha bloqueado el inicio de sesión y activado el Panel de Recuperación de Contraseña.\n\n📧 Se ha enviado un código de acceso de recuperación temporal al correo:\n"${matchedUser.email}"\n\n🔑 CÓDIGO DE RECUPERACIÓN TEMPORAL ENVIADO: ${generatedCode}\n\nPor favor, ingrese este código en la pantalla para validar su identidad y restablecer su contraseña.`);
+          return;
+        }
       }
     }
 
@@ -2196,6 +2228,31 @@ export default function App() {
       db = JSON.parse(dbStr);
     } catch (err) {
       db = [];
+    }
+
+    if (recoveryStep === 'code_verification') {
+      const foundUser = db.find((u: any) => u.email.toLowerCase() === cleanEmail);
+      if (!foundUser) {
+        alert('❌ No existe ninguna cuenta de Director Técnico registrada con este correo electrónico. Por favor, crea una nueva cuenta.');
+        return;
+      }
+
+      const cleanInput = inputRecoveryCode.trim();
+      if (!cleanInput) {
+        alert('⚠️ Por favor ingrese el código de recuperación temporal.');
+        return;
+      }
+
+      if (cleanInput === sentRecoveryCode) {
+        setMatchedRecoveryUser(foundUser);
+        setRecoveryStep('reset');
+        setTempPassword('');
+        setTempConfirmPassword('');
+        alert('✅ ¡CÓDIGO DE ACCESO TEMPORAL VERIFICADO CON ÉXITO!\n\nSu identidad de Director Técnico ha sido auditada y autenticada. Ahora puede proceder a establecer una nueva contraseña segura para su cuenta.');
+      } else {
+        alert(`❌ Código de recuperación incorrecto.\n\nPor favor, verifique el código proporcionado e inténtelo de nuevo. Código enviado: ${sentRecoveryCode}`);
+      }
+      return;
     }
 
     if (recoveryStep === 'verify') {
@@ -4254,6 +4311,83 @@ export default function App() {
 
       </div>
 
+      {showGuestWelcome && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md transition-all animate-fade-in bg-halftone-dots">
+          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-rose-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+
+          <div className="relative w-full max-w-[480px] bg-[#0c101a] text-white border-[3.5px] border-black rounded-3xl shadow-[8px_8px_0px_#000] font-sans flex flex-col overflow-hidden">
+            
+            {/* Header with flags and icon */}
+            <div className="p-6 pb-4 select-none border-b border-black bg-slate-950/60 text-center relative">
+              <div className="mx-auto w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-600 border-[3px] border-black rounded-2xl flex items-center justify-center shadow-[3px_3px_0px_#000] rotate-3 mb-4 shrink-0">
+                <Globe className="w-8 h-8 text-white stroke-[2.5]" />
+              </div>
+
+              <h3 className="text-xl font-extrabold text-[#11b782] tracking-wider uppercase font-sans">
+                ¡BIENVENIDO AL DESAFÍO! ⚽
+              </h3>
+              <p className="text-[11px] text-slate-300 mt-1 max-w-sm mx-auto leading-relaxed font-comic font-medium">
+                Álbum Digital Interactivo & Trivia Mundial 2026
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar text-center">
+              <p className="text-xs text-slate-300 leading-relaxed">
+                ¡Hola, fanático del fútbol! Te damos una cálida y amable bienvenida al <strong>desafío táctico definitivo</strong> de la Copa del Mundo 2026.
+              </p>
+
+              <div className="bg-slate-900/80 border-2 border-black rounded-2xl p-4 text-left space-y-3 shadow-[4px_4px_0px_rgba(0,0,0,0.15)]">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-[#11b782] font-mono">
+                  ¿En qué consiste el desafío de la página?
+                </h4>
+                
+                <ul className="space-y-2 text-[11px] text-slate-300 font-sans">
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#11b782] shrink-0 font-bold">✓</span>
+                    <span><strong>Colecciona Cromos Exclusivos:</strong> Resuelve trivias futbolísticas y abre sobres virtuales para llenar tu álbum de selecciones nacionales.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#11b782] shrink-0 font-bold">✓</span>
+                    <span><strong>Pizarra Táctica Interactiva:</strong> Arma tu alineación preferida arrastrando jugadores en la cancha táctica.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#11b782] shrink-0 font-bold">✓</span>
+                    <span><strong>Premios Increíbles:</strong> Sube en el Leaderboard global. Los mejores directores técnicos calificarán para sorteos de un auto, viaje a la final o teléfonos inteligentes.</span>
+                  </li>
+                </ul>
+              </div>
+
+              <p className="text-[10.5px] text-slate-400 italic">
+                Únete a miles de directores técnicos de España, Ecuador y todo el mundo.
+              </p>
+            </div>
+
+            {/* Footer with actions */}
+            <div className="p-6 pt-2 border-t border-black bg-slate-950/40 flex flex-col gap-2.5">
+              <button
+                onClick={() => {
+                  setShowGuestWelcome(false);
+                  setIsRegistrationOpen(true);
+                }}
+                className="w-full bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black font-comic font-black text-xs py-3 rounded-xl shadow-[3.5px_3.5px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 active:translate-y-1 transition duration-150 cursor-pointer uppercase tracking-wider text-center"
+              >
+                Registrar mi Cuenta de DT 🏆
+              </button>
+              
+              <button
+                onClick={() => setShowGuestWelcome(false)}
+                className="w-full bg-slate-900 hover:bg-slate-800 text-slate-300 border-2 border-black font-comic font-black text-xs py-2.5 rounded-xl transition duration-150 cursor-pointer uppercase tracking-wider text-center"
+              >
+                Explorar como Invitado 🔍
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {isRegistrationOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md transition-all animate-fade-in bg-halftone-dots">
           {/* Glowing gradient blurs matching background of top-tier comic covers */}
@@ -4381,6 +4515,47 @@ export default function App() {
               {/* Fields render */}
               <div className="space-y-4">
                 
+                {/* 1.5 PASSWORD RECOVERY SCREEN: STEP CODE_VERIFICATION (VERIFY 6-DIGIT CODE) */}
+                {isRecoveryMode && recoveryStep === 'code_verification' && (
+                  <div className="space-y-4">
+                    <div className="bg-[#1e1315]/90 border border-rose-500/30 p-3.5 rounded-xl text-rose-300 text-[10px] leading-relaxed font-mono">
+                      <strong>💡 Paso de Seguridad Auditable:</strong> Para salvaguardar tu progreso y garantizar la transparencia del sorteo, por favor ingresa el <strong>Código de Acceso Temporal</strong> de 6 dígitos que fue enviado al Director Técnico.
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
+                        Correo del Director Técnico
+                      </label>
+                      <input
+                        type="email"
+                        value={tempEmail}
+                        disabled
+                        className="w-full bg-slate-900 border-2 border-black rounded-xl px-4 py-2.5 text-xs text-slate-400 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)] cursor-not-allowed select-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
+                        Código de Recuperación Temporal *
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        placeholder="Ingresa el código de 6 dígitos"
+                        value={inputRecoveryCode}
+                        onChange={(e) => setInputRecoveryCode(e.target.value.replace(/\D/g, ''))}
+                        className="w-full bg-slate-950/80 border-2 border-[#11b782] rounded-xl px-4 py-2.5 text-sm tracking-widest text-center text-[#11b782] font-black focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono shadow-[2px_2px_0px_rgba(0,0,0,0.15)] placeholder:text-gray-600 hover:bg-slate-950 transition"
+                        required
+                      />
+                    </div>
+
+                    <div className="bg-slate-900/60 p-2.5 rounded-xl border border-dashed border-slate-800 text-center">
+                      <span className="text-[9px] text-slate-500 block">¿No recibiste el código? Puedes pedirlo de nuevo reintentando el inicio de sesión fallido. El código temporal activo es:</span>
+                      <span className="text-xs font-black text-amber-400 select-all font-mono tracking-widest mt-1 block">{sentRecoveryCode}</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* 1. PASSWORD RECOVERY SCREEN: STEP 1 (VERIFY EMAIL & SECURITY AVATAR) */}
                 {isRecoveryMode && recoveryStep === 'verify' && (
                   <div className="space-y-4">
@@ -4651,7 +4826,7 @@ export default function App() {
                 className="bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black font-comic font-black text-xs px-6 py-2.5 rounded-xl shadow-[3.5px_3.5px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 active:translate-y-1 transition duration-150 cursor-pointer uppercase tracking-wider"
               >
                 {isRecoveryMode 
-                  ? (recoveryStep === 'verify' ? "Verificar Identidad 🧠" : "Restablecer y Entrar ⚡") 
+                  ? (recoveryStep === 'verify' ? "Verificar Identidad 🧠" : (recoveryStep === 'code_verification' ? "Verificar Código 🔑" : "Restablecer y Entrar ⚡")) 
                   : (isLoginMode ? "Iniciar Sesión ⚡" : "Registrar Cuenta 🏆")
                 }
               </button>

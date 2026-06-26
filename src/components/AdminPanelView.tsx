@@ -63,6 +63,7 @@ interface ActiveUser {
   avatar: string;
   licenseCode?: string;
   email?: string;
+  password?: string;
   tacticalBoards?: any;
   createdAt?: string;
   referredByEmail?: string;
@@ -4060,6 +4061,10 @@ app.post('/api/webhooks/fal', async (req, res) => {
                   <div>
                     <span className="text-gray-500 block text-[9px] uppercase">Correo de Google Vinculado:</span>
                     <span className="text-[11px] text-emerald-400 font-bold select-all break-all">{inspectingUser.email || 'No especificado'}</span>
+                  </div>
+                  <div>
+                    <span className="text-rose-400 block text-[9px] uppercase font-bold">🔑 Contraseña Registrada:</span>
+                    <span className="text-[11px] text-rose-300 font-black select-all bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">{inspectingUser.password || 'Sin contraseña / Admin'}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 block text-[9px] uppercase">Licencia Oficial de Certificación:</span>

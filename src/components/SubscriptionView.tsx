@@ -102,8 +102,8 @@ export default function SubscriptionView({
 
   // Payment checkout modal states
   const [showPaymentModal, setShowPaymentModal] = useState<string | null>(null);
-  // payment modes: 'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo'
-  const [paymentGateway, setPaymentGateway] = useState<'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo'>('efectivo');
+  // payment modes: 'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo' | 'stripe'
+  const [paymentGateway, setPaymentGateway] = useState<'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo' | 'stripe'>('efectivo');
   
   // Selection states for Segmented pricing of purchases
   const [selectedContinentToPurchase, setSelectedContinentToPurchase] = useState<string>('América');
@@ -477,6 +477,40 @@ export default function SubscriptionView({
     }
 
     setSubmittingPayment(true);
+
+    if (paymentGateway === 'stripe') {
+      try {
+        // Save checkout intent states so callbacks can parse it
+        localStorage.setItem('dt_last_intent_plan', showPaymentModal);
+        localStorage.setItem('dt_last_intent_continent', vipChosenContinent);
+        localStorage.setItem('dt_last_intent_country', scoutChosenCountry);
+
+        const response = await fetch('/api/checkout/stripe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: currentUserId,
+            planTier: showPaymentModal,
+            country: scoutChosenCountry,
+            continent: vipChosenContinent,
+            promoterId: localStorage.getItem('affiliate_ref') || ''
+          })
+        });
+        const data = await response.json();
+        
+        if (data.url) {
+          window.location.href = data.url; // Redirects safely to Stripe checkout session
+          return;
+        } else {
+          setPaymentError(data.error || 'Error al crear la sesión de pago de Stripe.');
+        }
+      } catch (err: any) {
+        setPaymentError('Fallo de conexión con el servidor de pagos Stripe: ' + err.message);
+      } finally {
+        setSubmittingPayment(false);
+      }
+      return;
+    }
 
     if (paymentGateway === 'payphone') {
       try {
@@ -1195,36 +1229,123 @@ export default function SubscriptionView({
             {/* Modal Body */}
             <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
               
-              {/* Payment Gateways Selection list / Ecuador Adaptation */}
-              <div className="grid grid-cols-2 gap-2 bg-slate-950 border-2 border-black rounded-2xl p-1.5 text-center">
+              {/* Payment Gateways Selection list */}
+              <div className="grid grid-cols-2 gap-2 bg-slate-950 border-2 border-black rounded-2xl p-2 text-center">
 
                 <button
                   type="button"
-                  onClick={() => { setPaymentGateway('efectivo'); setPaymentError(''); }}
-                  className={`py-2.5 px-2 text-[11px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 border ${
-                    paymentGateway === 'efectivo' 
-                      ? 'bg-rose-500 text-black border-black shadow font-bold' 
+                  onClick={() => { setPaymentGateway('stripe'); setPaymentError(''); }}
+                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
+                    paymentGateway === 'stripe' 
+                      ? 'bg-[#635BFF] text-white border-black shadow-[2px_2px_0_#000]' 
                       : 'text-gray-400 hover:text-white border-transparent'
                   }`}
                 >
-                  <Coins className="w-5 h-5" /> Código de Activación
+                  <CreditCard className="w-4 h-4 text-[#8a85ff]" />
+                  <span>Stripe (España/Global)</span>
+                  <span className="text-[7.5px] uppercase bg-black/40 text-[#8a85ff] px-1 rounded">Tarjeta Real 💳</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setPaymentGateway('payphone'); setPaymentError(''); }}
+                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
+                    paymentGateway === 'payphone' 
+                      ? 'bg-amber-500 text-slate-950 border-black shadow-[2px_2px_0_#000]' 
+                      : 'text-gray-400 hover:text-white border-transparent'
+                  }`}
+                >
+                  <Smartphone className="w-4 h-4 text-amber-350" />
+                  <span>Payphone (Ecuador)</span>
+                  <span className="text-[7.5px] uppercase bg-black/40 text-amber-400 px-1 rounded">Tarjetas/App 🇪🇨</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setPaymentGateway('deuna'); setPaymentError(''); }}
+                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
+                    paymentGateway === 'deuna' 
+                      ? 'bg-teal-500 text-black border-black shadow-[2px_2px_0_#000]' 
+                      : 'text-gray-400 hover:text-white border-transparent'
+                  }`}
+                >
+                  <QrCode className="w-4 h-4 text-teal-300" />
+                  <span>Deuna QR (Ecuador)</span>
+                  <span className="text-[7.5px] uppercase bg-black/40 text-teal-400 px-1 rounded">Banco Pichincha 📲</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => { setPaymentGateway('transferencia'); setPaymentError(''); }}
-                  className={`py-2.5 px-2 text-[11px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1.5 border ${
+                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
                     paymentGateway === 'transferencia' 
-                      ? 'bg-indigo-600 text-white border-black shadow font-bold' 
+                      ? 'bg-indigo-600 text-white border-black shadow-[2px_2px_0_#000]' 
                       : 'text-gray-400 hover:text-white border-transparent'
                   }`}
                 >
-                  <Building className="w-5 h-5" /> Transferencia Bancaria
+                  <Building className="w-4 h-4 text-indigo-300" />
+                  <span>Transf. Bancaria</span>
+                  <span className="text-[7.5px] uppercase bg-black/40 text-indigo-400 px-1 rounded">Manual / Depósito</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setPaymentGateway('saldo'); setPaymentError(''); }}
+                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
+                    paymentGateway === 'saldo' 
+                      ? 'bg-emerald-500 text-black border-black shadow-[2px_2px_0_#000]' 
+                      : 'text-gray-400 hover:text-white border-transparent'
+                  }`}
+                >
+                  <Coins className="w-4 h-4 text-emerald-350" />
+                  <span>Mi Saldo DT</span>
+                  <span className="text-[7.5px] uppercase bg-black/40 text-emerald-400 px-1 rounded">${userCashBalance.toFixed(2)} USD</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => { setPaymentGateway('efectivo'); setPaymentError(''); }}
+                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
+                    paymentGateway === 'efectivo' 
+                      ? 'bg-rose-500 text-black border-black shadow-[2px_2px_0_#000]' 
+                      : 'text-gray-400 hover:text-white border-transparent'
+                  }`}
+                >
+                  <Coins className="w-4 h-4 text-rose-350" />
+                  <span>Código Físico</span>
+                  <span className="text-[7.5px] uppercase bg-black/40 text-rose-500 px-1 rounded">Activación 🎫</span>
                 </button>
 
               </div>
 
               {/* Dynamic Payment Gateways viewport */}
+              {paymentGateway === 'stripe' && (
+                <div className="space-y-3.5 animate-fade-in text-center border-2 border-black bg-[#10132c] p-4 rounded-2xl">
+                  <div className="flex justify-center items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-[#635BFF] animate-pulse" />
+                    <span className="text-[10px] text-[#8a85ff] uppercase tracking-widest font-mono font-bold">PAGO SEGURO CON STRIPE CHECKOUT</span>
+                  </div>
+
+                  <div className="bg-slate-950/80 p-3 rounded-xl border border-[#635BFF]/20 flex flex-col items-center text-center space-y-2">
+                    <div className="p-3 bg-gradient-to-br from-[#635BFF] to-[#4338ca] rounded-2xl border-2 border-black shadow">
+                      <CreditCard className="w-10 h-10 text-white" />
+                    </div>
+
+                    <p className="text-[11px] text-slate-300">
+                      Será redirigido al portal oficial y seguro de <strong>Stripe Checkout</strong> para completar su transacción mediante tarjeta de crédito o débito internacional.
+                    </p>
+
+                    <div className="text-[10.5px] font-extrabold text-[#8a85ff] mt-2 font-mono bg-[#635BFF]/10 px-3 py-1.5 rounded-lg border border-[#635BFF]/20">
+                      Monto a Procesar: {getPlanDetails(showPaymentModal).price}
+                    </div>
+
+                    <p className="text-[9px] text-gray-450 italic max-w-xs leading-normal">
+                      Soporta todas las tarjetas de crédito importantes (Visa, Mastercard, American Express) de Ecuador, España y del mundo con liquidación segura.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {paymentGateway === 'deuna' && (
                 <div className="space-y-3.5 animate-fade-in text-center border-2 border-black bg-[#061e1b] p-4 rounded-2xl">
                   <div className="flex justify-center items-center gap-2">
@@ -1542,9 +1663,13 @@ export default function SubscriptionView({
                     ? 'bg-teal-400 text-black hover:bg-teal-350'
                     : paymentGateway === 'payphone'
                       ? 'bg-amber-500 text-slate-950 hover:bg-amber-400'
-                      : paymentGateway === 'transferencia'
-                        ? 'bg-indigo-600 text-white hover:bg-indigo-500'
-                        : 'bg-rose-500 text-black hover:bg-rose-400'
+                      : paymentGateway === 'stripe'
+                        ? 'bg-[#635BFF] text-white hover:bg-[#5249f0]'
+                        : paymentGateway === 'transferencia'
+                          ? 'bg-indigo-600 text-white hover:bg-indigo-500'
+                          : paymentGateway === 'saldo'
+                            ? 'bg-emerald-500 text-black hover:bg-emerald-400'
+                            : 'bg-rose-500 text-black hover:bg-rose-400'
                 }`}
               >
                 {submittingPayment ? (
