@@ -471,11 +471,11 @@ export default function LeaderboardView({
   // Find user rank index
   const userRank = displayedRanking.findIndex(item => item.username.includes('Tú') || item.username.includes('Director')) + 1;
 
-  // Define prize targets based on ranking as of July 20th
+  // Define prize targets based on ranking as of July 30th
   const prizes = [
-    { rank: 1, title: 'Gran Premio de Clasificación', name: 'Premio en Efectivo: $2.000 USD', desc: 'Otorgado al primer lugar absoluto en puntaje de D.T. al corte final del 20 de julio.', icon: <Trophy className="w-5.5 h-5.5 text-yellow-450" />, badge: 'bg-yellow-500/15 border-yellow-500 text-yellow-405' },
-    { rank: 2, title: 'Segundo Premio de Clasificación', name: 'Premio en Efectivo: $1.000 USD', desc: 'Otorgado al segundo lugar absoluto en puntaje de D.T. al corte final del 20 de julio.', icon: <Award className="w-5.5 h-5.5 text-slate-300" />, badge: 'bg-slate-300/15 border-slate-300 text-slate-300' },
-    { rank: 3, title: 'Tercer Premio de Clasificación', name: 'Premio en Efectivo: $500 USD', desc: 'Otorgado al tercer lugar absoluto en puntaje de D.T. al corte final del 20 de julio.', icon: <Coins className="w-5.5 h-5.5 text-amber-500" />, badge: 'bg-amber-600/15 border-amber-600 text-amber-600' }
+    { rank: 1, title: 'Gran Premio de Clasificación', name: 'Premio en Efectivo: $1.000 USD', desc: 'Otorgado al primer lugar absoluto en puntaje de D.T. al corte final del 30 de julio, auditado por un notario público.', icon: <Trophy className="w-5.5 h-5.5 text-yellow-450" />, badge: 'bg-yellow-500/15 border-yellow-500 text-yellow-405' },
+    { rank: 2, title: 'Segundo Premio de Clasificación', name: 'Premio en Efectivo: $500 USD', desc: 'Otorgado al segundo lugar absoluto en puntaje de D.T. al corte final del 30 de julio, auditado por un notario público.', icon: <Award className="w-5.5 h-5.5 text-slate-300" />, badge: 'bg-slate-300/15 border-slate-300 text-slate-300' },
+    { rank: 3, title: 'Tercer Premio de Clasificación', name: 'Premio en Efectivo: $250 USD', desc: 'Otorgado al tercer lugar absoluto en puntaje de D.T. al corte final del 30 de julio, auditado por un notario público.', icon: <Coins className="w-5.5 h-5.5 text-amber-500" />, badge: 'bg-amber-600/15 border-amber-600 text-amber-600' }
   ];
 
   const isPaidPlan = currentUserSubscription === 'Plan Scout Básico' || currentUserSubscription === 'Pase VIP Elite';
@@ -670,7 +670,7 @@ export default function LeaderboardView({
               <div>
                 <h4 className="font-extrabold text-sm text-amber-400 uppercase font-mono tracking-wider">Inscripción a Premios Deshabilitada (Plan de Pago Requerido)</h4>
                 <p className="text-[11.5px] text-gray-300 leading-relaxed mt-0.5 max-w-2xl">
-                  Estás registrado con un <strong>Plan Gratuito Amateur</strong>. Tus puntos oficiales se registran en el ranking pero <strong>no eres elegible para recibir los premios en efectivo</strong> ($2.000, $1.000 o $500 USD). ¡Adquiere el Pase VIP o el Plan Scout Básico para habilitar tu elegibilidad auditable!
+                  Estás registrado con un <strong>Plan Gratuito Amateur</strong>. Tus puntos oficiales se registran en el ranking pero <strong>no eres elegible para recibir los premios en efectivo</strong> ($1.000, $500 o $250 USD). Los premios y donaciones se auditan con notario público y se entregarán el 30 de julio en vivo por Facebook Live y YouTube. ¡Adquiere el Pase VIP o el Plan Scout Básico para habilitar tu elegibilidad auditable!
                 </p>
               </div>
             </div>
@@ -768,9 +768,9 @@ export default function LeaderboardView({
                                : 'bg-slate-950 border-slate-850 text-gray-400';
 
               let eligibilityLabel = '';
-              if (pos === 1) eligibilityLabel = '🥇 $2.000 USD';
-              else if (pos === 2) eligibilityLabel = '🥈 $1.000 USD';
-              else if (pos === 3) eligibilityLabel = '🥉 $500 USD';
+              if (pos === 1) eligibilityLabel = '🥇 $1.000 USD';
+              else if (pos === 2) eligibilityLabel = '🥈 $500 USD';
+              else if (pos === 3) eligibilityLabel = '🥉 $250 USD';
 
               return (
                 <div

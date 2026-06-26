@@ -2038,11 +2038,11 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     // Map rewards for positions to ensure 100% auditable eligibility
     const finalRanking = sortedRanking.map((entry, index) => {
       const position = index + 1;
-      let raffleEligibility: "Auto de $20.000" | "Viaje a Galapágos" | "Set Tecnológico $1.500" | "Ninguno" = "Ninguno";
+      let raffleEligibility: "$1.000 USD (1er Lugar)" | "$500 USD (2do Lugar)" | "$250 USD (3er Lugar)" | "Ninguno" = "Ninguno";
 
-      if (position === 1) raffleEligibility = "Auto de $20.000";
-      else if (position === 2) raffleEligibility = "Viaje a Galapágos";
-      else if (position === 3) raffleEligibility = "Set Tecnológico $1.500";
+      if (position === 1) raffleEligibility = "$1.000 USD (1er Lugar)";
+      else if (position === 2) raffleEligibility = "$500 USD (2do Lugar)";
+      else if (position === 3) raffleEligibility = "$250 USD (3er Lugar)";
 
       return {
         rank: position,
@@ -2067,9 +2067,9 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
       status: "success",
       totalParticipantsCount: finalRanking.length,
       top3Prizes: {
-        prime: "Auto valorado en $20.000 (1er Lugar)",
-        secondary: "Viaje a Galápagos con Gastos Pagados (2do Lugar)",
-        tertiary: "Set Tecnológico de $1.500 (3er Lugar)"
+        prime: "$1.000 USD en Efectivo (1er Lugar)",
+        secondary: "$500 USD en Efectivo (2do Lugar)",
+        tertiary: "$250 USD en Efectivo (3er Lugar)"
       },
       ranking: finalRanking
     });

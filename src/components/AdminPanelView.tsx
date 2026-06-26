@@ -1119,9 +1119,9 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                       else if (u.subscription === 'Plan Scout Básico') planBadge = 'text-indigo-400 bg-indigo-500/10 border-indigo-500/20';
 
                       let rewardText = "Ninguno";
-                      if (pos === 1) rewardText = "🥇 $2.000 USD";
-                      else if (pos === 2) rewardText = "🥈 $1.000 USD";
-                      else if (pos === 3) rewardText = "🥉 $500 USD";
+                      if (pos === 1) rewardText = "🥇 $1.000 USD";
+                      else if (pos === 2) rewardText = "🥈 $500 USD";
+                      else if (pos === 3) rewardText = "🥉 $250 USD";
 
                       return (
                         <tr 
@@ -1829,18 +1829,18 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
           {/* Sorteo Prizes breakdown visualization */}
           <div className="bg-brand-sidebar border border-slate-850 rounded-2xl p-5 shadow-xl">
             <h3 className="font-bold text-white text-xs uppercase tracking-wider text-indigo-400 font-mono mb-4 flex items-center gap-1.5">
-              <Award className="w-4.5 h-4.5" /> Ganadores Proyectados al 20 de Julio
+              <Award className="w-4.5 h-4.5" /> Ganadores Proyectados al 30 de Julio
             </h3>
             
             <div className="space-y-3">
               <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-900 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-yellow-500/10 text-yellow-405 flex items-center justify-center border border-yellow-500/20 shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-yellow-500/10 text-yellow-455 flex items-center justify-center border border-yellow-500/20 shrink-0">
                     <Trophy className="w-4 h-4" />
                   </div>
                   <div>
-                    <h5 className="text-xs font-bold text-white">1er Lugar ($2.000 USD)</h5>
-                    <p className="text-[10px] text-gray-450 mt-0.5">Mejor puntaje acumulado al 20 de julio</p>
+                    <h5 className="text-xs font-bold text-white">1er Lugar ($1.000 USD)</h5>
+                    <p className="text-[10px] text-gray-450 mt-0.5">Mejor puntaje acumulado al 30 de julio</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -1856,7 +1856,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                     <Award className="w-4 h-4" />
                   </div>
                   <div>
-                    <h5 className="text-xs font-bold text-white">2do Lugar ($1.000 USD)</h5>
+                    <h5 className="text-xs font-bold text-white">2do Lugar ($500 USD)</h5>
                     <p className="text-[10px] text-gray-450 mt-0.5">Segundo mejor puntaje acumulado</p>
                   </div>
                 </div>
@@ -1873,7 +1873,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                     <Coins className="w-4 h-4" />
                   </div>
                   <div>
-                    <h5 className="text-xs font-bold text-white">3er Lugar ($500 USD)</h5>
+                    <h5 className="text-xs font-bold text-white">3er Lugar ($250 USD)</h5>
                     <p className="text-[10px] text-gray-450 mt-0.5">Tercer mejor puntaje acumulado</p>
                   </div>
                 </div>

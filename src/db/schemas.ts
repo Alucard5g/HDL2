@@ -130,10 +130,10 @@ export const GET_LEADERBOARD_SQL_QUERY = `
  * Determines eligibility prizes for the Top 3 Ranking players in real-time.
  * ============================================================================
  */
-export function assignRaffleEligibility(rank: number): 'Auto Híbrido' | 'Final Champions League' | 'Teléfono Gama Alta' | 'Ninguno' {
-  if (rank === 1) return 'Auto Híbrido';
-  if (rank === 2) return 'Final Champions League';
-  if (rank === 3) return 'Teléfono Gama Alta';
+export function assignRaffleEligibility(rank: number): '$1.000 USD (1er Lugar)' | '$500 USD (2do Lugar)' | '$250 USD (3er Lugar)' | 'Ninguno' {
+  if (rank === 1) return '$1.000 USD (1er Lugar)';
+  if (rank === 2) return '$500 USD (2do Lugar)';
+  if (rank === 3) return '$250 USD (3er Lugar)';
   return 'Ninguno';
 }
 

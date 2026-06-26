@@ -312,7 +312,7 @@ export default function SubscriptionView({
         'Cuesta $15.00 por continente (América, Europa o África/Asia/Oceanía juntas) 🌍',
         'Suma inmediata de +15 puntos de score a tu puntuación de DT por cada continente canjeado 👑',
         'Desbloqueo automático al 100% de todos los cromos de todos los países de ese continente 🏆',
-        'Corte final de puntuaciones realizado el día 20 de julio de 2026',
+        'Corte final de puntuaciones realizado el día 30 de julio de 2026',
         'Insignia dorada VIP de DT verificado en el panel de control'
       ],
       buttonText: 'Adquirir Continente ($15.00)',

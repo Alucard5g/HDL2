@@ -2637,37 +2637,46 @@ export default function App() {
                     <div className="bg-white border-[3px] border-black p-5 rounded-2xl shadow-[5px_5px_0px_#000] relative flex flex-col justify-between" id="panel-prizes-rewards">
                       <div>
                         <div className="inline-block bg-[#FDDF2B] text-black font-bangers text-xs px-3 py-1 rounded border-2 border-black rotate-[-0.5deg] mb-3 shadow-[2px_2px_0px_#000]">
-                          🏆 PREMIOS
+                          🏆 PREMIOS Y TRANSPARENCIA
                         </div>
-                        <h4 className="font-black text-black text-sm uppercase font-sans mb-3 tracking-tight flex items-center gap-2">
-                          <span>👑</span> PODIO DE GANADORES
+                        <h4 className="font-black text-black text-sm uppercase font-sans mb-2 tracking-tight flex items-center gap-2">
+                          <span>👑</span> PODIO DE GANADORES OFICIAL
                         </h4>
-                        <p className="text-[11px] text-gray-600 leading-relaxed font-semibold mb-3">
-                          Los usuarios con planes activos (Plan Scout Básico o Pase VIP Elite) que alcancen los primeros puestos del ranking general serán acreedores a los siguientes premios en efectivo:
+                        <p className="text-[10.5px] text-gray-600 leading-relaxed font-semibold mb-3">
+                          Los usuarios con planes activos (Plan Scout Básico o Pase VIP Elite) que alcancen los primeros puestos del ranking general recibirán los siguientes premios en efectivo el <strong>30 de julio</strong>:
                         </p>
-                        <ul className="space-y-2 text-xs text-gray-700 font-comic font-bold">
+                        <ul className="space-y-1.5 text-xs text-gray-700 font-comic font-bold mb-3">
                           <li className="flex items-center justify-between bg-amber-100/30 border border-amber-300/40 rounded-lg p-2">
                             <span className="flex items-center gap-2 text-gray-800">
                               <span className="text-base text-amber-500">🥇</span> <strong>1er Lugar</strong>
                             </span>
-                            <span className="font-mono font-black text-amber-700 text-sm">$2.000 USD</span>
+                            <span className="font-mono font-black text-amber-700 text-sm">$1.000 USD</span>
                           </li>
                           <li className="flex items-center justify-between bg-slate-100/50 border border-slate-300/40 rounded-lg p-2">
                             <span className="flex items-center gap-2 text-gray-800">
                               <span className="text-base text-slate-500">🥈</span> <strong>2do Lugar</strong>
                             </span>
-                            <span className="font-mono font-black text-slate-700 text-sm">$1.000 USD</span>
+                            <span className="font-mono font-black text-slate-700 text-sm">$500 USD</span>
                           </li>
                           <li className="flex items-center justify-between bg-amber-600/10 border border-amber-700/20 rounded-lg p-2">
                             <span className="flex items-center gap-2 text-gray-800">
                               <span className="text-base text-amber-700">🥉</span> <strong>3er Lugar</strong>
                             </span>
-                            <span className="font-mono font-black text-amber-800 text-sm">$500 USD</span>
+                            <span className="font-mono font-black text-amber-800 text-sm">$250 USD</span>
                           </li>
                         </ul>
+                        
+                        <div className="bg-slate-900 text-white p-3 rounded-xl border-2 border-black text-[10px] space-y-1.5 leading-normal">
+                          <p>
+                            📺 <strong>Transmisión en Vivo:</strong> La premiación se realizará en vivo el <strong>30 de julio de 2026</strong> a través de nuestras transmisiones oficiales en <strong>Facebook Live</strong> y <strong>YouTube</strong>.
+                          </p>
+                          <p>
+                            🛡️ <strong>Seguridad y Fe Pública:</strong> Para garantizar absoluta transparencia, tanto el cómputo final de puntos del ranking como el destino de las donaciones son <strong>auditados y certificados por un Notario Público</strong>.
+                          </p>
+                        </div>
                       </div>
                       <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center bg-yellow-50/40 -mx-5 -mb-5 p-4 rounded-b-2xl">
-                        <span className="text-[9px] font-mono text-amber-700 font-bold uppercase tracking-wide">Elegibilidad para Cuentas de Pago</span>
+                        <span className="text-[9px] font-mono text-amber-700 font-bold uppercase tracking-wide">ELEGIBILIDAD AUDITADA POR NOTARIO</span>
                         <span className="text-xs text-amber-600">🏆</span>
                       </div>
                     </div>
@@ -3871,7 +3880,7 @@ export default function App() {
                       <div>
                         <h4 className="font-bold text-xs text-white uppercase tracking-wider font-mono">📢 ¡Inicia tu Registro de Elite!</h4>
                         <p className="text-[11px] text-gray-300 mt-0.5 leading-relaxed">
-                          Estás usando una credencial de invitado temporal. Regístrate hoy de forma 100% gratuita para recibir tu propio <strong>Código de Juego Único</strong> y participar activamente por un Auto Híbrido en el Sorteo Oficial de la Gala.
+                          Estás usando una credencial de invitado temporal. Regístrate hoy de forma 100% gratuita para recibir tu propio <strong>Código de Juego Único</strong> y participar activamente por los premios en efectivo ($1.000 USD al 1º, $500 USD al 2º y $250 USD al 3º) el 30 de julio en vivo, con total transparencia auditada por un notario público.
                         </p>
                       </div>
                     </div>
@@ -4354,7 +4363,11 @@ export default function App() {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-[#11b782] shrink-0 font-bold">✓</span>
-                    <span><strong>Premios Increíbles:</strong> Sube en el Leaderboard global. Los mejores directores técnicos calificarán para sorteos de un auto, viaje a la final o teléfonos inteligentes.</span>
+                    <span><strong>Premios en Efectivo:</strong> Gana <strong>$1.000 USD</strong> (1er lugar), <strong>$500 USD</strong> (2do lugar) y <strong>$250 USD</strong> (3er lugar). Los premios se entregarán el <strong>30 de julio de 2026</strong> en vivo por Facebook Live y YouTube.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#11b782] shrink-0 font-bold">✓</span>
+                    <span><strong>Auditoría Notarial Completa:</strong> Para máxima seguridad y transparencia, la contabilidad de puntos y todas las donaciones son <strong>auditadas en vivo por un notario público</strong>.</span>
                   </li>
                 </ul>
               </div>
@@ -4974,11 +4987,11 @@ export default function App() {
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-amber-400 font-black shrink-0">✓</span>
-                      <span>Corte final de puntuaciones realizado el día <strong>20 de julio de 2026</strong>.</span>
+                      <span>Corte final de puntuaciones realizado el día <strong>30 de julio de 2026</strong>.</span>
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-amber-400 font-black shrink-0">✓</span>
-                      <span>Elegibilidad directa: 1er Lugar: $2.000, 2do Lugar: $1.000, 3er Lugar: $500 USD en efectivo.</span>
+                      <span>Elegibilidad directa: 1er Lugar: $1.000, 2do Lugar: $500, 3er Lugar: $250 USD en efectivo, auditado por un notario público.</span>
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-amber-400 font-black shrink-0">✓</span>
