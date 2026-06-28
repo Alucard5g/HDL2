@@ -1404,6 +1404,71 @@ export default function App() {
     return 'África, Asia y Oceanía';
   };
 
+  const handleSavePlayoffs = async (
+    winners: { [matchId: string]: string }, 
+    scores: { [matchId: string]: { golesLocal: number; golesVisitante: number } }
+  ) => {
+    // Save to tacticalBoards under the special key '__playoffPredictions'
+    const updatedBoards = {
+      ...tacticalBoards,
+      '__playoffPredictions': {
+        country: '__playoffPredictions',
+        formation: 'playoffs',
+        selectedPlayers: {},
+        prediction: null,
+        winners,
+        scores,
+        predictionSavedAt: new Date().toISOString()
+      } as any
+    };
+    
+    setTacticalBoards(updatedBoards);
+    localStorage.setItem('scouting_tactical_boards', JSON.stringify(updatedBoards));
+
+    // Instantly sync with Server DB using userSync logic
+    try {
+      const invitedListParsed = (() => {
+        try {
+          const list = localStorage.getItem('dt_invited_emails');
+          return list ? JSON.parse(list) : [];
+        } catch {
+          return [];
+        }
+      })();
+
+      const scoreInfo = getCurrentUserScoreInfo(updatedBoards);
+
+      await fetch('/api/user/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: userId,
+          username: username,
+          gameCode: userCode,
+          email: userEmail,
+          password: userPassword,
+          unlockedLevels,
+          aciertosOnce: scoreInfo.totalOnceHits,
+          aciertosMarcador: scoreInfo.totalScoreHits,
+          unlockedStickersCount: scoreInfo.unlockedStickersCount,
+          completedCountries: scoreInfo.completedCountriesList,
+          score: scoreInfo.totalScore,
+          subscription: userSubscription,
+          avatar: userAvatar,
+          licenseCode: userLicense,
+          tacticalBoards: updatedBoards,
+          referredByEmail: userReferredByEmail,
+          invitedEmails: invitedListParsed,
+          coins: userCoins,
+          cashBalance: userCashBalance
+        })
+      });
+      console.log('[Playoffs Sync] Guardado y sincronización exitosa en base de datos.');
+    } catch (err) {
+      console.error('[Playoffs Sync Error]:', err);
+    }
+  };
+
   // Dynamic score calculator matching required point formulas:
   // - 1 cromo = 1 pt
   // - Completed country = 5 pt
@@ -1426,7 +1491,7 @@ export default function App() {
       let isCountryCompletedScout = userSubscription === 'Plan Scout Básico' && isCountryChosen(country);
 
       // Access checks
-      const hasCromoAccess = !isRegistered || 
+      const hasCromoAccess = !isRegistered || isAdmin || 
         (userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(country))) ||
         (userSubscription === 'Plan Scout Básico' && isCountryChosen(country)) ||
         (userSubscription === 'Ninguna' && freeChosenCountry === country);
@@ -1564,6 +1629,9 @@ export default function App() {
   }, [unlockedLevels, userSubscription, userCode, userId, username, userAvatar, currentUserInfo.totalOnceHits, currentUserInfo.totalScoreHits, userLicense, tacticalBoards, userEmail, userReferredByEmail, userCoins, userCashBalance, purchasedPoints]);
 
   const isCountryLockedForUser = (countryName: string): boolean => {
+    if (isAdmin) {
+      return false;
+    }
     if (!isRegistered) {
       return countryName !== 'Ecuador';
     }
@@ -1587,9 +1655,14 @@ export default function App() {
   };
 
   const handleCountrySelectionClick = (countryName: string) => {
+    if (isAdmin) {
+      setSelectedCountryName(countryName);
+      return;
+    }
+
     if (!isRegistered) {
       if (countryName !== 'Ecuador') {
-        alert('📢 MODO INVITADO LIMITADO\n\nComo invitado, solo puedes observar y jugar con la Selección de Ecuador. Por favor, regístrate de forma 100% gratuita para coleccionar y jugar con las 32 selecciones del Mundial y registrar tu puntaje.');
+        alert('📢 MODO INVITADO LIMITADO\n\nComo invitado, solo puedes observar y jugar con la Selección de Ecuador. Por favor, regístrate de forma 100% gratuita para coleccionar y jugar con las 32 selecciones de Héroes del Deporte y registrar tu puntaje.');
         setIsRegistrationOpen(true);
         return;
       }
@@ -2586,7 +2659,7 @@ export default function App() {
                     </div>
                     <div className="text-center md:text-left">
                       <h3 className="font-bangers text-2xl text-white tracking-wide uppercase leading-tight">MÉTODO DE JUEGO, ACREDITACIÓN DE PUNTOS Y GRANDES PREMIOS</h3>
-                      <p className="font-mono text-xs text-[#11b782] font-black uppercase tracking-wider">REGLAMENTO OFICIAL DEL ÁLBUM TRIVIA MUNDIAL 2026</p>
+                      <p className="font-mono text-xs text-[#11b782] font-black uppercase tracking-wider">REGLAMENTO OFICIAL DEL ÁLBUM TRIVIA HÉROES DEL DEPORTE</p>
                     </div>
                   </div>
 
@@ -3037,11 +3110,11 @@ export default function App() {
                       const isContinentChosen = (cont: string) => vipChosenContinent && vipChosenContinent.split(',').map(s => s.trim().toUpperCase()).includes(cont.toUpperCase());
                       const isCountryChosen = (cName: string) => scoutChosenCountry && scoutChosenCountry.split(',').map(s => s.trim().toUpperCase()).includes(cName.toUpperCase());
 
-                      const hasCromoAccessForThisCountry = !isRegistered 
+                      const hasCromoAccessForThisCountry = isAdmin || (!isRegistered 
                         ? (c.name === 'Ecuador')
                         : ((userSubscription === 'Pase VIP Elite' && isContinentChosen(getCountryContinent(c.name))) ||
                            (userSubscription === 'Plan Scout Básico' && isCountryChosen(c.name)) ||
-                           (userSubscription === 'Ninguna' && freeChosenCountry === c.name));
+                           (userSubscription === 'Ninguna' && freeChosenCountry === c.name)));
 
                       let completionBadge = '';
                       if (unlockedCromos === maxCromos) completionBadge = '🏆';
@@ -3986,6 +4059,7 @@ export default function App() {
                 onSelectCountry={handleCountrySelectionClick}
                 setActiveTab={setActiveTab}
                 matchSyncKey={matchSyncKey}
+                onSavePlayoffs={handleSavePlayoffs}
               />
             )}
  
@@ -4125,7 +4199,7 @@ export default function App() {
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 leading-relaxed font-comic">
-                    Comunicados oficiales del director de juego y notas de parches del Album-Trivia Mundial 2026 en tiempo real.
+                    Comunicados oficiales del director de juego y notas de parches de Héroes del Deporte en tiempo real.
                   </p>
 
                   <div className="space-y-3 pt-2 max-h-[190px] overflow-y-auto pr-1">
@@ -4287,7 +4361,7 @@ export default function App() {
             {/* General bottom line */}
             <div className="border-t border-slate-900 pt-5 text-center text-[10px] text-slate-500 font-mono flex flex-col sm:flex-row items-center justify-between gap-3">
               <div>
-                © 2026 Álbum Trivia Mundial. Creado por <strong>CIG</strong>, Diseño por <strong>RKLY</strong>, impulsado con IA de vanguardia, servidores de baja latencia y tecnología Google Cloud.
+                © 2026 Héroes del Deporte. Creado por <strong>CIG</strong>, Diseño por <strong>RKLY</strong>, impulsado con IA de vanguardia, servidores de baja latencia y tecnología Google Cloud.
               </div>
               <div className="flex gap-4">
                 <span className="text-gray-500">Admin email: geovannygrk3d@gmail.com</span>
@@ -4379,7 +4453,7 @@ export default function App() {
                 ¡BIENVENIDO AL DESAFÍO! ⚽
               </h3>
               <p className="text-[11px] text-slate-300 mt-1 max-w-sm mx-auto leading-relaxed font-comic font-medium">
-                Álbum Digital Interactivo & Trivia Mundial 2026
+                Álbum Digital Interactivo & Trivia Héroes del Deporte
               </p>
             </div>
 

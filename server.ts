@@ -2403,14 +2403,14 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
   });
 
   // Serve static files / Vite middleware
-  const isProd = process.env.NODE_ENV === "production" || !!process.env.PORT;
+  const isProd = process.env.NODE_ENV === "production";
 
   if (!isProd) {
     console.log("Modo: Desarrollo Local");
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
-      appType: "custom",
+      appType: "spa",
     });
     app.use(vite.middlewares);
   } else {

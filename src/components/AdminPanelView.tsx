@@ -39,7 +39,7 @@ import {
   Key
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { COUNTRIES, generatePlayersForCountry, MATCH_FIXTURES } from '../data';
+import { COUNTRIES, generatePlayersForCountry, MATCH_FIXTURES, KNOCKOUT_FIXTURES } from '../data';
 
 function getSafeImageUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
@@ -88,6 +88,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
   const [successMsg, setSuccessMsg] = useState<string>('');
   const [inspectingUser, setInspectingUser] = useState<ActiveUser | null>(null);
   const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(new Date());
+  const freshInspectingUser = inspectingUser ? (usersList.find(u => u.id === inspectingUser.id) || inspectingUser) : null;
   
   // States for consolidated database view and filters
   const [dbSubView, setDbSubView] = useState<'users' | 'predictions' | 'stickers' | 'matches'>('users');
@@ -3449,7 +3450,7 @@ app.post('/api/webhooks/fal', async (req, res) => {
               CONTROLLER CENTRAL DE LICENCIAS Y FACTURACIÓN COMIC
             </h3>
             <p className="text-xs sm:text-sm text-slate-200 font-comic max-w-4xl leading-relaxed">
-              Registra, audita, convalida y depura todos los pagos procesados por Stripe Checkout, Payphone o recibos de efectivo (Deuna, transferencias bancarias o cupones prepago). Cada plan Premium (<strong>Plan Scout Básico o Pase VIP Elite</strong>) está enlazado a un código de licencia auditable único para certificar su elegibilidad a los premios oficiales en efectivo de la Copa Mundial 2026.
+              Registra, audita, convalida y depura todos los pagos procesados por Stripe Checkout, Payphone o recibos de efectivo (Deuna, transferencias bancarias o cupones prepago). Cada plan Premium (<strong>Plan Scout Básico o Pase VIP Elite</strong>) está enlazado a un código de licencia auditable único para certificar su elegibilidad a los premios oficiales en efectivo de Héroes del Deporte.
             </p>
           </div>
 
@@ -3465,7 +3466,7 @@ app.post('/api/webhooks/fal', async (req, res) => {
             <div className="bg-slate-900 border-2 border-black p-4 rounded-2xl shadow-[3px_3px_0px_#000] text-center">
               <span className="text-[9px] uppercase font-mono text-purple-400 block">Pases VIP Elite Activos</span>
               <span className="text-2xl font-black text-yellow-400 font-mono block mt-1">
-                {usersList.filter(u => u.subscription === "Pase VIP Elite" || u.subscription === "Pase VIP Mundialista").length}
+                {usersList.filter(u => u.subscription === "Pase VIP Elite" || u.subscription === "Pase VIP Premium").length}
               </span>
               <span className="text-[10px] text-gray-400 font-mono block">👑 Beneficio de +15 puntos</span>
             </div>
@@ -4017,8 +4018,10 @@ app.post('/api/webhooks/fal', async (req, res) => {
         </div>
       )}
 
-      {inspectingUser && (
-        <div id="admin-inspect-modal" className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-all overflow-y-auto">
+      {freshInspectingUser && (() => {
+        const inspectingUser = freshInspectingUser;
+        return (
+          <div id="admin-inspect-modal" className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-all overflow-y-auto">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 15 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -4177,12 +4180,14 @@ app.post('/api/webhooks/fal', async (req, res) => {
                   ⚽ Alineación Táctica & Pronóstico para Torneo
                 </h5>
 
-                {!inspectingUser.tacticalBoards || Object.keys(inspectingUser.tacticalBoards).length === 0 ? (
+                {!inspectingUser.tacticalBoards || Object.keys(inspectingUser.tacticalBoards).filter(k => k !== '__playoffPredictions').length === 0 ? (
                   <div className="text-center py-6 bg-slate-950/40 rounded-2xl border-2 border-dashed border-slate-850">
                     <p className="text-xs text-slate-400 font-comic">Este Director Técnico aún no ha guardado ninguna táctica oficial ni pronóstico en la pizarra.</p>
                   </div>
                 ) : (
-                  Object.entries(inspectingUser.tacticalBoards).map(([countryName, bObj]: [string, any]) => {
+                  Object.entries(inspectingUser.tacticalBoards)
+                    .filter(([countryName]) => countryName !== '__playoffPredictions')
+                    .map(([countryName, bObj]: [string, any]) => {
                     const countryInfo = COUNTRIES.find(c => c.name === countryName);
                     const countryPlayers = generatePlayersForCountry(countryName);
                     
@@ -4273,6 +4278,180 @@ app.post('/api/webhooks/fal', async (req, res) => {
                 )}
               </div>
 
+              {/* Sección 3: Pronósticos de Playoffs (Llaves de Eliminación Directa) */}
+              <div className="space-y-4 pt-4 border-t border-slate-900">
+                <h5 className="font-mono text-[10px] text-emerald-400 uppercase font-black tracking-widest flex items-center gap-2">
+                  🏆 PRONÓSTICOS DE PLAYOFFS (DIECISEISAVOS A LA FINAL)
+                </h5>
+
+                {(() => {
+                  const playoffData = inspectingUser.tacticalBoards?.['__playoffPredictions'];
+                  if (!playoffData) {
+                    return (
+                      <div className="text-center py-6 bg-slate-950/40 rounded-2xl border-2 border-dashed border-slate-850">
+                        <p className="text-xs text-slate-400 font-comic">Este Director Técnico aún no registra pronósticos para las llaves de Playoffs.</p>
+                      </div>
+                    );
+                  }
+
+                  const winners = playoffData.winners || {};
+                  const scores = playoffData.scores || {};
+                  const savedAt = playoffData.predictionSavedAt;
+
+                  // Define the static structure of the stages so we can map them cleanly
+                  const stages = [
+                    {
+                      title: "⚡ Dieciseisavos de Final (Lado Izquierdo)",
+                      matches: [
+                        { id: 'ko-3', l: 'Alemania', v: 'Paraguay' },
+                        { id: 'ko-6', l: 'Francia', v: 'Suecia' },
+                        { id: 'ko-1', l: 'Sudáfrica', v: 'Canadá' },
+                        { id: 'ko-4', l: 'Países Bajos', v: 'Marruecos' },
+                        { id: 'ko-11', l: 'Portugal', v: 'Croacia' },
+                        { id: 'ko-12', l: 'España', v: 'Austria' },
+                        { id: 'ko-9', l: 'Estados Unidos', v: 'Bosnia y Herzegovina' },
+                        { id: 'ko-10', l: 'Bélgica', v: 'Senegal' }
+                      ]
+                    },
+                    {
+                      title: "⚡ Dieciseisavos de Final (Lado Derecho)",
+                      matches: [
+                        { id: 'ko-13', l: 'Escocia', v: 'Argelia' },
+                        { id: 'ko-15', l: 'Ucrania', v: 'Gales' },
+                        { id: 'ko-2', l: 'Brasil', v: 'Japón' },
+                        { id: 'ko-5', l: 'Argentina', v: 'Dinamarca' },
+                        { id: 'ko-14', l: 'Uruguay', v: 'Polonia' },
+                        { id: 'ko-16', l: 'Suiza', v: 'República Checa' },
+                        { id: 'ko-7', l: 'Inglaterra', v: 'Nigeria' },
+                        { id: 'ko-8', l: 'Italia', v: 'Túnez' }
+                      ]
+                    },
+                    {
+                      title: "🧠 Octavos de Final",
+                      matches: [
+                        { id: 'oct-L1', p1: 'ko-3', p2: 'ko-6' },
+                        { id: 'oct-L2', p1: 'ko-1', p2: 'ko-4' },
+                        { id: 'oct-L3', p1: 'ko-11', p2: 'ko-12' },
+                        { id: 'oct-L4', p1: 'ko-9', p2: 'ko-10' },
+                        { id: 'oct-R1', p1: 'ko-13', p2: 'ko-15' },
+                        { id: 'oct-R2', p1: 'ko-2', p2: 'ko-5' },
+                        { id: 'oct-R3', p1: 'ko-14', p2: 'ko-16' },
+                        { id: 'oct-R4', p1: 'ko-7', p2: 'ko-8' }
+                      ]
+                    },
+                    {
+                      title: "🛡️ Cuartos de Final",
+                      matches: [
+                        { id: 'qf-L1', p1: 'oct-L1', p2: 'oct-L2' },
+                        { id: 'qf-L2', p1: 'oct-L3', p2: 'oct-L4' },
+                        { id: 'qf-R1', p1: 'oct-R1', p2: 'oct-R2' },
+                        { id: 'qf-R2', p1: 'oct-R3', p2: 'oct-R4' }
+                      ]
+                    },
+                    {
+                      title: "🔥 Semifinales",
+                      matches: [
+                        { id: 'sf-L', p1: 'qf-L1', p2: 'qf-L2' },
+                        { id: 'sf-R', p1: 'qf-R1', p2: 'qf-R2' }
+                      ]
+                    },
+                    {
+                      title: "🏆 Gran Final",
+                      matches: [
+                        { id: 'final', p1: 'sf-L', p2: 'sf-R' }
+                      ]
+                    }
+                  ];
+
+                  const getFlag = (name: string) => {
+                    if (!name) return "🏳️";
+                    const found = COUNTRIES.find(c => c.name === name);
+                    return found ? found.flag : "🌍";
+                  };
+
+                  return (
+                    <div className="space-y-4">
+                      {savedAt && (
+                        <div className="text-right text-[10px] text-slate-500 font-mono">
+                          ⏱️ Registrado el: {new Date(savedAt).toLocaleString('es-ES')}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {stages.map((stage) => {
+                          return (
+                            <div key={stage.title} className="bg-slate-950/60 rounded-2xl border-2 border-black p-4 space-y-3 shadow-[4px_4px_0px_#000]">
+                              <span className="text-[11px] font-sans text-yellow-400 block uppercase tracking-wider border-b border-slate-900 pb-1 font-bold">
+                                {stage.title}
+                              </span>
+
+                              <div className="space-y-2 font-mono text-xs">
+                                {stage.matches.map((m) => {
+                                  // Determine teams for this match
+                                  let localTeam = '';
+                                  let visitanteTeam = '';
+
+                                  if ('l' in m) {
+                                    localTeam = m.l;
+                                    visitanteTeam = m.v;
+                                  } else {
+                                    localTeam = winners[m.p1] || `Ganador ${m.p1.toUpperCase()}`;
+                                    visitanteTeam = winners[m.p2] || `Ganador ${m.p2.toUpperCase()}`;
+                                  }
+
+                                  const winner = winners[m.id];
+                                  const matchScore = scores[m.id] || { golesLocal: 0, golesVisitante: 0 };
+                                  const isResolved = !!winner;
+
+                                  return (
+                                    <div key={m.id} className="bg-slate-950/80 border border-slate-900 p-2.5 rounded-xl flex items-center justify-between">
+                                      <div className="flex-1 space-y-1">
+                                        {/* Local */}
+                                        <div className="flex items-center justify-between">
+                                          <span className={`flex items-center gap-1.5 truncate ${winner === localTeam ? 'text-emerald-400 font-black' : 'text-slate-300'}`}>
+                                            <span>{getFlag(localTeam)}</span>
+                                            <span className="truncate uppercase text-[10px]">{localTeam}</span>
+                                          </span>
+                                          <span className="text-slate-400 font-bold bg-slate-900 px-1.5 py-0.5 rounded text-[10px]">
+                                            {matchScore.golesLocal}
+                                          </span>
+                                        </div>
+
+                                        {/* Visitante */}
+                                        <div className="flex items-center justify-between">
+                                          <span className={`flex items-center gap-1.5 truncate ${winner === visitanteTeam ? 'text-emerald-400 font-black' : 'text-slate-300'}`}>
+                                            <span>{getFlag(visitanteTeam)}</span>
+                                            <span className="truncate uppercase text-[10px]">{visitanteTeam}</span>
+                                          </span>
+                                          <span className="text-slate-400 font-bold bg-slate-900 px-1.5 py-0.5 rounded text-[10px]">
+                                            {matchScore.golesVisitante}
+                                          </span>
+                                        </div>
+                                      </div>
+
+                                      <div className="border-l border-slate-900 pl-3 ml-3 shrink-0 flex flex-col items-center justify-center min-w-[70px]">
+                                        <span className="text-[8px] text-slate-500 font-bold font-sans uppercase">GANADOR</span>
+                                        {isResolved ? (
+                                          <span className="text-[9px] text-white bg-emerald-600 border border-black px-1.5 py-0.5 rounded font-black truncate max-w-[85px] uppercase font-sans text-center mt-1 font-bold">
+                                            {winner}
+                                          </span>
+                                        ) : (
+                                          <span className="text-[9px] text-slate-500 italic mt-1 font-sans">Pendiente</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
             </div>
 
             <div className="bg-slate-950 p-4 border-t border-slate-900 text-center select-none">
@@ -4285,7 +4464,8 @@ app.post('/api/webhooks/fal', async (req, res) => {
             </div>
           </motion.div>
         </div>
-      )}
+        );
+      })()}
 
       {customConfirm && (
         <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 backdrop-blur-sm transition-all">

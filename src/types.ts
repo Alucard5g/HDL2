@@ -42,6 +42,11 @@ export interface Match {
   marcadorReal?: { golesLocal: number; golesVisitante: number };
   onceInicialReal: string[]; // List of player IDs in the official starting XI
   jugado: boolean;
+  hora_ect?: string;
+  estadio?: string;
+  fase?: string;
+  equipo_local?: string;
+  equipo_visitante?: string;
 }
 
 export interface UserPrediction {
