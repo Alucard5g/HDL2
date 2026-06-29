@@ -582,7 +582,7 @@ export default function App() {
     localStorage.setItem('dt_admin_sync_counter', adminSyncCounter.toString());
   }, [adminSyncCounter]);
 
-  const isAdmin = userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail';
+  const isAdmin = userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail' || userEmail.trim().toLowerCase() === 'conscientizarte13@gmail.com' || userEmail.trim().toLowerCase() === 'conscientizarte13@gmail';
 
   const isRegistered = userId !== 'user_me' && !!userEmail && userEmail.trim().length > 0;
 
@@ -699,7 +699,7 @@ export default function App() {
   const [footerSuggestName, setFooterSuggestName] = useState<string>('');
   const [footerSuggestEmail, setFooterSuggestEmail] = useState<string>('');
   const [footerSuggestContent, setFooterSuggestContent] = useState<string>('');
-  const [footerSuggestRecipient, setFooterSuggestRecipient] = useState<string>('geovannygrk3d@gmail.com');
+  const [footerSuggestRecipient, setFooterSuggestRecipient] = useState<string>('conscientizarte13@gmail.com');
   const [footerSuggestSuccess, setFooterSuggestSuccess] = useState<string>('');
   const [footerSuggestLoading, setFooterSuggestLoading] = useState<boolean>(false);
 
@@ -2157,7 +2157,7 @@ export default function App() {
     // Auto-navigate to dynamic subscription plans (despliega el panel de suscripción)
     setActiveTab('subscription');
 
-    const isAdmin = cleanEmail === 'geovannygrk3d@gmail.com' || cleanEmail === 'geovannygrk3d@gmail';
+    const isAdmin = cleanEmail === 'geovannygrk3d@gmail.com' || cleanEmail === 'geovannygrk3d@gmail' || cleanEmail === 'conscientizarte13@gmail.com' || cleanEmail === 'conscientizarte13@gmail';
     if (isAdmin) {
       alert(`🎉 ¡Google Sign-in Exitoso, Bienvenido Administrador Central!\n\nEmail: "${cleanEmail}"\nContraseña registrada correctamente.\nTu Clave Única es: "${uniqueId}"\nTu Código de Juego es: "${code}"\n\nTu juego se ha iniciado DESDE CERO con un álbum limpio de 0 cromos.\nTienes acceso privilegiado completo al Panel de Administración de Sorteos.\nRedirigiendo al panel de suscripción...`);
     } else {
@@ -2351,7 +2351,7 @@ export default function App() {
     }
 
     // Special fallback for admin or demo if nothing registered yet
-    if (cleanEmail === 'geovannygrk3d@gmail.com' || cleanEmail === 'geovannygrk3d@gmail') {
+    if (cleanEmail === 'geovannygrk3d@gmail.com' || cleanEmail === 'geovannygrk3d@gmail' || cleanEmail === 'conscientizarte13@gmail.com' || cleanEmail === 'conscientizarte13@gmail') {
       const uniqueId = 'usr_admin';
       const code = 'DT-ADMIN';
       const adminUser = 'Administrador Senior';
@@ -3484,7 +3484,7 @@ export default function App() {
                     {/* Trivia Lock statuses in Retropanel format */}
                     <div className="mt-6 border-t-[3px] border-black pt-5">
                       <h4 className="text-xs font-bangers tracking-widest text-black uppercase mb-3.5">
-                        🎯 EXÁMENES DE EXPANSIÓN (IA DE GOOGLE AI STUDIO)
+                        🎯 TRIVIA DEPORTIVA
                       </h4>
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -4210,7 +4210,7 @@ export default function App() {
 
             {/* TAB: Admin Database Panel */}
             {activeTab === 'admin' && (
-              (userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail') ? (
+              (userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail' || userEmail.trim().toLowerCase() === 'conscientizarte13@gmail.com' || userEmail.trim().toLowerCase() === 'conscientizarte13@gmail') ? (
                 <AdminPanelView
                   currentUserScore={currentUserInfo.totalScore}
                   currentUserCode={userCode}
@@ -4256,14 +4256,14 @@ export default function App() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">Email Autorizado:</span> 
-                      <span className="text-blue-600 font-semibold underline">geovannygrk3d@gmail.com (o geovannygrk3d@gmail)</span>
+                      <span className="text-blue-600 font-semibold underline">conscientizarte13@gmail.com (o conscientizarte13@gmail)</span>
                     </div>
                   </div>
 
                   <div className="mt-8 flex flex-col sm:flex-row items-center justify-end gap-3.5 pt-4 border-t border-slate-100">
                     <button
                       onClick={() => {
-                        setTempEmail('geovannygrk3d@gmail.com');
+                        setTempEmail('conscientizarte13@gmail.com');
                         setIsRegistrationOpen(true);
                       }}
                       className="w-full sm:w-auto bg-[#1a73e8] hover:bg-[#1557b0] text-white font-medium text-xs tracking-wide px-5 py-2.5 rounded shadow-sm hover:shadow duration-150 transition cursor-pointer flex items-center justify-center gap-2"
@@ -4387,7 +4387,7 @@ export default function App() {
                       onChange={(e) => setFooterSuggestRecipient(e.target.value)}
                       className="w-full bg-slate-900 border-2 border-black text-[10px] text-indigo-300 py-1.5 px-2.5 rounded-lg focus:outline-none font-bold"
                     >
-                      <option value="geovannygrk3d@gmail.com">Sugerencia a: geovannygrk3d@gmail.com</option>
+                      <option value="conscientizarte13@gmail.com">Sugerencia a: conscientizarte13@gmail.com</option>
                       <option value="roly3d@hotmail.com">Soporte a: roly3d@hotmail.com</option>
                       <option value="roly3d.rg@gmail.com">Licencias a: roly3d.rg@gmail.com</option>
                     </select>
@@ -4463,7 +4463,7 @@ export default function App() {
                   <button 
                     onClick={() => setAppCustomAlert({
                       title: '🎗️ Donaciones Directas de Patrocinio',
-                      message: 'Si deseas transferir por Deuna, Banco Pichincha o cooperativas aliadas de Ecuador para aparecer en la lista de marcas del álbum, por favor contáctanos escribiendo a geovannygrk3d@gmail.com o roly3d@hotmail.com.'
+                      message: 'Si deseas transferir por Deuna, Banco Pichincha o cooperativas aliadas de Ecuador para aparecer en la lista de marcas del álbum, por favor contáctanos escribiendo a conscientizarte13@gmail.com o roly3d@hotmail.com.'
                     })}
                     className="py-2 px-3 bg-[#e11d48] hover:bg-[#be123c] text-white font-bangers text-[11px] uppercase tracking-wide rounded-lg border border-black cursor-pointer shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition"
                   >
@@ -4480,7 +4480,7 @@ export default function App() {
                 © 2026 Héroes del Deporte. Creado por <strong>CIG</strong>, Diseño por <strong>RKLY</strong>, impulsado con IA de vanguardia, servidores de baja latencia y tecnología Google Cloud.
               </div>
               <div className="flex gap-4">
-                <span className="text-gray-500">Admin email: geovannygrk3d@gmail.com</span>
+                <span className="text-gray-500">Admin email: conscientizarte13@gmail.com</span>
               </div>
             </div>
           </footer>
@@ -4734,15 +4734,15 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    setTempEmail('geovannygrk3d@gmail.com');
-                    setTempUsername('DT_Geovanny_2026');
+                    setTempEmail('conscientizarte13@gmail.com');
+                    setTempUsername('DT_Conscientizarte_2026');
                     setTempAvatar('👑');
                   }}
                   title="Click para autocompletar con tu cuenta de correo activa"
                   className="w-full bg-[#1e293b] hover:bg-[#334155] text-white border-2 border-black rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:translate-y-0.5 shadow-[3px_3px_0px_rgba(0,0,0,1)] select-none"
                 >
                   <span className="text-base">📧</span>
-                  <span className="truncate font-mono">Autocompletar con {userEmail || 'geovannygrk3d@gmail.com'}</span>
+                  <span className="truncate font-mono">Autocompletar con {userEmail || 'conscientizarte13@gmail.com'}</span>
                 </button>
               )}
 
@@ -4925,8 +4925,8 @@ export default function App() {
                       />
                       <p className="text-[9px] text-slate-400 mt-1.5 leading-snug font-mono">
                         {isLoginMode 
-                          ? "Ingresa el mismo correo que usaste al registrarte. Admite geovannygrk3d@gmail.com."
-                          : "Para habilitar facultades de Administrador Senior, ingresa el correo autenticado geovannygrk3d@gmail.com o geovannygrk3d@gmail"
+                          ? "Ingresa el mismo correo que usaste al registrarte. Admite conscientizarte13@gmail.com."
+                          : "Para habilitar facultades de Administrador Senior, ingresa el correo autenticado conscientizarte13@gmail.com"
                         }
                       </p>
                     </div>

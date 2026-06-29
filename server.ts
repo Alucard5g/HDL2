@@ -1277,48 +1277,50 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     u.id !== "user_ancelotti"
   );
 
-  // Ensure that the administrator always exists with geovannygrk3d@gmail.com and password 1313
-  const adminEmail = "geovannygrk3d@gmail.com";
-  let adminUser = REGISTERED_USERS.find(u => u.email && u.email.toLowerCase().trim() === adminEmail);
-  if (!adminUser) {
-    adminUser = {
-      id: "usr_admin",
-      username: "Geovanny Admin",
-      gameCode: "DT-1313",
-      email: adminEmail,
-      password: "1313",
-      role: "admin",
-      subscription: "Pase VIP Elite",
-      coins: 10000,
-      cashBalance: 500,
-      unlockedLevels: { "1": true, "2": true, "3": true, "4": true, "5": true, "6": true },
-      aciertosOnce: 11,
-      aciertosMarcador: 5,
-      score: 1500,
-      completedCountries: [],
-      unlockedStickersCount: 0,
-      tacticalBoards: {},
-      referredByEmail: "",
-      invitedEmails: [],
-      avatar: "👑",
-      licenseCode: "LIC-1313",
-      createdAt: new Date().toISOString(),
-      adminSyncCounter: 1
-    };
-    REGISTERED_USERS.push(adminUser);
-    console.log(`[Admin Seed] Created admin user: ${adminEmail}`);
-  } else {
-    // Force email, password, and role to be geovannygrk3d@gmail.com, 1313, and admin
-    adminUser.email = adminEmail;
-    adminUser.password = "1313";
-    adminUser.role = "admin";
-    adminUser.subscription = "Pase VIP Elite";
-    adminUser.gameCode = adminUser.gameCode || "DT-1313";
-    adminUser.avatar = adminUser.avatar || "👑";
-    adminUser.licenseCode = adminUser.licenseCode || "LIC-1313";
-    adminUser.createdAt = adminUser.createdAt || new Date().toISOString();
-    console.log(`[Admin Seed] Verified and enforced admin user: ${adminEmail}`);
-  }
+  // Ensure that the administrators always exist with geovannygrk3d@gmail.com and conscientizarte13@gmail.com and password 1313
+  const adminEmails = ["geovannygrk3d@gmail.com", "conscientizarte13@gmail.com"];
+  adminEmails.forEach((adminEmail, idx) => {
+    let adminUser = REGISTERED_USERS.find(u => u.email && u.email.toLowerCase().trim() === adminEmail);
+    if (!adminUser) {
+      adminUser = {
+        id: idx === 0 ? "usr_admin" : "usr_admin_conscientizarte",
+        username: idx === 0 ? "Geovanny Admin" : "Conscientizarte Admin",
+        gameCode: idx === 0 ? "DT-1313" : "DT-CONSCIENTIZARTE",
+        email: adminEmail,
+        password: "1313",
+        role: "admin",
+        subscription: "Pase VIP Elite",
+        coins: 10000,
+        cashBalance: 500,
+        unlockedLevels: { "1": true, "2": true, "3": true, "4": true, "5": true, "6": true },
+        aciertosOnce: 11,
+        aciertosMarcador: 5,
+        score: 1500,
+        completedCountries: [],
+        unlockedStickersCount: 0,
+        tacticalBoards: {},
+        referredByEmail: "",
+        invitedEmails: [],
+        avatar: "👑",
+        licenseCode: idx === 0 ? "LIC-1313" : "LIC-CONSCIENTIZARTE",
+        createdAt: new Date().toISOString(),
+        adminSyncCounter: 1
+      };
+      REGISTERED_USERS.push(adminUser);
+      console.log(`[Admin Seed] Created admin user: ${adminEmail}`);
+    } else {
+      // Force email, password, and role to be correct
+      adminUser.email = adminEmail;
+      adminUser.password = "1313";
+      adminUser.role = "admin";
+      adminUser.subscription = "Pase VIP Elite";
+      adminUser.gameCode = adminUser.gameCode || (idx === 0 ? "DT-1313" : "DT-CONSCIENTIZARTE");
+      adminUser.avatar = adminUser.avatar || "👑";
+      adminUser.licenseCode = adminUser.licenseCode || (idx === 0 ? "LIC-1313" : "LIC-CONSCIENTIZARTE");
+      adminUser.createdAt = adminUser.createdAt || new Date().toISOString();
+      console.log(`[Admin Seed] Verified and enforced admin user: ${adminEmail}`);
+    }
+  });
 
   saveUsersToDisk();
 
@@ -2022,7 +2024,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
       username,
       email,
       suggestion,
-      sentTo: "geovannygrk3d@gmail.com",
+      sentTo: "conscientizarte13@gmail.com",
       createdAt: new Date().toISOString(),
       status: "pending"
     };
@@ -2032,7 +2034,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     console.log(`=========================================`);
     console.log(`[EMAIL SEND SIMULATION]`);
     console.log(`From: noreply@albumtrivia2026.com`);
-    console.log(`To: geovannygrk3d@gmail.com`);
+    console.log(`To: conscientizarte13@gmail.com`);
     console.log(`Subject: Nueva Sugerencia de ${username} (${email})`);
     console.log(`Body:`);
     console.log(suggestion);
@@ -2046,7 +2048,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
       });
       res.json({ 
         status: "success", 
-        message: "Tu sugerencia ha sido enviada con éxito a geovannygrk3d@gmail.com. ¡Gracias por ayudarnos a mejorar!", 
+        message: "Tu sugerencia ha sido enviada con éxito a conscientizarte13@gmail.com. ¡Gracias por ayudarnos a mejorar!", 
         suggestion: newSuggestion 
       });
     } catch (err: any) {
@@ -2115,7 +2117,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     let existingIndex = REGISTERED_USERS.findIndex(u => u.id === userId);
 
     // Define role based on email or subscription
-    const isUserAdmin = email && (email.toLowerCase().trim() === 'geovannygrk3d@gmail.com' || email.toLowerCase().trim() === 'geovannygrk3d@gmail');
+    const isUserAdmin = email && (email.toLowerCase().trim() === 'geovannygrk3d@gmail.com' || email.toLowerCase().trim() === 'geovannygrk3d@gmail' || email.toLowerCase().trim() === 'conscientizarte13@gmail.com' || email.toLowerCase().trim() === 'conscientizarte13@gmail');
     const finalRole = isUserAdmin ? "admin" : (subscription && subscription !== "Ninguna") ? "premium" : "user";
     
     let mergedUser: ServerUser;

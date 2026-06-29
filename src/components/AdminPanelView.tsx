@@ -3854,7 +3854,7 @@ app.post('/api/webhooks/fal', async (req, res) => {
               BLOG DE COMUNICADOS & FEEDBACK DE DIRECTORES TÉCNICOS
             </h3>
             <p className="text-xs sm:text-sm text-slate-200 font-comic max-w-4xl leading-relaxed">
-              Publica novedades, comunicados de parches tácticos, lanzamientos de cromos customizados de leyendas, o responde a los comentarios enviados por los coleccionistas de la comunidad directamente a tu buzón oficial (<strong>geovannygrk3d@gmail.com</strong>).
+              Publica novedades, comunicados de parches tácticos, lanzamientos de cromos customizados de leyendas, o responde a los comentarios enviados por los coleccionistas de la comunidad directamente a tu buzón oficial (<strong>conscientizarte13@gmail.com</strong>).
             </p>
           </div>
 
@@ -3963,7 +3963,7 @@ app.post('/api/webhooks/fal', async (req, res) => {
               <div className="space-y-3 pt-4 border-t border-slate-800">
                 <div className="flex justify-between items-center">
                   <h4 className="font-bangers text-lg text-white uppercase tracking-wider flex items-center gap-1.5">
-                    <MessageSquare className="w-5 h-5 text-emerald-400" /> SUGERENCIAS RECIBIDAS (Simuladas a geovannygrk3d@gmail.com)
+                    <MessageSquare className="w-5 h-5 text-emerald-400" /> SUGERENCIAS RECIBIDAS (Buzón oficial: conscientizarte13@gmail.com)
                   </h4>
                   <button
                     onClick={fetchSuggestions}
@@ -4316,14 +4316,14 @@ app.post('/api/webhooks/fal', async (req, res) => {
                     {
                       title: "⚡ Dieciseisavos de Final (Lado Derecho)",
                       matches: [
-                        { id: 'ko-13', l: 'Escocia', v: 'Argelia' },
-                        { id: 'ko-15', l: 'Ucrania', v: 'Gales' },
                         { id: 'ko-2', l: 'Brasil', v: 'Japón' },
-                        { id: 'ko-5', l: 'Argentina', v: 'Dinamarca' },
-                        { id: 'ko-14', l: 'Uruguay', v: 'Polonia' },
-                        { id: 'ko-16', l: 'Suiza', v: 'República Checa' },
-                        { id: 'ko-7', l: 'Inglaterra', v: 'Nigeria' },
-                        { id: 'ko-8', l: 'Italia', v: 'Túnez' }
+                        { id: 'ko-5', l: 'Costa de Marfil', v: 'Noruega' },
+                        { id: 'ko-7', l: 'México', v: 'Ecuador' },
+                        { id: 'ko-8', l: 'Inglaterra', v: 'RD Congo' },
+                        { id: 'ko-14', l: 'Argentina', v: 'Cabo Verde' },
+                        { id: 'ko-16', l: 'Australia', v: 'Egipto' },
+                        { id: 'ko-13', l: 'Suiza', v: 'Argelia' },
+                        { id: 'ko-15', l: 'Colombia', v: 'Ghana' }
                       ]
                     },
                     {
@@ -4333,10 +4333,10 @@ app.post('/api/webhooks/fal', async (req, res) => {
                         { id: 'oct-L2', p1: 'ko-1', p2: 'ko-4' },
                         { id: 'oct-L3', p1: 'ko-11', p2: 'ko-12' },
                         { id: 'oct-L4', p1: 'ko-9', p2: 'ko-10' },
-                        { id: 'oct-R1', p1: 'ko-13', p2: 'ko-15' },
-                        { id: 'oct-R2', p1: 'ko-2', p2: 'ko-5' },
+                        { id: 'oct-R1', p1: 'ko-2', p2: 'ko-5' },
+                        { id: 'oct-R2', p1: 'ko-7', p2: 'ko-8' },
                         { id: 'oct-R3', p1: 'ko-14', p2: 'ko-16' },
-                        { id: 'oct-R4', p1: 'ko-7', p2: 'ko-8' }
+                        { id: 'oct-R4', p1: 'ko-13', p2: 'ko-15' }
                       ]
                     },
                     {

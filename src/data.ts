@@ -521,8 +521,9 @@ export const KNOCKOUT_FIXTURES: Match[] = [
 
 // Generates correct Fútbol Internacional match information and onceInicial for the matches
 export function getPopulatedMatch(country: string, playersOfCountry: Player[]): Match {
-  // Find real match containing country
-  const bases = MATCH_FIXTURES.find(m => m.local === country || m.visitante === country) || {
+  // Find real match containing country (Prioritizing KNOCKOUT_FIXTURES / Dieciseisavos de Final, falling back to MATCH_FIXTURES)
+  const bases = KNOCKOUT_FIXTURES.find(m => m.local === country || m.visitante === country) ||
+                MATCH_FIXTURES.find(m => m.local === country || m.visitante === country) || {
     id: `match-gen-${country.substring(0,3).toLowerCase()}`,
     local: country,
     visitante: 'Uruguay',
