@@ -3,6 +3,8 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import Stripe from "stripe";
+import admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 
 const getPathDetails = () => {
   let filename = "";
@@ -121,33 +123,224 @@ async function generateContentWithRetry(
   throw lastError;
 }
 
+const firebaseProjectId = "gen-lang-client-0012760447";
+const firebaseDatabaseId = "ai-studio-mundialscoutinga-d18f7d1d-c65c-48f3-87fd-0e2241debc6a";
+
+try {
+  admin.initializeApp({
+    projectId: firebaseProjectId,
+  });
+} catch (e) {
+  // Safe double-initialization prevention
+}
+
+let db: any;
+let isFirestoreAvailable = false;
+try {
+  db = getFirestore(undefined, firebaseDatabaseId);
+} catch (e) {
+  console.warn("Could not initialize with custom Database ID. Falling back to default database.", e);
+  db = getFirestore();
+}
+
+// Firestore synchronization helper functions
+async function saveUserToFirestore(user: any) {
+  if (!isFirestoreAvailable) return;
+  if (!user || !user.id) return;
+  try {
+    const cleanUser = { ...user };
+    // Make sure it doesn't have undefined values which Firestore rejects
+    for (const key of Object.keys(cleanUser)) {
+      if (cleanUser[key] === undefined) {
+        delete cleanUser[key];
+      }
+    }
+    await db.collection("users").doc(user.id).set(cleanUser, { merge: true });
+    console.log(`[Firestore Success] Saved user: ${user.id}`);
+  } catch (err) {
+    console.error(`[Firestore Error] Failed to save user ${user.id}:`, err);
+  }
+}
+
+async function deleteUserFromFirestore(id: string) {
+  if (!isFirestoreAvailable) return;
+  if (!id) return;
+  try {
+    await db.collection("users").doc(id).delete();
+    console.log(`[Firestore Success] Deleted user: ${id}`);
+  } catch (err) {
+    console.error(`[Firestore Error] Failed to delete user ${id}:`, err);
+  }
+}
+
+async function saveStickerToFirestore(playerId: string, imageUrl: string | null) {
+  if (!isFirestoreAvailable) return;
+  if (!playerId) return;
+  try {
+    if (imageUrl === null) {
+      await db.collection("customStickers").doc(playerId).delete();
+      console.log(`[Firestore Success] Deleted custom sticker for: ${playerId}`);
+    } else {
+      await db.collection("customStickers").doc(playerId).set({ imageUrl });
+      console.log(`[Firestore Success] Saved custom sticker for: ${playerId}`);
+    }
+  } catch (err) {
+    console.error(`[Firestore Error] Failed to update sticker ${playerId}:`, err);
+  }
+}
+
+async function saveMatchToFirestore(matchId: string, data: any | null) {
+  if (!isFirestoreAvailable) return;
+  if (!matchId) return;
+  try {
+    if (data === null) {
+      await db.collection("customMatches").doc(matchId).delete();
+      console.log(`[Firestore Success] Deleted custom match: ${matchId}`);
+    } else {
+      await db.collection("customMatches").doc(matchId).set(data);
+      console.log(`[Firestore Success] Saved custom match: ${matchId}`);
+    }
+  } catch (err) {
+    console.error(`[Firestore Error] Failed to update custom match ${matchId}:`, err);
+  }
+}
+
+async function saveBlogPostToFirestore(post: any, isDelete = false) {
+  if (!isFirestoreAvailable) return;
+  if (!post || !post.id) return;
+  try {
+    if (isDelete) {
+      await db.collection("blogPosts").doc(post.id).delete();
+      console.log(`[Firestore Success] Deleted blog post: ${post.id}`);
+    } else {
+      await db.collection("blogPosts").doc(post.id).set(post);
+      console.log(`[Firestore Success] Saved blog post: ${post.id}`);
+    }
+  } catch (err) {
+    console.error(`[Firestore Error] Failed to update blog post ${post.id}:`, err);
+  }
+}
+
+async function saveSuggestionToFirestore(suggestion: any, isDelete = false) {
+  if (!isFirestoreAvailable) return;
+  if (!suggestion || !suggestion.id) return;
+  try {
+    if (isDelete) {
+      await db.collection("suggestions").doc(suggestion.id).delete();
+      console.log(`[Firestore Success] Deleted suggestion: ${suggestion.id}`);
+    } else {
+      await db.collection("suggestions").doc(suggestion.id).set(suggestion);
+      console.log(`[Firestore Success] Saved suggestion: ${suggestion.id}`);
+    }
+  } catch (err) {
+    console.error(`[Firestore Error] Failed to update suggestion ${suggestion.id}:`, err);
+  }
+}
+
+async function saveSubscriptionCodeToFirestore(code: string, data: any | null) {
+  if (!isFirestoreAvailable) return;
+  if (!code) return;
+  try {
+    if (data === null) {
+      await db.collection("customSubscriptionCodes").doc(code).delete();
+      console.log(`[Firestore Success] Deleted subscription code: ${code}`);
+    } else {
+      const cleanData = { ...data };
+      for (const key of Object.keys(cleanData)) {
+        if (cleanData[key] === undefined) {
+          delete cleanData[key];
+        }
+      }
+      await db.collection("customSubscriptionCodes").doc(code).set(cleanData);
+      console.log(`[Firestore Success] Saved subscription code: ${code}`);
+    }
+  } catch (err) {
+    console.error(`[Firestore Error] Failed to update subscription code ${code}:`, err);
+  }
+}
+
 async function startServer() {
   const app = express();
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // Check if the custom database is accessible and has read/write permissions at startup
+  let canUseCustomDb = false;
+  try {
+    console.log(`[Firebase/Firestore Startup] Verifying connection and permission for database ID: ${firebaseDatabaseId}...`);
+    await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
+    await db.collection("test-connection").doc("test").get();
+    canUseCustomDb = true;
+    isFirestoreAvailable = true;
+    console.log(`[Firebase/Firestore Startup] Connection and read/write permissions verified successfully for custom database: ${firebaseDatabaseId}`);
+  } catch (testErr: any) {
+    console.warn(`[Firebase/Firestore Startup Warning] Custom database ID ${firebaseDatabaseId} is not accessible. Error: ${testErr.message || testErr}`);
+  }
+
+  if (!canUseCustomDb) {
+    console.log("[Firebase/Firestore Startup] Falling back to default database for all cloud synchronization...");
+    try {
+      db = getFirestore();
+      // Test connection to default database
+      await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
+      isFirestoreAvailable = true;
+      console.log("[Firebase/Firestore Startup] Connected to default database successfully with read/write permissions.");
+    } catch (fbErr: any) {
+      isFirestoreAvailable = false;
+      console.error(`[Firebase/Firestore Startup Error] Default database connection test also failed. Error: ${fbErr.message || fbErr}. Continuing with local files...`);
+    }
+  }
+
   // Resilient helper to resolve data file paths in dev and bundled production mode
   function resolveDataPath(filename: string): string {
-    const pathsToTry = [
+    const rootDataDir = path.join(process.cwd(), "data");
+    const rootPath = path.join(rootDataDir, filename);
+
+    // If it already exists at the clean root /data/ folder, use it!
+    if (fs.existsSync(rootPath)) {
+      return rootPath;
+    }
+
+    // Otherwise, let's search in fallback locations (e.g. src/data)
+    const fallbackPaths = [
       path.join(process.cwd(), "src/data", filename),
       path.join(__dirname, "../src/data", filename),
       path.join(__dirname, "src/data", filename),
-      path.join(__dirname, "data", filename),
     ];
-    for (const p of pathsToTry) {
-      if (fs.existsSync(p)) {
-        return p;
+
+    for (const fb of fallbackPaths) {
+      if (fs.existsSync(fb)) {
+        // We found it in a legacy fallback location! Let's migrate it cleanly to root /data/
+        try {
+          if (!fs.existsSync(rootDataDir)) {
+            fs.mkdirSync(rootDataDir, { recursive: true });
+          }
+          const content = fs.readFileSync(fb, "utf-8");
+          fs.writeFileSync(rootPath, content, "utf-8");
+          console.log(`[Database Migration]: Migrated ${filename} successfully to ${rootPath}`);
+          
+          // Delete the old legacy file in src/data so it does not clutter the IDE or show errors
+          try {
+            fs.unlinkSync(fb);
+            console.log(`[Database Migration]: Cleaned up legacy file: ${fb}`);
+          } catch (delErr) {
+            console.error(`[Database Migration Error]: Could not delete legacy ${fb}:`, delErr);
+          }
+          return rootPath;
+        } catch (migErr: any) {
+          console.error(`[Database Migration Error] Failed to migrate ${filename} from ${fb}:`, migErr);
+          return fb; // fallback to legacy if migration fails
+        }
       }
     }
-    // Fallback standard path and ensure parent path exists
-    const defaultPath = path.join(process.cwd(), "src/data", filename);
-    const dir = path.dirname(defaultPath);
-    if (!fs.existsSync(dir)) {
+
+    // If it does not exist anywhere, initialize it under root /data/
+    if (!fs.existsSync(rootDataDir)) {
       try {
-        fs.mkdirSync(dir, { recursive: true });
+        fs.mkdirSync(rootDataDir, { recursive: true });
       } catch (e) {}
     }
-    return defaultPath;
+    return rootPath;
   }
 
   // Initialize CUSTOM_STICKERS_DB from filesystem to persist manually associated stickers across restarts
@@ -1051,6 +1244,15 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     } catch (err: any) {
       console.error("[Registered Users Saving Error]:", err);
     }
+
+    // Asynchronously back up users to Firestore
+    if (REGISTERED_USERS && Array.isArray(REGISTERED_USERS)) {
+      for (const user of REGISTERED_USERS) {
+        saveUserToFirestore(user).catch(err => {
+          console.error(`[Firestore Background Sync Error] user ${user.id}:`, err);
+        });
+      }
+    }
   }
 
   // In-memory dynamic database for Registered Users (Safe for auditing & Admin controls)
@@ -1075,7 +1277,202 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     u.id !== "user_ancelotti"
   );
 
+  // Ensure that the administrator always exists with geovannygrk3d@gmail.com and password 1313
+  const adminEmail = "geovannygrk3d@gmail.com";
+  let adminUser = REGISTERED_USERS.find(u => u.email && u.email.toLowerCase().trim() === adminEmail);
+  if (!adminUser) {
+    adminUser = {
+      id: "usr_admin",
+      username: "Geovanny Admin",
+      gameCode: "DT-1313",
+      email: adminEmail,
+      password: "1313",
+      role: "admin",
+      subscription: "Pase VIP Elite",
+      coins: 10000,
+      cashBalance: 500,
+      unlockedLevels: { "1": true, "2": true, "3": true, "4": true, "5": true, "6": true },
+      aciertosOnce: 11,
+      aciertosMarcador: 5,
+      score: 1500,
+      completedCountries: [],
+      unlockedStickersCount: 0,
+      tacticalBoards: {},
+      referredByEmail: "",
+      invitedEmails: [],
+      avatar: "👑",
+      licenseCode: "LIC-1313",
+      createdAt: new Date().toISOString(),
+      adminSyncCounter: 1
+    };
+    REGISTERED_USERS.push(adminUser);
+    console.log(`[Admin Seed] Created admin user: ${adminEmail}`);
+  } else {
+    // Force email, password, and role to be geovannygrk3d@gmail.com, 1313, and admin
+    adminUser.email = adminEmail;
+    adminUser.password = "1313";
+    adminUser.role = "admin";
+    adminUser.subscription = "Pase VIP Elite";
+    adminUser.gameCode = adminUser.gameCode || "DT-1313";
+    adminUser.avatar = adminUser.avatar || "👑";
+    adminUser.licenseCode = adminUser.licenseCode || "LIC-1313";
+    adminUser.createdAt = adminUser.createdAt || new Date().toISOString();
+    console.log(`[Admin Seed] Verified and enforced admin user: ${adminEmail}`);
+  }
+
   saveUsersToDisk();
+
+  // Synchronize memory databases with Firestore at startup
+  async function syncWithFirestore() {
+    if (!isFirestoreAvailable) {
+      console.log("[Firebase/Firestore] Skipping cloud synchronization because database is not available.");
+      return;
+    }
+    console.log("[Firebase/Firestore] Syncing memory databases with Firestore using the resolved database...");
+
+    // 1. Registered Users
+    try {
+      const usersSnapshot = await db.collection("users").get();
+      if (!usersSnapshot.empty) {
+        const loadedUsers: ServerUser[] = [];
+        usersSnapshot.forEach((doc: any) => {
+          loadedUsers.push(doc.data() as ServerUser);
+        });
+        REGISTERED_USERS = loadedUsers.filter(u => 
+          u.id !== "user_bielsa" && 
+          u.id !== "user_tactico" && 
+          u.id !== "user_scout" && 
+          u.id !== "user_mundial" && 
+          u.id !== "user_ancelotti"
+        );
+        console.log(`[Firebase/Firestore] Hydrated ${REGISTERED_USERS.length} registered users from Firestore.`);
+      } else {
+        console.log("[Firebase/Firestore] No users found in cloud. Bootstrapping with existing local records...");
+        if (REGISTERED_USERS.length > 0) {
+          for (const user of REGISTERED_USERS) {
+            await saveUserToFirestore(user);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Firebase/Firestore Error] Failed to hydrate users:", err);
+    }
+
+    // 2. Custom Stickers
+    try {
+      const stickersSnapshot = await db.collection("customStickers").get();
+      if (!stickersSnapshot.empty) {
+        const loadedStickers: Record<string, string> = {};
+        stickersSnapshot.forEach((doc: any) => {
+          loadedStickers[doc.id] = doc.data().imageUrl;
+        });
+        CUSTOM_STICKERS_DB = loadedStickers;
+        console.log(`[Firebase/Firestore] Hydrated ${Object.keys(CUSTOM_STICKERS_DB).length} custom stickers from Firestore.`);
+      } else {
+        console.log("[Firebase/Firestore] No custom stickers found in cloud. Bootstrapping...");
+        if (Object.keys(CUSTOM_STICKERS_DB).length > 0) {
+          for (const [playerId, url] of Object.entries(CUSTOM_STICKERS_DB)) {
+            await saveStickerToFirestore(playerId, url);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Firebase/Firestore Error] Failed to hydrate custom stickers:", err);
+    }
+
+    // 3. Custom Matches
+    try {
+      const matchesSnapshot = await db.collection("customMatches").get();
+      if (!matchesSnapshot.empty) {
+        const loadedMatches: any = {};
+        matchesSnapshot.forEach((doc: any) => {
+          loadedMatches[doc.id] = doc.data();
+        });
+        CUSTOM_MATCHES_DB = loadedMatches;
+        console.log(`[Firebase/Firestore] Hydrated ${Object.keys(CUSTOM_MATCHES_DB).length} custom matches from Firestore.`);
+      } else {
+        console.log("[Firebase/Firestore] No custom matches found in cloud. Bootstrapping...");
+        if (Object.keys(CUSTOM_MATCHES_DB).length > 0) {
+          for (const [matchId, val] of Object.entries(CUSTOM_MATCHES_DB)) {
+            await saveMatchToFirestore(matchId, val);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Firebase/Firestore Error] Failed to hydrate custom matches:", err);
+    }
+
+    // 4. Blog Posts
+    try {
+      const blogSnapshot = await db.collection("blogPosts").get();
+      if (!blogSnapshot.empty) {
+        const loadedPosts: any[] = [];
+        blogSnapshot.forEach((doc: any) => {
+          loadedPosts.push(doc.data());
+        });
+        loadedPosts.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        BLOG_POSTS_DB = loadedPosts;
+        console.log(`[Firebase/Firestore] Hydrated ${BLOG_POSTS_DB.length} blog posts from Firestore.`);
+      } else {
+        console.log("[Firebase/Firestore] No blog posts found in cloud. Bootstrapping...");
+        if (BLOG_POSTS_DB.length > 0) {
+          for (const post of BLOG_POSTS_DB) {
+            await saveBlogPostToFirestore(post);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Firebase/Firestore Error] Failed to hydrate blog posts:", err);
+    }
+
+    // 5. Suggestions
+    try {
+      const suggestionsSnapshot = await db.collection("suggestions").get();
+      if (!suggestionsSnapshot.empty) {
+        const loadedSuggestions: any[] = [];
+        suggestionsSnapshot.forEach((doc: any) => {
+          loadedSuggestions.push(doc.data());
+        });
+        loadedSuggestions.sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+        SUGGESTIONS_DB = loadedSuggestions;
+        console.log(`[Firebase/Firestore] Hydrated ${SUGGESTIONS_DB.length} suggestions from Firestore.`);
+      } else {
+        console.log("[Firebase/Firestore] No suggestions found in cloud. Bootstrapping...");
+        if (SUGGESTIONS_DB.length > 0) {
+          for (const s of SUGGESTIONS_DB) {
+            await saveSuggestionToFirestore(s);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Firebase/Firestore Error] Failed to hydrate suggestions:", err);
+    }
+
+    // 6. Custom Subscription Codes
+    try {
+      const codesSnapshot = await db.collection("customSubscriptionCodes").get();
+      if (!codesSnapshot.empty) {
+        const loadedCodes: any = {};
+        codesSnapshot.forEach((doc: any) => {
+          loadedCodes[doc.id] = doc.data();
+        });
+        CUSTOM_SUBSCRIPTION_CODES_DB = loadedCodes;
+        console.log(`[Firebase/Firestore] Hydrated ${Object.keys(CUSTOM_SUBSCRIPTION_CODES_DB).length} custom subscription codes from Firestore.`);
+      } else {
+        console.log("[Firebase/Firestore] No custom subscription codes found in cloud. Bootstrapping...");
+        if (Object.keys(CUSTOM_SUBSCRIPTION_CODES_DB).length > 0) {
+          for (const [code, val] of Object.entries(CUSTOM_SUBSCRIPTION_CODES_DB)) {
+            await saveSubscriptionCodeToFirestore(code, val);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("[Firebase/Firestore Error] Failed to hydrate custom subscription codes:", err);
+    }
+  }
+
+  // Trigger cloud hydration at startup
+  await syncWithFirestore();
 
   // ==========================================================================
   // BRAND PROMOTER REVENUE & QR REFERRAL SYSTEM DATA STRUCTURES
@@ -1398,6 +1795,12 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     // Save safely to file system
     try {
       fs.writeFileSync(customStickersPath, JSON.stringify(CUSTOM_STICKERS_DB, null, 2), "utf-8");
+      
+      // Sync with Firestore
+      saveStickerToFirestore(playerId, (deleteSticker || imageUrl === "") ? null : imageUrl).catch(err => {
+        console.error("[Firestore Error] Syncing custom sticker:", err);
+      });
+
       res.json({ 
         status: "success", 
         message: deleteSticker 
@@ -1441,6 +1844,10 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     
     try {
       fs.writeFileSync(customSubCodesPath, JSON.stringify(CUSTOM_SUBSCRIPTION_CODES_DB, null, 2), "utf-8");
+      // Sync with Firestore
+      saveSubscriptionCodeToFirestore(targetCode, CUSTOM_SUBSCRIPTION_CODES_DB[targetCode]).catch(err => {
+        console.error("[Firestore Error] Syncing sub code:", err);
+      });
     } catch (e: any) {
       console.error("[Subscription Codes Save Error]:", e);
     }
@@ -1459,6 +1866,10 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
       delete CUSTOM_SUBSCRIPTION_CODES_DB[targetCode];
       try {
         fs.writeFileSync(customSubCodesPath, JSON.stringify(CUSTOM_SUBSCRIPTION_CODES_DB, null, 2), "utf-8");
+        // Sync with Firestore (deletion)
+        saveSubscriptionCodeToFirestore(targetCode, null).catch(err => {
+          console.error("[Firestore Error] Deleting sub code:", err);
+        });
       } catch (e) {}
     }
     res.json({ status: "success" });
@@ -1532,6 +1943,12 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     
     try {
       fs.writeFileSync(customMatchesPath, JSON.stringify(CUSTOM_MATCHES_DB, null, 2), "utf-8");
+      
+      // Sync with Firestore
+      saveMatchToFirestore(matchId, resetMatch ? null : CUSTOM_MATCHES_DB[matchId]).catch(err => {
+        console.error("[Firestore Error] Syncing custom match:", err);
+      });
+
       res.json({ 
         status: "success", 
         message: resetMatch 
@@ -1565,6 +1982,10 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     BLOG_POSTS_DB.unshift(newPost);
     try {
       fs.writeFileSync(blogPostsPath, JSON.stringify(BLOG_POSTS_DB, null, 2), "utf-8");
+      // Sync with Firestore
+      saveBlogPostToFirestore(newPost).catch(err => {
+        console.error("[Firestore Error] Saving blog post:", err);
+      });
       res.json({ status: "success", post: newPost });
     } catch (err: any) {
       console.error("[Blog Write Error]:", err);
@@ -1578,6 +1999,10 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     BLOG_POSTS_DB = BLOG_POSTS_DB.filter(post => post.id !== id);
     try {
       fs.writeFileSync(blogPostsPath, JSON.stringify(BLOG_POSTS_DB, null, 2), "utf-8");
+      // Sync with Firestore (deletion)
+      saveBlogPostToFirestore({ id }, true).catch(err => {
+        console.error("[Firestore Error] Deleting blog post:", err);
+      });
       res.json({ status: "success", message: "Post eliminado con éxito." });
     } catch (err: any) {
       console.error("[Blog Delete Error]:", err);
@@ -1615,6 +2040,10 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
 
     try {
       fs.writeFileSync(suggestionsPath, JSON.stringify(SUGGESTIONS_DB, null, 2), "utf-8");
+      // Sync with Firestore
+      saveSuggestionToFirestore(newSuggestion).catch(err => {
+        console.error("[Firestore Error] Saving suggestion:", err);
+      });
       res.json({ 
         status: "success", 
         message: "Tu sugerencia ha sido enviada con éxito a geovannygrk3d@gmail.com. ¡Gracias por ayudarnos a mejorar!", 
@@ -1637,6 +2066,10 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     SUGGESTIONS_DB = SUGGESTIONS_DB.filter(s => s.id !== id);
     try {
       fs.writeFileSync(suggestionsPath, JSON.stringify(SUGGESTIONS_DB, null, 2), "utf-8");
+      // Sync with Firestore (deletion)
+      saveSuggestionToFirestore({ id }, true).catch(err => {
+        console.error("[Firestore Error] Deleting suggestion:", err);
+      });
       res.json({ status: "success", message: "Sugerencia eliminada con éxito." });
     } catch (err: any) {
       console.error("[Suggestion Delete Error]:", err);
@@ -1822,6 +2255,10 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
         CUSTOM_SUBSCRIPTION_CODES_DB[usedCode].usedAt = new Date().toISOString();
         try {
           fs.writeFileSync(customSubCodesPath, JSON.stringify(CUSTOM_SUBSCRIPTION_CODES_DB, null, 2), "utf-8");
+          // Sync with Firestore
+          saveSubscriptionCodeToFirestore(usedCode, CUSTOM_SUBSCRIPTION_CODES_DB[usedCode]).catch(err => {
+            console.error("[Firestore Error] Syncing used sub code:", err);
+          });
         } catch (e) {}
         console.log(`[Subscription Code Redeemed] Code ${usedCode} marked as used by user ${user.username}`);
       }
@@ -2286,12 +2723,27 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     }
     REGISTERED_USERS = REGISTERED_USERS.filter(u => u.id !== id);
     saveUsersToDisk();
+    deleteUserFromFirestore(id).catch(err => {
+      console.error("[Firestore Error] deleting user:", err);
+    });
     res.json({ status: "success", message: "Usuario eliminado con éxito" });
   });
 
   app.post("/api/admin/users/reset-all", (req, res) => {
     REGISTERED_USERS = [];
     saveUsersToDisk();
+    
+    // Also delete users from Firestore
+    if (isFirestoreAvailable) {
+      db.collection("users").get().then((snapshot: any) => {
+        const batch = db.batch();
+        snapshot.forEach((doc: any) => {
+          batch.delete(doc.ref);
+        });
+        batch.commit().catch((err: any) => console.error("[Firestore Error] resetting users:", err));
+      }).catch((err: any) => console.error("[Firestore Error] getting users for reset:", err));
+    }
+
     res.json({ status: "success", message: "Todos los progresos de usuario en el servidor han sido reseteados a cero." });
   });
 
