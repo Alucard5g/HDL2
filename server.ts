@@ -387,7 +387,8 @@ async function startServer() {
     invitedEmails: z.array(z.string()).optional(),
     coins: z.number().int().optional(),
     cashBalance: z.number().optional(),
-    password: z.string().optional()
+    password: z.string().optional(),
+    adminSyncCounter: z.number().int().optional()
   });
 
   const checkoutPayphoneSchema = z.object({
@@ -1005,11 +1006,13 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     createdAt: string;
     email?: string;
     password?: string;
+    unlockedLevels?: any;
     tacticalBoards?: any;
     referredByEmail?: string;
     invitedEmails?: string[];
     coins?: number;
     cashBalance?: number;
+    adminSyncCounter?: number;
   }
 
   function getReferralPointsForUser(email: string | undefined): number {
@@ -1334,6 +1337,43 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     res.json({ exists });
   });
 
+  // API 1.455: Secure member login against the central database
+  app.post("/api/user/login", loginRateLimiter, (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ status: "error", message: "Faltan credenciales (correo o contraseña)" });
+    }
+    const emailLower = email.trim().toLowerCase();
+    const matchedUser = REGISTERED_USERS.find(u => u.email && u.email.toLowerCase() === emailLower);
+    if (!matchedUser) {
+      return res.status(404).json({ status: "error", message: "El correo electrónico ingresado no se encuentra registrado en nuestra base de datos central." });
+    }
+    if (matchedUser.password !== password) {
+      return res.status(401).json({ status: "error", message: "La contraseña ingresada es incorrecta." });
+    }
+
+    const referralPoints = getReferralPointsForUser(matchedUser.email);
+    const successfulReferrals = REGISTERED_USERS.filter(x => 
+      x.referredByEmail && 
+      matchedUser.email && 
+      x.referredByEmail.toLowerCase().trim() === matchedUser.email.toLowerCase().trim() &&
+      x.subscription && 
+      x.subscription.toLowerCase().trim() !== "ninguna" &&
+      x.id !== x.referredByEmail
+    );
+    const successfulReferralEmails = successfulReferrals.map(x => x.email || x.username);
+
+    const userWithReferrals = {
+      ...matchedUser,
+      referralPoints,
+      successfulReferralsCount: successfulReferralEmails.length,
+      successfulReferralEmails,
+      score: (matchedUser.score || 0) + referralPoints
+    };
+
+    res.json({ status: "success", user: userWithReferrals });
+  });
+
   // API 1.46: Get custom user stickers map across users and devices for global synchronization
   app.get("/api/stickers/custom", (req, res) => {
     res.json({ status: "success", stickers: CUSTOM_STICKERS_DB });
@@ -1604,9 +1644,17 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     }
   });
 
+  function getSubscriptionRank(sub: string | undefined): number {
+    if (!sub) return 0;
+    const s = sub.toLowerCase().trim();
+    if (s.includes("vip") || s.includes("elite") || s.includes("mundialista")) return 2;
+    if (s.includes("scout") || s.includes("basico") || s.includes("básico")) return 1;
+    return 0;
+  }
+
   // API 1.5: Sync User Profile & Game Information automatically with DB
   app.post("/api/user/sync", signupRateLimiter, validateBody(userSyncSchema), (req, res) => {
-    const { id, username, gameCode, unlockedLevels, aciertosOnce, aciertosMarcador, subscription, avatar, licenseCode, email, password, tacticalBoards, referredByEmail, invitedEmails, coins, cashBalance } = req.body;
+    const { id, username, gameCode, unlockedLevels, aciertosOnce, aciertosMarcador, subscription, avatar, licenseCode, email, password, tacticalBoards, referredByEmail, invitedEmails, coins, cashBalance, adminSyncCounter } = req.body;
     
     const userId = id || "user_me";
 
@@ -1637,50 +1685,94 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     const isUserAdmin = email && (email.toLowerCase().trim() === 'geovannygrk3d@gmail.com' || email.toLowerCase().trim() === 'geovannygrk3d@gmail');
     const finalRole = isUserAdmin ? "admin" : (subscription && subscription !== "Ninguna") ? "premium" : "user";
     
-    const updatedUser: ServerUser = {
-      id: userId,
-      username: username || "Tú (Director Técnico)",
-      gameCode: gameCode || "DT-MINE",
-      unlockedStickersCount: finalUnlockedStickersCount,
-      completedCountries: finalCompletedCountries,
-      aciertosOnce: aciertosOnce || 0,
-      aciertosMarcador: aciertosMarcador || 0,
-      score: finalScore,
-      subscription: subscription || "Ninguna",
-      role: finalRole,
-      avatar: avatar || "👑",
-      licenseCode: licenseCode || "",
-      createdAt: new Date().toISOString(),
-      email: email || "",
-      password: password || "",
-      tacticalBoards: tacticalBoards || {},
-      referredByEmail: referredByEmail ? referredByEmail.trim().toLowerCase() : "",
-      invitedEmails: invitedEmails || [],
-      coins: coins || 0,
-      cashBalance: cashBalance || 0
-    };
-    
+    let mergedUser: ServerUser;
+
     if (existingIndex !== -1) {
-      REGISTERED_USERS[existingIndex] = {
-        ...REGISTERED_USERS[existingIndex],
-        ...updatedUser,
+      const existingUser = REGISTERED_USERS[existingIndex];
+      const serverCounter = existingUser.adminSyncCounter || 0;
+      const clientCounter = adminSyncCounter || 0;
+
+      if (serverCounter > clientCounter) {
+        // The server has newer administrative/billing updates that the client doesn't have yet.
+        // We preserve the server's master copies of administrative fields.
+        mergedUser = {
+          ...existingUser,
+          unlockedStickersCount: finalUnlockedStickersCount,
+          completedCountries: finalCompletedCountries,
+          unlockedLevels: unlockedLevels !== undefined ? unlockedLevels : (existingUser.unlockedLevels || {}),
+          tacticalBoards: tacticalBoards !== undefined ? { ...existingUser.tacticalBoards, ...tacticalBoards } : (existingUser.tacticalBoards || {}),
+          avatar: avatar || existingUser.avatar || "👑",
+          adminSyncCounter: serverCounter,
+          password: password !== undefined ? password : (existingUser.password || ""),
+          email: email !== undefined ? email : (existingUser.email || ""),
+          referredByEmail: referredByEmail !== undefined ? (referredByEmail ? referredByEmail.trim().toLowerCase() : "") : (existingUser.referredByEmail || ""),
+          invitedEmails: invitedEmails !== undefined ? invitedEmails : (existingUser.invitedEmails || [])
+        };
+      } else {
+        // The client is fully up-to-date with server administrative fields, or we are at the same version.
+        // We can safely update most fields from client, but we still guard the subscription level against accidental downgrades.
+        const serverSubRank = getSubscriptionRank(existingUser.subscription || "Ninguna");
+        const clientSubRank = getSubscriptionRank(subscription || "Ninguna");
+        
+        let resolvedSubscription = subscription || "Ninguna";
+        let resolvedLicense = licenseCode || "";
+        
+        if (serverSubRank > clientSubRank) {
+          resolvedSubscription = existingUser.subscription || "Ninguna";
+          resolvedLicense = existingUser.licenseCode || "";
+        }
+
+        mergedUser = {
+          ...existingUser,
+          username: username || existingUser.username || "Tú (Director Técnico)",
+          gameCode: gameCode || existingUser.gameCode || "DT-MINE",
+          unlockedStickersCount: finalUnlockedStickersCount,
+          completedCountries: finalCompletedCountries,
+          aciertosOnce: aciertosOnce || 0,
+          aciertosMarcador: aciertosMarcador || 0,
+          score: finalScore,
+          subscription: resolvedSubscription,
+          role: isUserAdmin ? "admin" : (resolvedSubscription !== "Ninguna" ? "premium" : "user"),
+          avatar: avatar || existingUser.avatar || "👑",
+          licenseCode: resolvedLicense,
+          email: email !== undefined ? email : (existingUser.email || ""),
+          password: password !== undefined ? password : (existingUser.password || ""),
+          tacticalBoards: tacticalBoards !== undefined ? { ...existingUser.tacticalBoards, ...tacticalBoards } : (existingUser.tacticalBoards || {}),
+          referredByEmail: referredByEmail !== undefined ? (referredByEmail ? referredByEmail.trim().toLowerCase() : "") : (existingUser.referredByEmail || ""),
+          invitedEmails: invitedEmails !== undefined ? invitedEmails : (existingUser.invitedEmails || []),
+          coins: coins !== undefined ? coins : (existingUser.coins || 0),
+          cashBalance: cashBalance !== undefined ? cashBalance : (existingUser.cashBalance || 0),
+          adminSyncCounter: clientCounter
+        };
+      }
+      
+      REGISTERED_USERS[existingIndex] = mergedUser;
+    } else {
+      // New registration
+      const newUser: ServerUser = {
+        id: userId,
+        username: username || "Tú (Director Técnico)",
+        gameCode: gameCode || "DT-MINE",
         unlockedStickersCount: finalUnlockedStickersCount,
         completedCountries: finalCompletedCountries,
+        aciertosOnce: aciertosOnce || 0,
+        aciertosMarcador: aciertosMarcador || 0,
         score: finalScore,
+        subscription: subscription || "Ninguna",
         role: finalRole,
-        licenseCode: licenseCode !== undefined ? licenseCode : (REGISTERED_USERS[existingIndex].licenseCode || ""),
-        email: email !== undefined ? email : (REGISTERED_USERS[existingIndex].email || ""),
-        password: password !== undefined ? password : (REGISTERED_USERS[existingIndex].password || ""),
-        tacticalBoards: tacticalBoards !== undefined ? { ...REGISTERED_USERS[existingIndex].tacticalBoards, ...tacticalBoards } : (REGISTERED_USERS[existingIndex].tacticalBoards || {}),
-        referredByEmail: referredByEmail !== undefined ? (referredByEmail ? referredByEmail.trim().toLowerCase() : "") : (REGISTERED_USERS[existingIndex].referredByEmail || ""),
-        invitedEmails: invitedEmails !== undefined ? invitedEmails : (REGISTERED_USERS[existingIndex].invitedEmails || []),
-        coins: coins !== undefined ? coins : (REGISTERED_USERS[existingIndex].coins || 0),
-        cashBalance: cashBalance !== undefined ? cashBalance : (REGISTERED_USERS[existingIndex].cashBalance || 0),
-        // Preserve original creation time if exists
-        createdAt: REGISTERED_USERS[existingIndex].createdAt || updatedUser.createdAt
+        avatar: avatar || "👑",
+        licenseCode: licenseCode || "",
+        createdAt: new Date().toISOString(),
+        email: email || "",
+        password: password || "",
+        tacticalBoards: tacticalBoards || {},
+        referredByEmail: referredByEmail ? referredByEmail.trim().toLowerCase() : "",
+        invitedEmails: invitedEmails || [],
+        coins: coins !== undefined ? coins : 350,
+        cashBalance: cashBalance !== undefined ? cashBalance : 15.00,
+        adminSyncCounter: 0
       };
-    } else {
-      REGISTERED_USERS.push(updatedUser);
+      REGISTERED_USERS.push(newUser);
     }
 
     saveUsersToDisk();
@@ -2125,7 +2217,8 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
       role: "user",
       avatar: avatar || "⚽",
       licenseCode: licenseCode || (subscription && subscription !== "Ninguna" ? `LIC-${(subscription === "Pase VIP Mundialista" || subscription === "Pase VIP Elite") ? "VIP" : "SCOUT"}-${Math.floor(100000 + Math.random() * 900000)}` : ""),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      adminSyncCounter: 1
     };
     
     REGISTERED_USERS.push(newUser);
@@ -2178,6 +2271,8 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
         reference: "ADMIN_UPDATE_" + u.id.toUpperCase()
       });
     }
+
+    u.adminSyncCounter = (u.adminSyncCounter || 0) + 1;
 
     saveUsersToDisk();
 

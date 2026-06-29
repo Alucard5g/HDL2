@@ -574,6 +574,14 @@ export default function App() {
 
   const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean>(false);
 
+  const [adminSyncCounter, setAdminSyncCounter] = useState<number>(() => {
+    return Number(localStorage.getItem('dt_admin_sync_counter') || '0');
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dt_admin_sync_counter', adminSyncCounter.toString());
+  }, [adminSyncCounter]);
+
   const isAdmin = userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail';
 
   const isRegistered = userId !== 'user_me' && !!userEmail && userEmail.trim().length > 0;
@@ -1460,7 +1468,8 @@ export default function App() {
           referredByEmail: userReferredByEmail,
           invitedEmails: invitedListParsed,
           coins: userCoins,
-          cashBalance: userCashBalance
+          cashBalance: userCashBalance,
+          adminSyncCounter: adminSyncCounter
         })
       });
       console.log('[Playoffs Sync] Guardado y sincronización exitosa en base de datos.');
@@ -1606,7 +1615,8 @@ export default function App() {
             referredByEmail: userReferredByEmail,
             invitedEmails: invitedListParsed,
             coins: userCoins,
-            cashBalance: userCashBalance
+            cashBalance: userCashBalance,
+            adminSyncCounter: adminSyncCounter
           })
         });
         if (response.ok) {
@@ -1618,6 +1628,41 @@ export default function App() {
             setSuccessfulReferralsCount(rCount);
             localStorage.setItem('dt_user_referral_points', String(rPoints));
             localStorage.setItem('dt_user_referral_count', String(rCount));
+
+            // Sync server version state if admin updated it
+            if (data.user.adminSyncCounter !== undefined && data.user.adminSyncCounter !== adminSyncCounter) {
+              setAdminSyncCounter(data.user.adminSyncCounter);
+              localStorage.setItem('dt_admin_sync_counter', String(data.user.adminSyncCounter));
+              
+              if (data.user.username) {
+                setUsername(data.user.username);
+                localStorage.setItem('dt_username', data.user.username);
+              }
+              if (data.user.gameCode) {
+                setUserCode(data.user.gameCode);
+                localStorage.setItem('dt_user_code', data.user.gameCode);
+              }
+              if (data.user.subscription) {
+                setUserSubscription(data.user.subscription);
+                localStorage.setItem('user_subscription', data.user.subscription);
+              }
+              if (data.user.licenseCode !== undefined) {
+                setUserLicense(data.user.licenseCode);
+                if (data.user.licenseCode) {
+                  localStorage.setItem('dt_user_license', data.user.licenseCode);
+                } else {
+                  localStorage.removeItem('dt_user_license');
+                }
+              }
+              if (data.user.coins !== undefined) {
+                setUserCoins(data.user.coins);
+                localStorage.setItem('dt_user_coins', String(data.user.coins));
+              }
+              if (data.user.cashBalance !== undefined) {
+                setUserCashBalance(data.user.cashBalance);
+                localStorage.setItem('dt_user_cash_balance', String(data.user.cashBalance));
+              }
+            }
           }
         }
       } catch (err) {
@@ -1920,7 +1965,8 @@ export default function App() {
           referredByEmail: userReferredByEmail,
           invitedEmails: invitedListParsed,
           coins: userCoins,
-          cashBalance: userCashBalance
+          cashBalance: userCashBalance,
+          adminSyncCounter: adminSyncCounter
         })
       });
     } catch (err) {
@@ -2119,7 +2165,7 @@ export default function App() {
     }
   };
 
-  const handleCommitLogin = (e: React.FormEvent) => {
+  const handleCommitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanEmail = tempEmail.trim().toLowerCase();
     const inputPass = tempPassword;
@@ -2133,105 +2179,175 @@ export default function App() {
       return;
     }
 
-    // Get current registered users database
-    const dbStr = localStorage.getItem('dt_users_database') || '[]';
-    let db = [];
+    let matchedUser: any = null;
+    let loginSuccess = false;
+
+    // 1. Try to login via the Express server database first
     try {
-      db = JSON.parse(dbStr);
+      const response = await fetch('/api/user/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: inputPass })
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'success' && data.user) {
+          matchedUser = data.user;
+          loginSuccess = true;
+          
+          // Also save/update this user in the local browser database "dt_users_database" for local offline fallback
+          const dbStr = localStorage.getItem('dt_users_database') || '[]';
+          let localDb = [];
+          try {
+            localDb = JSON.parse(dbStr);
+            if (!Array.isArray(localDb)) localDb = [];
+          } catch {
+            localDb = [];
+          }
+          const idx = localDb.findIndex((u: any) => u.email.toLowerCase() === cleanEmail);
+          const localUser = {
+            id: matchedUser.id,
+            username: matchedUser.username,
+            email: matchedUser.email,
+            avatar: matchedUser.avatar,
+            code: matchedUser.gameCode || matchedUser.code,
+            password: matchedUser.password,
+            license: matchedUser.licenseCode || matchedUser.license || '',
+            subscription: matchedUser.subscription || 'Ninguna',
+            unlockedLevels: matchedUser.unlockedLevels,
+            tacticalBoards: matchedUser.tacticalBoards,
+            vipChosenContinent: matchedUser.vipChosenContinent || 'América'
+          };
+          if (idx !== -1) {
+            localDb[idx] = { ...localDb[idx], ...localUser };
+          } else {
+            localDb.push(localUser);
+          }
+          localStorage.setItem('dt_users_database', JSON.stringify(localDb));
+        } else {
+          alert(`❌ ${data.message || 'Error al iniciar sesión'}`);
+          return;
+        }
+      } else if (response.status === 401 || response.status === 404) {
+        const data = await response.json();
+        alert(`❌ ${data.message || 'Credenciales incorrectas'}`);
+        return;
+      }
     } catch (err) {
-      db = [];
+      console.warn('Servidor inaccesible. Se procede con la base de datos local.', err);
     }
 
-    // Check account existence
-    const matchedUser = db.find((u: any) => u.email.toLowerCase() === cleanEmail);
-
-    if (matchedUser) {
-      if (inputPass === matchedUser.password) {
-        // Login success with registered user!
-        setLoginAttempts(0);
-        setUserId(matchedUser.id || 'usr_' + Math.floor(100000 + Math.random() * 900050));
-        setUsername(matchedUser.username || 'Tú (Director Técnico)');
-        setUserCode(matchedUser.code || 'DT-' + Math.floor(1000 + Math.random() * 9000));
-        setUserAvatar(matchedUser.avatar || '👑');
-        setUserEmail(matchedUser.email);
-        setUserPassword(matchedUser.password);
-        setUserLicense(matchedUser.license || '');
-        setUserSubscription(matchedUser.subscription || 'Ninguna');
-        if (matchedUser.vipChosenContinent) {
-          setVipChosenContinent(matchedUser.vipChosenContinent);
-          localStorage.setItem('dt_vip_chosen_continent', matchedUser.vipChosenContinent);
+    // 2. Local fallback if server check was offline or skipped
+    if (!loginSuccess) {
+      const dbStr = localStorage.getItem('dt_users_database') || '[]';
+      let db = [];
+      try {
+        db = JSON.parse(dbStr);
+      } catch (err) {
+        db = [];
+      }
+      const localUser = db.find((u: any) => u.email.toLowerCase() === cleanEmail);
+      if (localUser) {
+        if (inputPass === localUser.password) {
+          matchedUser = localUser;
+          loginSuccess = true;
         } else {
-          setVipChosenContinent('América');
-          localStorage.setItem('dt_vip_chosen_continent', 'América');
-        }
+          const nextAttempts = loginAttempts + 1;
+          setLoginAttempts(nextAttempts);
 
-        if (matchedUser.unlockedLevels) {
-          setUnlockedLevels(matchedUser.unlockedLevels);
-          localStorage.setItem('scouting_unlocked_levels', JSON.stringify(matchedUser.unlockedLevels));
-        } else {
-          const resetLevels: { [country: string]: { [level: number]: boolean } } = {};
-          COUNTRIES.forEach(c => {
-            resetLevels[c.name] = { 1: false, 2: false, 3: false };
-          });
-          setUnlockedLevels(resetLevels);
-          localStorage.setItem('scouting_unlocked_levels', JSON.stringify(resetLevels));
-        }
+          if (nextAttempts < 3) {
+            alert(`❌ Contraseña incorrecta (Intento ${nextAttempts} de 3).\n\nLe quedan ${3 - nextAttempts} intentos antes de activar el panel de recuperación y enviarle un código temporal.`);
+            return;
+          } else {
+            setLoginAttempts(0);
+            const generatedCode = String(Math.floor(100000 + Math.random() * 900000));
+            setSentRecoveryCode(generatedCode);
+            setIsRecoveryMode(true);
+            setRecoveryStep('code_verification');
+            setMatchedRecoveryUser(localUser);
+            setTempPassword('');
+            setTempConfirmPassword('');
+            setInputRecoveryCode('');
 
-        if (matchedUser.tacticalBoards) {
-          setTacticalBoards(matchedUser.tacticalBoards);
-          localStorage.setItem('scouting_tactical_boards', JSON.stringify(matchedUser.tacticalBoards));
-        } else {
-          setTacticalBoards({});
-          localStorage.setItem('scouting_tactical_boards', '{}');
-        }
-
-        localStorage.setItem('dt_user_id', matchedUser.id || 'usr_me');
-        localStorage.setItem('dt_username', matchedUser.username || 'Tú (Director Técnico)');
-        localStorage.setItem('dt_user_code', matchedUser.code || '');
-        localStorage.setItem('dt_user_avatar', matchedUser.avatar || '👑');
-        localStorage.setItem('dt_user_email', matchedUser.email);
-        localStorage.setItem('dt_user_password', matchedUser.password);
-        localStorage.setItem('user_subscription', matchedUser.subscription || 'Ninguna');
-        if (matchedUser.license) {
-          localStorage.setItem('dt_user_license', matchedUser.license);
-        } else {
-          localStorage.removeItem('dt_user_license');
-        }
-
-        setIsRegistrationOpen(false);
-
-        // Set active tab to subscription
-        setActiveTab('subscription');
-
-        alert(`🔑 ¡Bienvenido de vuelta, D.T. ${matchedUser.username}!\n\nIdentidad y progreso recuperados exitosamente.`);
-        return;
-      } else {
-        const nextAttempts = loginAttempts + 1;
-        setLoginAttempts(nextAttempts);
-
-        if (nextAttempts < 3) {
-          alert(`❌ Contraseña incorrecta (Intento ${nextAttempts} de 3).\n\nLe quedan ${3 - nextAttempts} intentos antes de activar el panel de recuperación y enviarle un código temporal.`);
-          return;
-        } else {
-          // Reset attempts counter
-          setLoginAttempts(0);
-          
-          // Generate an auditable 6-digit verification code
-          const generatedCode = String(Math.floor(100000 + Math.random() * 900000));
-          setSentRecoveryCode(generatedCode);
-          
-          // Activate recover state at code verification step
-          setIsRecoveryMode(true);
-          setRecoveryStep('code_verification');
-          setMatchedRecoveryUser(matchedUser);
-          setTempPassword('');
-          setTempConfirmPassword('');
-          setInputRecoveryCode('');
-
-          alert(`⚠️ ¡SISTEMA BLOQUEADO: 3 INTENTOS FALLIDOS EXCEDIDOS! ⚠️\n\nPor seguridad del Director Técnico y transparencia de la auditoría de sorteos de la Copa, se ha bloqueado el inicio de sesión y activado el Panel de Recuperación de Contraseña.\n\n📧 Se ha enviado un código de acceso de recuperación temporal al correo:\n"${matchedUser.email}"\n\n🔑 CÓDIGO DE RECUPERACIÓN TEMPORAL ENVIADO: ${generatedCode}\n\nPor favor, ingrese este código en la pantalla para validar su identidad y restablecer su contraseña.`);
-          return;
+            alert(`⚠️ ¡SISTEMA BLOQUEADO: 3 INTENTOS FALLIDOS EXCEDIDOS! ⚠️\n\nPor seguridad del Director Técnico y transparencia de la auditoría de sorteos de la Copa, se ha bloqueado el inicio de sesión y activado el Panel de Recuperación de Contraseña.\n\n📧 Se ha enviado un código de acceso de recuperación temporal al correo:\n"${localUser.email}"\n\n🔑 CÓDIGO DE RECUPERACIÓN TEMPORAL ENVIADO: ${generatedCode}\n\nPor favor, ingrese este código en la pantalla para validar su identidad y restablecer su contraseña.`);
+            return;
+          }
         }
       }
+    }
+
+    // If successfully logged in (either via server or local fallback)
+    if (loginSuccess && matchedUser) {
+      setLoginAttempts(0);
+      setUserId(matchedUser.id || 'usr_' + Math.floor(100000 + Math.random() * 900050));
+      setUsername(matchedUser.username || 'Tú (Director Técnico)');
+      setUserCode(matchedUser.gameCode || matchedUser.code || 'DT-' + Math.floor(1000 + Math.random() * 9000));
+      setUserAvatar(matchedUser.avatar || '👑');
+      setUserEmail(matchedUser.email);
+      setUserPassword(matchedUser.password);
+      setUserLicense(matchedUser.licenseCode || matchedUser.license || '');
+      setUserSubscription(matchedUser.subscription || 'Ninguna');
+      
+      if (matchedUser.adminSyncCounter !== undefined) {
+        setAdminSyncCounter(matchedUser.adminSyncCounter);
+        localStorage.setItem('dt_admin_sync_counter', String(matchedUser.adminSyncCounter));
+      }
+
+      if (matchedUser.vipChosenContinent) {
+        setVipChosenContinent(matchedUser.vipChosenContinent);
+        localStorage.setItem('dt_vip_chosen_continent', matchedUser.vipChosenContinent);
+      } else {
+        setVipChosenContinent('América');
+        localStorage.setItem('dt_vip_chosen_continent', 'América');
+      }
+
+      if (matchedUser.unlockedLevels) {
+        setUnlockedLevels(matchedUser.unlockedLevels);
+        localStorage.setItem('scouting_unlocked_levels', JSON.stringify(matchedUser.unlockedLevels));
+      } else {
+        const resetLevels: { [country: string]: { [level: number]: boolean } } = {};
+        COUNTRIES.forEach(c => {
+          resetLevels[c.name] = { 1: false, 2: false, 3: false };
+        });
+        setUnlockedLevels(resetLevels);
+        localStorage.setItem('scouting_unlocked_levels', JSON.stringify(resetLevels));
+      }
+
+      if (matchedUser.tacticalBoards) {
+        setTacticalBoards(matchedUser.tacticalBoards);
+        localStorage.setItem('scouting_tactical_boards', JSON.stringify(matchedUser.tacticalBoards));
+      } else {
+        setTacticalBoards({});
+        localStorage.setItem('scouting_tactical_boards', '{}');
+      }
+
+      if (matchedUser.coins !== undefined) {
+        setUserCoins(matchedUser.coins);
+        localStorage.setItem('dt_user_coins', String(matchedUser.coins));
+      }
+      if (matchedUser.cashBalance !== undefined) {
+        setUserCashBalance(matchedUser.cashBalance);
+        localStorage.setItem('dt_user_cash_balance', String(matchedUser.cashBalance));
+      }
+
+      localStorage.setItem('dt_user_id', matchedUser.id || 'usr_me');
+      localStorage.setItem('dt_username', matchedUser.username || 'Tú (Director Técnico)');
+      localStorage.setItem('dt_user_code', matchedUser.gameCode || matchedUser.code || '');
+      localStorage.setItem('dt_user_avatar', matchedUser.avatar || '👑');
+      localStorage.setItem('dt_user_email', matchedUser.email);
+      localStorage.setItem('dt_user_password', matchedUser.password);
+      localStorage.setItem('user_subscription', matchedUser.subscription || 'Ninguna');
+      if (matchedUser.licenseCode || matchedUser.license) {
+        localStorage.setItem('dt_user_license', matchedUser.licenseCode || matchedUser.license);
+      } else {
+        localStorage.removeItem('dt_user_license');
+      }
+
+      setIsRegistrationOpen(false);
+      setActiveTab('subscription');
+
+      alert(`🔑 ¡Bienvenido de vuelta, D.T. ${matchedUser.username}!\n\nIdentidad, billetera y progreso recuperados exitosamente desde la base de datos central.`);
+      return;
     }
 
     // Special fallback for admin or demo if nothing registered yet
@@ -2261,7 +2377,7 @@ export default function App() {
       return;
     }
 
-    alert('❌ No se encontró ningún Director Técnico registrado con este correo en esta terminal. Activando Protocolo de Restauración de Contraseña.');
+    alert('❌ No se encontró ningún Director Técnico registrado con este correo en la base de datos central ni de forma local. Activando Protocolo de Restauración de Contraseña.');
     
     // Activate recover state
     setIsRecoveryMode(true);

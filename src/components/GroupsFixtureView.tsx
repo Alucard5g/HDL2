@@ -130,6 +130,7 @@ export default function GroupsFixtureView({
   };
 
   const [bracketActiveTab, setBracketActiveTab] = useState<'left' | 'center' | 'right'>('center');
+  const [bracketViewMode, setBracketViewMode] = useState<'fit' | 'full'>('fit');
 
   // Helper to calculate unlocked player count for any country
   const getUnlockedCount = (countryName: string): number => {
@@ -379,42 +380,81 @@ export default function GroupsFixtureView({
             // BRACKET VIEW (Spectacular Left/Right symmetrical tournament tree inspired by the uploaded image)
             <div className="space-y-6" id="interactive-bracket-tree">
               
-              {/* Mobile/Tablet Sub-Navigation for the Symmetrical Tree */}
-              <div className="lg:hidden flex bg-black/80 border-2 border-slate-800 p-1 rounded-2xl gap-1 justify-center max-w-md mx-auto relative z-10">
+              {/* Dynamic View Settings Header */}
+              <div className="flex flex-col md:flex-row justify-between items-center bg-slate-900 border-4 border-black p-4 rounded-3xl gap-4 shadow-[6px_6px_0px_#000] relative overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(rgba(0,0,0,0.15)_1.5px,transparent_1.5px)] [background-size:12px_12px] pointer-events-none" />
+                <div className="flex items-center gap-3 relative z-10">
+                  <div className="w-10 h-10 bg-yellow-400 border-3 border-black rounded-xl flex items-center justify-center font-bold text-lg shadow-[2px_2px_0px_#000]">
+                    🏆
+                  </div>
+                  <div>
+                    <h4 className="font-bangers text-lg tracking-wider text-white uppercase drop-shadow-[1px_1px_0px_#000]">VISTA DEL SIMULADOR</h4>
+                    <p className="text-[9px] font-mono text-[#10b981] uppercase tracking-widest font-black">Ajusta el tamaño del fixture a tu pantalla</p>
+                  </div>
+                </div>
+
+                <div className="flex bg-slate-950 border-2 border-slate-800 p-1 rounded-2xl gap-1 shrink-0 relative z-10">
+                  <button
+                    onClick={() => setBracketViewMode('fit')}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      bracketViewMode === 'fit'
+                        ? 'bg-[#ef4444] text-white border border-black shadow-[2px_2px_0px_#000]'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    📱 Una Pantalla (Compacto)
+                  </button>
+                  <button
+                    onClick={() => setBracketViewMode('full')}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                      bracketViewMode === 'full'
+                        ? 'bg-[#ef4444] text-white border border-black shadow-[2px_2px_0px_#000]'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    🌳 Árbol Completo (Scroll)
+                  </button>
+                </div>
+              </div>
+
+              {/* Symmetrical Tree Zone Sub-Navigation */}
+              <div className={`flex bg-slate-900 border-4 border-black p-1.5 rounded-2xl gap-1.5 justify-center max-w-lg mx-auto relative z-10 shadow-[4px_4px_0px_#000] ${
+                bracketViewMode === 'fit' ? 'flex' : 'lg:hidden flex'
+              }`}>
                 <button
                   onClick={() => setBracketActiveTab('left')}
-                  className={`flex-1 py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center ${
+                  className={`flex-1 py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center border-2 ${
                     bracketActiveTab === 'left'
-                      ? 'bg-red-600 text-white border border-black shadow-lg shadow-red-600/25'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-[#ef4444] text-white border-black shadow-[3px_3px_0px_#000] translate-y-[-1px]'
+                      : 'bg-slate-950 text-gray-400 border-slate-800 hover:text-white'
                   }`}
                 >
-                  ⬅ Lado Izq.
+                  ◀ LADO IZQ.
                 </button>
                 <button
                   onClick={() => setBracketActiveTab('center')}
-                  className={`flex-1 py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center ${
+                  className={`flex-1 py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center border-2 ${
                     bracketActiveTab === 'center'
-                      ? 'bg-emerald-600 text-white border border-black shadow-lg shadow-emerald-600/25'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-[#10b981] text-white border-black shadow-[3px_3px_0px_#000] translate-y-[-1px]'
+                      : 'bg-slate-950 text-gray-400 border-slate-800 hover:text-white'
                   }`}
                 >
                   🏆 GRAN FINAL
                 </button>
                 <button
                   onClick={() => setBracketActiveTab('right')}
-                  className={`flex-1 py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center ${
+                  className={`flex-1 py-2 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer text-center border-2 ${
                     bracketActiveTab === 'right'
-                      ? 'bg-red-600 text-white border border-black shadow-lg shadow-red-600/25'
-                      : 'text-gray-400 hover:text-white'
+                      ? 'bg-[#ef4444] text-white border-black shadow-[3px_3px_0px_#000] translate-y-[-1px]'
+                      : 'bg-slate-950 text-gray-400 border-slate-800 hover:text-white'
                   }`}
                 >
-                  Lado Der. ➡
+                  LADO DER. ▶
                 </button>
               </div>
 
               {/* High-Fidelity Playoff Stage Map */}
-              <div className="relative rounded-3xl overflow-hidden border-4 border-black shadow-[8px_8px_0px_rgba(0,0,0,1)] bg-slate-950 p-4 md:p-6">
+              <div className="relative rounded-3xl overflow-hidden border-4 border-black shadow-[8px_8px_0px_rgba(0,0,0,1)] bg-slate-950 p-3 md:p-5">
                 
                 {/* Comic skyline sunset horizon background with drone stars overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-red-950/40 via-slate-950 to-slate-950 pointer-events-none" />
@@ -427,13 +467,23 @@ export default function GroupsFixtureView({
                 <div className="absolute bottom-0 left-0 right-0 h-28 opacity-10 pointer-events-none bg-cover bg-bottom select-none mix-blend-screen" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1519501025264-65ba15a82390?q=80&w=600&auto=format&fit=crop')` }} />
 
                 {/* Symmetrical columns block */}
-                <div className="relative z-10 w-full overflow-x-auto select-none custom-scrollbar">
+                <div className={`relative z-10 w-full select-none custom-scrollbar ${
+                  bracketViewMode === 'fit' ? 'overflow-visible' : 'overflow-x-auto'
+                }`}>
                   
                   {/* Container representing the layout of the user's uploaded mockup */}
-                  <div className="min-w-[1240px] xl:min-w-[1400px] grid grid-cols-11 gap-2 xl:gap-4 items-center py-6">
+                  <div className={
+                    bracketViewMode === 'fit'
+                      ? "w-full max-w-full grid grid-cols-5 gap-2 xl:gap-3 items-center py-4"
+                      : "min-w-[1240px] xl:min-w-[1400px] grid grid-cols-11 gap-2 xl:gap-4 items-center py-6"
+                  }>
                     
                     {/* COLUMN 1: Left Round of 32 (Dieciseisavos) */}
-                    <div className={`col-span-2 space-y-4 ${bracketActiveTab === 'left' ? 'block' : 'hidden lg:block'}`}>
+                    <div className={`col-span-2 ${
+                      bracketViewMode === 'fit'
+                        ? (bracketActiveTab === 'left' ? 'block space-y-2' : 'hidden')
+                        : (bracketActiveTab === 'left' ? 'block space-y-4' : 'hidden lg:block space-y-4')
+                    }`}>
                       <div className="text-center bg-black/80 border-2 border-red-600 py-1.5 px-3 rounded-xl mb-2">
                         <span className="text-[10px] font-black text-white uppercase font-mono tracking-widest">Dieciseisavos Izq.</span>
                       </div>
@@ -450,24 +500,28 @@ export default function GroupsFixtureView({
                       ].map((m, idx) => {
                         const winner = bracketWinners[m.id];
                         return (
-                          <div key={m.id} className="bg-slate-900/90 border-2 border-black p-2.5 rounded-2xl shadow-md space-y-1.5 relative group">
+                          <div key={m.id} className={`bg-slate-900/90 border-2 border-black rounded-2xl shadow-md relative group ${
+                            bracketViewMode === 'fit' ? 'p-1.5 space-y-1' : 'p-2.5 space-y-1.5'
+                          }`}>
                             <span className="text-[8px] font-mono font-bold text-red-500 block uppercase">LLAVE {idx+1}</span>
                             
                             {/* Team Local (Sticker slot layout: clean white backgrounds for strong contrast) */}
                             <div 
-                              className={`flex items-center justify-between p-2 rounded-xl border-2 transition-all text-xs ${
+                              className={`flex items-center justify-between px-2 py-1 rounded-xl border-2 transition-all ${
+                                bracketViewMode === 'fit' ? 'text-[10px]' : 'text-xs'
+                              } ${
                                 winner === m.l 
-                                  ? 'bg-red-600 border-black text-white font-black' 
+                                  ? 'bg-[#ef4444] border-black text-white font-black' 
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '44px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '32px' : '44px' }}
                             >
                               <div 
                                 onClick={() => handleSelectWinner(m.id, m.l, [m.next, 'qf-L' + Math.ceil((idx+1)/4), 'sf-L', 'final'])}
                                 className="truncate flex items-center gap-1 cursor-pointer flex-1 py-1"
                               >
                                 <span className="text-lg filter drop-shadow">{getFlagByName(m.l)}</span>
-                                <span className="uppercase tracking-tight text-[11px] truncate">{m.l}</span>
+                                <span className="uppercase tracking-tight truncate">{m.l}</span>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <input 
@@ -486,7 +540,9 @@ export default function GroupsFixtureView({
                                       }
                                     }));
                                   }}
-                                  className="w-8 h-7 bg-slate-100 text-black border-2 border-black font-mono text-[11px] text-center rounded outline-none font-bold"
+                                  className={`bg-slate-100 text-black border-2 border-black font-mono text-center rounded outline-none font-bold ${
+                                    bracketViewMode === 'fit' ? 'w-7 h-6 text-[10px]' : 'w-8 h-7 text-[11px]'
+                                  }`}
                                 />
                                 {winner === m.l && <CheckCircle className="w-3.5 h-3.5 text-white shrink-0" />}
                               </div>
@@ -494,19 +550,21 @@ export default function GroupsFixtureView({
 
                             {/* Team Visitante */}
                             <div 
-                              className={`flex items-center justify-between p-2 rounded-xl border-2 transition-all text-xs ${
+                              className={`flex items-center justify-between px-2 py-1 rounded-xl border-2 transition-all ${
+                                bracketViewMode === 'fit' ? 'text-[10px]' : 'text-xs'
+                              } ${
                                 winner === m.v 
-                                  ? 'bg-red-600 border-black text-white font-black' 
+                                  ? 'bg-[#ef4444] border-black text-white font-black' 
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '44px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '32px' : '44px' }}
                             >
                               <div 
                                 onClick={() => handleSelectWinner(m.id, m.v, [m.next, 'qf-L' + Math.ceil((idx+1)/4), 'sf-L', 'final'])}
                                 className="truncate flex items-center gap-1 cursor-pointer flex-1 py-1"
                               >
                                 <span className="text-lg filter drop-shadow">{getFlagByName(m.v)}</span>
-                                <span className="uppercase tracking-tight text-[11px] truncate">{m.v}</span>
+                                <span className="uppercase tracking-tight truncate">{m.v}</span>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <input 
@@ -525,7 +583,9 @@ export default function GroupsFixtureView({
                                       }
                                     }));
                                   }}
-                                  className="w-8 h-7 bg-slate-100 text-black border-2 border-black font-mono text-[11px] text-center rounded outline-none font-bold"
+                                  className={`bg-slate-100 text-black border-2 border-black font-mono text-center rounded outline-none font-bold ${
+                                    bracketViewMode === 'fit' ? 'w-7 h-6 text-[10px]' : 'w-8 h-7 text-[11px]'
+                                  }`}
                                 />
                                 {winner === m.v && <CheckCircle className="w-3.5 h-3.5 text-white shrink-0" />}
                               </div>
@@ -536,7 +596,11 @@ export default function GroupsFixtureView({
                     </div>
 
                     {/* COLUMN 2: Left Octavos de Final */}
-                    <div className={`col-span-1 space-y-12 ${bracketActiveTab === 'left' ? 'block' : 'hidden lg:block'}`}>
+                    <div className={`col-span-1 ${
+                      bracketViewMode === 'fit'
+                        ? (bracketActiveTab === 'left' ? 'block space-y-4' : 'hidden')
+                        : (bracketActiveTab === 'left' ? 'block space-y-12' : 'hidden lg:block space-y-12')
+                    }`}>
                       <div className="text-center bg-black/80 border-2 border-indigo-600 py-1 px-1.5 rounded-lg mb-4">
                         <span className="text-[9px] font-black text-white uppercase font-mono tracking-wider">Octavos Izq</span>
                       </div>
@@ -552,7 +616,7 @@ export default function GroupsFixtureView({
                         const winner = bracketWinners[m.id];
 
                         return (
-                          <div key={m.id} className="bg-slate-900/50 border border-slate-800 p-2 rounded-xl space-y-2 relative">
+                          <div key={m.id} className="bg-slate-900/50 border border-slate-800 p-1.5 rounded-xl space-y-1.5 relative">
                             {/* Branch Connector lines */}
                             <div className="absolute left-[-10px] top-1/2 w-2.5 h-[1.5px] bg-red-600/60" />
                             <div className="absolute right-[-10px] top-1/2 w-2.5 h-[1.5px] bg-red-600/60" />
@@ -562,31 +626,31 @@ export default function GroupsFixtureView({
                             {/* Team A Slot */}
                             <div
                               onClick={() => t1 && handleSelectWinner(m.id, t1, m.dkeys)}
-                              className={`flex items-center justify-between p-1.5 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t1 ? 'cursor-pointer hover:bg-slate-850' : 'cursor-not-allowed opacity-35'
                               } ${
                                 winner === t1 && t1
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '34px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '34px' }}
                             >
-                              <span className="truncate">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Ganador'}</span>
+                              <span className="truncate text-[10px]">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Ganador'}</span>
                             </div>
 
                             {/* Team B Slot */}
                             <div
                               onClick={() => t2 && handleSelectWinner(m.id, t2, m.dkeys)}
-                              className={`flex items-center justify-between p-1.5 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t2 ? 'cursor-pointer hover:bg-slate-850' : 'cursor-not-allowed opacity-35'
                               } ${
                                 winner === t2 && t2
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '34px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '34px' }}
                             >
-                              <span className="truncate">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Ganador'}</span>
+                              <span className="truncate text-[10px]">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Ganador'}</span>
                             </div>
                           </div>
                         );
@@ -594,7 +658,11 @@ export default function GroupsFixtureView({
                     </div>
 
                     {/* COLUMN 3: Left Cuartos de Final */}
-                    <div className={`col-span-1 space-y-24 ${bracketActiveTab === 'left' ? 'block' : 'hidden lg:block'}`}>
+                    <div className={
+                      bracketViewMode === 'fit'
+                        ? (bracketActiveTab === 'left' ? 'col-span-1 space-y-8' : 'hidden')
+                        : `col-span-1 ${bracketActiveTab === 'left' ? 'block space-y-24' : 'hidden lg:block space-y-24'}`
+                    }>
                       <div className="text-center bg-black/80 border-2 border-yellow-500 py-1 px-1.5 rounded-lg mb-4">
                         <span className="text-[9px] font-black text-white uppercase font-mono tracking-wider">Cuartos Izq</span>
                       </div>
@@ -608,37 +676,37 @@ export default function GroupsFixtureView({
                         const winner = bracketWinners[m.id];
 
                         return (
-                          <div key={m.id} className="bg-slate-900/50 border border-slate-800 p-2 rounded-xl space-y-2 relative">
+                          <div key={m.id} className="bg-slate-900/50 border border-slate-800 p-1.5 rounded-xl space-y-1.5 relative">
                             <span className="text-[8px] font-mono text-yellow-500 font-bold block uppercase font-mono">CUARTOS L{idx+1}</span>
                             
                             {/* Team A Slot */}
                             <div
                               onClick={() => t1 && handleSelectWinner(m.id, t1, m.dkeys)}
-                              className={`flex items-center justify-between p-1.5 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t1 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t1 && t1
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '34px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '34px' }}
                             >
-                              <span className="truncate">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Ganador'}</span>
+                              <span className="truncate text-[10px]">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Ganador'}</span>
                             </div>
 
                             {/* Team B Slot */}
                             <div
                               onClick={() => t2 && handleSelectWinner(m.id, t2, m.dkeys)}
-                              className={`flex items-center justify-between p-1.5 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t2 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t2 && t2
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '34px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '34px' }}
                             >
-                              <span className="truncate">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Ganador'}</span>
+                              <span className="truncate text-[10px]">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Ganador'}</span>
                             </div>
                           </div>
                         );
@@ -646,7 +714,11 @@ export default function GroupsFixtureView({
                     </div>
 
                     {/* COLUMN 4: Left Semifinal */}
-                    <div className={`col-span-1 space-y-4 flex flex-col justify-center ${bracketActiveTab === 'left' || bracketActiveTab === 'center' ? 'block' : 'hidden lg:block'}`}>
+                    <div className={
+                      bracketViewMode === 'fit'
+                        ? (bracketActiveTab === 'left' || bracketActiveTab === 'center' ? 'col-span-1 space-y-4 flex flex-col justify-center' : 'hidden')
+                        : `col-span-1 space-y-4 flex flex-col justify-center ${bracketActiveTab === 'left' || bracketActiveTab === 'center' ? 'block' : 'hidden lg:block'}`
+                    }>
                       <div className="text-center bg-black/80 border border-emerald-500 py-1 px-1.5 rounded-lg">
                         <span className="text-[9px] font-black text-emerald-400 uppercase font-mono tracking-wider">Semifinal Izq</span>
                       </div>
@@ -657,35 +729,35 @@ export default function GroupsFixtureView({
                         const winner = bracketWinners['sf-L'];
 
                         return (
-                          <div className="bg-slate-900/50 border border-slate-850 p-2.5 rounded-xl space-y-2 relative">
+                          <div className="bg-slate-900/50 border border-slate-850 p-1.5 rounded-xl space-y-1.5 relative">
                             {/* Team A */}
                             <div
                               onClick={() => t1 && handleSelectWinner('sf-L', t1, ['final'])}
-                              className={`flex items-center justify-between p-2 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t1 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t1 && t1
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '36px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '36px' }}
                             >
-                              <span className="truncate">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Semifinalista L1'}</span>
+                              <span className="truncate text-[10px]">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Semifinalista L1'}</span>
                             </div>
 
                             {/* Team B */}
                             <div
                               onClick={() => t2 && handleSelectWinner('sf-L', t2, ['final'])}
-                              className={`flex items-center justify-between p-2 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t2 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t2 && t2
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '36px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '36px' }}
                             >
-                              <span className="truncate">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Semifinalista L2'}</span>
+                              <span className="truncate text-[10px]">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Semifinalista L2'}</span>
                             </div>
                           </div>
                         );
@@ -693,94 +765,105 @@ export default function GroupsFixtureView({
                     </div>
 
                     {/* CENTER STAGE (Columns 5, 6, 7): Glowing drone-light cup, skyline backdrop, and final cards */}
-                    <div className={`col-span-3 flex flex-col items-center justify-center space-y-8 text-center px-2 py-4 border-2 border-dashed border-red-600/25 rounded-3xl bg-black/40 min-h-[480px] relative ${bracketActiveTab === 'center' ? 'block' : 'hidden lg:block'}`}>
+                    <div className={
+                      bracketViewMode === 'fit'
+                        ? (bracketActiveTab === 'center'
+                            ? 'col-span-3 flex flex-col items-center justify-center space-y-4 text-center px-1.5 py-3 border-2 border-dashed border-red-600/25 rounded-3xl bg-black/40 min-h-[380px] relative'
+                            : (bracketActiveTab === 'left' || bracketActiveTab === 'right' ? 'col-span-1 flex flex-col items-center justify-center space-y-3 text-center px-1.5 py-3 border border-slate-800 rounded-2xl bg-black/20 relative' : 'hidden')
+                          )
+                        : `col-span-3 flex flex-col items-center justify-center space-y-8 text-center px-2 py-4 border-2 border-dashed border-red-600/25 rounded-3xl bg-black/40 min-h-[480px] relative ${bracketActiveTab === 'center' ? 'block' : 'hidden lg:block'}`
+                    }>
                       
                       {/* Glorious Glowing Drone Soccer Trophy Illustration */}
-                      <div className="relative w-full flex flex-col items-center justify-center my-1 select-none pointer-events-none">
-                        
-                        {/* Glowing drone circle lights */}
-                        <div className="w-24 h-24 rounded-full border-4 border-red-600/40 bg-red-600/20 absolute blur-md animate-pulse" />
-                        
-                        {/* Inner Trophy structure built out of high-fidelity vector lights */}
-                        <div className="relative z-10 flex flex-col items-center">
-                          <Trophy className="w-14 h-14 text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] animate-bounce duration-3000" />
+                      {!(bracketViewMode === 'fit' && bracketActiveTab !== 'center') && (
+                        <div className="relative w-full flex flex-col items-center justify-center my-1 select-none pointer-events-none">
                           
-                          {/* Symmetrical dot circles simulating drone performance */}
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-dotted border-red-500/30 rounded-full animate-spin duration-10000" />
-                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 border border-dashed border-emerald-500/20 rounded-full animate-spin duration-15000" />
-                        </div>
+                          {/* Glowing drone circle lights */}
+                          <div className="w-24 h-24 rounded-full border-4 border-red-600/40 bg-red-600/20 absolute blur-md animate-pulse" />
+                          
+                          {/* Inner Trophy structure built out of high-fidelity vector lights */}
+                          <div className="relative z-10 flex flex-col items-center">
+                            <Trophy className="w-14 h-14 text-red-500 drop-shadow-[0_0_15px_rgba(239,68,68,0.8)] animate-bounce duration-3000" />
+                            
+                            {/* Symmetrical dot circles simulating drone performance */}
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-dotted border-red-500/30 rounded-full animate-spin duration-10000" />
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 border border-dashed border-emerald-500/20 rounded-full animate-spin duration-15000" />
+                          </div>
 
-                        {/* Sparkles / Drone star dots */}
-                        <span className="absolute top-0 left-1/4 w-1 h-1 bg-red-400 rounded-full animate-ping" />
-                        <span className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping duration-2000" />
-                        <span className="absolute bottom-1/4 left-1/3 w-1 h-1 bg-yellow-400 rounded-full animate-ping duration-1500" />
-                        <span className="absolute top-2/3 right-1/3 w-1.5 h-1.5 bg-red-400 rounded-full animate-ping duration-3000" />
-                        
-                        <div className="text-center mt-3 z-10">
-                          <span className="text-[9px] bg-red-600/20 border border-red-500/30 text-red-400 px-3 py-0.5 rounded-full font-mono font-black uppercase tracking-widest inline-block scale-95">
-                            DRONE LIGHT SHOW LIVE
-                          </span>
+                          {/* Sparkles / Drone star dots */}
+                          <span className="absolute top-0 left-1/4 w-1 h-1 bg-red-400 rounded-full animate-ping" />
+                          <span className="absolute top-1/3 right-1/4 w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping duration-2000" />
+                          <span className="absolute bottom-1/4 left-1/3 w-1 h-1 bg-yellow-400 rounded-full animate-ping duration-1500" />
+                          <span className="absolute top-2/3 right-1/3 w-1.5 h-1.5 bg-red-400 rounded-full animate-ping duration-3000" />
+                          
+                          <div className="text-center mt-3 z-10">
+                            <span className="text-[9px] bg-red-600/20 border border-red-500/30 text-red-400 px-3 py-0.5 rounded-full font-mono font-black uppercase tracking-widest inline-block scale-95">
+                              DRONE LIGHT SHOW LIVE
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {/* GRAN FINAL CARD (The central clash) */}
-                      <div className="w-full max-w-[280px] bg-slate-900 border-4 border-black p-4 rounded-3xl shadow-[6px_6px_0px_#000] relative overflow-hidden">
+                      <div className={`w-full bg-slate-900 border-4 border-black rounded-3xl shadow-[4px_4px_0px_#000] relative overflow-hidden ${
+                        bracketViewMode === 'fit' && bracketActiveTab !== 'center' ? 'p-2 max-w-full' : 'p-4 max-w-[280px]'
+                      }`}>
                         {/* Banner header */}
-                        <div className="absolute top-0 left-0 right-0 bg-[#e11d48] text-white font-black text-[9px] font-mono uppercase tracking-widest py-1 border-b-2 border-black">
-                          ⚡ GRAN FINAL DE HÉROES ⚡
+                        <div className="absolute top-0 left-0 right-0 bg-[#e11d48] text-white font-black text-[9px] font-mono uppercase tracking-widest py-1 border-b-2 border-black text-center">
+                          {bracketViewMode === 'fit' && bracketActiveTab !== 'center' ? '⚡ FINAL ⚡' : '⚡ GRAN FINAL DE HÉROES ⚡'}
                         </div>
                         
-                        <div className="space-y-3 mt-4 text-left">
+                        <div className={`space-y-2 text-left ${
+                          bracketViewMode === 'fit' && bracketActiveTab !== 'center' ? 'mt-3' : 'mt-4'
+                        }`}>
                           {(() => {
                             const leftFinalist = bracketWinners['sf-L'] || '';
                             const rightFinalist = bracketWinners['sf-R'] || '';
                             const champion = bracketWinners['final'];
 
                             return (
-                              <div className="space-y-2">
+                              <div className="space-y-1">
                                 {/* Left finalist block */}
                                 <div
                                   onClick={() => leftFinalist && handleSelectWinner('final', leftFinalist, [])}
-                                  className={`flex items-center justify-between p-2 rounded-xl border-2 transition-all ${
+                                  className={`flex items-center justify-between px-2 py-1 rounded-xl border-2 transition-all ${
                                     leftFinalist ? 'cursor-pointer hover:scale-102' : 'opacity-40'
                                   } ${
                                     champion === leftFinalist && leftFinalist
-                                      ? 'bg-emerald-600 border-black text-white font-black'
+                                      ? 'bg-[#10b981] border-black text-white font-black'
                                       : 'bg-white border-black text-black font-extrabold'
                                   }`}
-                                  style={{ minHeight: '44px' }}
+                                  style={{ minHeight: bracketViewMode === 'fit' && bracketActiveTab !== 'center' ? '28px' : '44px' }}
                                 >
                                   <span className="truncate flex items-center gap-1.5">
-                                    <span className="text-xl filter drop-shadow">{getFlagByName(leftFinalist)}</span>
-                                    <span className="uppercase text-[11px] truncate">{leftFinalist || 'Ganador Izq.'}</span>
+                                    <span className="text-lg filter drop-shadow">{getFlagByName(leftFinalist)}</span>
+                                    <span className="uppercase text-[10px] truncate">{leftFinalist || 'Ganador Izq.'}</span>
                                   </span>
-                                  {champion === leftFinalist && leftFinalist && <CheckCircle className="w-4 h-4 text-white" />}
+                                  {champion === leftFinalist && leftFinalist && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                                 </div>
 
                                 {/* VS decorative bubble */}
-                                <div className="text-center font-black text-gray-500 font-mono text-[10px] uppercase py-0.5 flex items-center justify-center gap-2">
-                                  <div className="h-[1px] bg-slate-800 flex-1" />
+                                <div className="text-center font-black text-gray-500 font-mono text-[9px] uppercase py-0.5 flex items-center justify-center gap-1">
                                   <span>VS</span>
-                                  <div className="h-[1px] bg-slate-800 flex-1" />
                                 </div>
 
                                 {/* Right finalist block */}
                                 <div
                                   onClick={() => rightFinalist && handleSelectWinner('final', rightFinalist, [])}
-                                  className={`flex items-center justify-between p-2 rounded-xl border-2 transition-all ${
+                                  className={`flex items-center justify-between px-2 py-1 rounded-xl border-2 transition-all ${
                                     rightFinalist ? 'cursor-pointer hover:scale-102' : 'opacity-40'
                                   } ${
                                     champion === rightFinalist && rightFinalist
-                                      ? 'bg-emerald-600 border-black text-white font-black'
+                                      ? 'bg-[#10b981] border-black text-white font-black'
                                       : 'bg-white border-black text-black font-extrabold'
                                   }`}
-                                  style={{ minHeight: '44px' }}
+                                  style={{ minHeight: bracketViewMode === 'fit' && bracketActiveTab !== 'center' ? '28px' : '44px' }}
                                 >
                                   <span className="truncate flex items-center gap-1.5">
-                                    <span className="text-xl filter drop-shadow">{getFlagByName(rightFinalist)}</span>
-                                    <span className="uppercase text-[11px] truncate">{rightFinalist || 'Ganador Der.'}</span>
+                                    <span className="text-lg filter drop-shadow">{getFlagByName(rightFinalist)}</span>
+                                    <span className="uppercase text-[10px] truncate">{rightFinalist || 'Ganador Der.'}</span>
                                   </span>
-                                  {champion === rightFinalist && rightFinalist && <CheckCircle className="w-4 h-4 text-white" />}
+                                  {champion === rightFinalist && rightFinalist && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                                 </div>
                               </div>
                             );
@@ -792,29 +875,30 @@ export default function GroupsFixtureView({
                       {(() => {
                         const champion = bracketWinners['final'];
                         return (
-                          <div className="bg-gradient-to-br from-[#1c2e21] to-[#0a120d] border-4 border-black p-5 rounded-3xl text-center shadow-[6px_6px_0px_#000] w-full max-w-[240px] relative shrink-0">
+                          <div className={`bg-gradient-to-br from-[#1c2e21] to-[#0a120d] border-4 border-black rounded-3xl text-center shadow-[4px_4px_0px_#000] relative shrink-0 ${
+                            bracketViewMode === 'fit' && bracketActiveTab !== 'center' ? 'p-2 w-full max-w-full' : 'p-5 w-full max-w-[240px]'
+                          }`}>
                             {/* Inner comic tag */}
-                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white font-black font-mono text-[9px] px-3 py-1 rounded-md border-2 border-black uppercase tracking-wider skew-x-[-6deg]">
-                              👑 CAMPEÓN SUPREMO 👑
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-red-600 text-white font-black font-mono text-[9px] px-2 py-0.5 rounded-md border-2 border-black uppercase tracking-wider skew-x-[-6deg] whitespace-nowrap">
+                              👑 {bracketViewMode === 'fit' && bracketActiveTab !== 'center' ? 'CAMPEÓN' : 'CAMPEÓN SUPREMO'} 👑
                             </div>
 
-                            <div className="flex justify-center my-2">
-                              <Star className={`w-12 h-12 text-yellow-400 filter drop-shadow-[0_0_8px_rgba(250,204,21,0.5)] ${champion ? 'animate-bounce' : 'opacity-20'}`} />
-                            </div>
+                            {!(bracketViewMode === 'fit' && bracketActiveTab !== 'center') && (
+                              <div className="flex justify-center my-2">
+                                <Star className={`w-12 h-12 text-yellow-400 filter drop-shadow-[0_0_8px_rgba(250,204,21,0.5)] ${champion ? 'animate-bounce' : 'opacity-20'}`} />
+                              </div>
+                            )}
 
                             {champion ? (
                               <div className="space-y-1">
-                                <span className="text-4xl block animate-pulse">{getFlagByName(champion)}</span>
-                                <h4 className="text-base font-black text-white uppercase font-sans tracking-wide">
+                                <span className={`block animate-pulse ${bracketViewMode === 'fit' && bracketActiveTab !== 'center' ? 'text-2xl mt-1' : 'text-4xl'}`}>{getFlagByName(champion)}</span>
+                                <h4 className="text-xs font-black text-white uppercase font-sans tracking-wide">
                                   {champion}
                                 </h4>
-                                <p className="text-[10px] font-mono text-[#10B981] font-black uppercase tracking-widest">
-                                  ¡HÉROE DE LA GLORIA!
-                                </p>
                               </div>
                             ) : (
-                              <span className="text-[10px] text-slate-400 italic font-mono uppercase font-bold block leading-relaxed px-2">
-                                Selecciona ganadores para coronar al monarca de la copa
+                              <span className="text-[9px] text-slate-400 italic font-mono uppercase font-bold block leading-relaxed py-1">
+                                {bracketViewMode === 'fit' && bracketActiveTab !== 'center' ? 'Sin coronar' : 'Selecciona ganadores para coronar al monarca'}
                               </span>
                             )}
                           </div>
@@ -823,7 +907,11 @@ export default function GroupsFixtureView({
                     </div>
 
                     {/* COLUMN 8: Right Semifinal */}
-                    <div className={`col-span-1 space-y-4 flex flex-col justify-center ${bracketActiveTab === 'right' || bracketActiveTab === 'center' ? 'block' : 'hidden lg:block'}`}>
+                    <div className={
+                      bracketViewMode === 'fit'
+                        ? (bracketActiveTab === 'right' || bracketActiveTab === 'center' ? 'col-span-1 space-y-4 flex flex-col justify-center' : 'hidden')
+                        : `col-span-1 space-y-4 flex flex-col justify-center ${bracketActiveTab === 'right' || bracketActiveTab === 'center' ? 'block' : 'hidden lg:block'}`
+                    }>
                       <div className="text-center bg-black/80 border border-emerald-500 py-1 px-1.5 rounded-lg">
                         <span className="text-[9px] font-black text-emerald-400 uppercase font-mono tracking-wider">Semifinal Der</span>
                       </div>
@@ -834,35 +922,35 @@ export default function GroupsFixtureView({
                         const winner = bracketWinners['sf-R'];
 
                         return (
-                          <div className="bg-slate-900/50 border border-slate-850 p-2.5 rounded-xl space-y-2 relative">
+                          <div className="bg-slate-900/50 border border-slate-850 p-1.5 rounded-xl space-y-1.5 relative">
                             {/* Team A */}
                             <div
                               onClick={() => t1 && handleSelectWinner('sf-R', t1, ['final'])}
-                              className={`flex items-center justify-between p-2 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t1 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t1 && t1
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '36px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '36px' }}
                             >
-                              <span className="truncate">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Semifinalista R1'}</span>
+                              <span className="truncate text-[10px]">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Semifinalista R1'}</span>
                             </div>
 
                             {/* Team B */}
                             <div
                               onClick={() => t2 && handleSelectWinner('sf-R', t2, ['final'])}
-                              className={`flex items-center justify-between p-2 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t2 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t2 && t2
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '36px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '36px' }}
                             >
-                              <span className="truncate">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Semifinalista R2'}</span>
+                              <span className="truncate text-[10px]">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Semifinalista R2'}</span>
                             </div>
                           </div>
                         );
@@ -870,7 +958,11 @@ export default function GroupsFixtureView({
                     </div>
 
                     {/* COLUMN 9: Right Cuartos de Final */}
-                    <div className={`col-span-1 space-y-24 ${bracketActiveTab === 'right' ? 'block' : 'hidden lg:block'}`}>
+                    <div className={
+                      bracketViewMode === 'fit'
+                        ? (bracketActiveTab === 'right' ? 'col-span-1 space-y-8' : 'hidden')
+                        : `col-span-1 ${bracketActiveTab === 'right' ? 'block space-y-24' : 'hidden lg:block space-y-24'}`
+                    }>
                       <div className="text-center bg-black/80 border-2 border-yellow-500 py-1 px-1.5 rounded-lg mb-4">
                         <span className="text-[9px] font-black text-white uppercase font-mono tracking-wider">Cuartos Der</span>
                       </div>
@@ -884,37 +976,37 @@ export default function GroupsFixtureView({
                         const winner = bracketWinners[m.id];
 
                         return (
-                          <div key={m.id} className="bg-slate-900/50 border border-slate-800 p-2 rounded-xl space-y-2 relative">
+                          <div key={m.id} className="bg-slate-900/50 border border-slate-800 p-1.5 rounded-xl space-y-1.5 relative">
                             <span className="text-[8px] font-mono text-yellow-500 font-bold block uppercase font-mono">CUARTOS R{idx+1}</span>
                             
                             {/* Team A Slot */}
                             <div
                               onClick={() => t1 && handleSelectWinner(m.id, t1, m.dkeys)}
-                              className={`flex items-center justify-between p-1.5 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t1 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t1 && t1
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '34px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '34px' }}
                             >
-                              <span className="truncate">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Ganador'}</span>
+                              <span className="truncate text-[10px]">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Ganador'}</span>
                             </div>
 
                             {/* Team B Slot */}
                             <div
                               onClick={() => t2 && handleSelectWinner(m.id, t2, m.dkeys)}
-                              className={`flex items-center justify-between p-1.5 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t2 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t2 && t2
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '34px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '34px' }}
                             >
-                              <span className="truncate">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Ganador'}</span>
+                              <span className="truncate text-[10px]">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Ganador'}</span>
                             </div>
                           </div>
                         );
@@ -922,7 +1014,11 @@ export default function GroupsFixtureView({
                     </div>
 
                     {/* COLUMN 10: Right Octavos de Final */}
-                    <div className={`col-span-1 space-y-12 ${bracketActiveTab === 'right' ? 'block' : 'hidden lg:block'}`}>
+                    <div className={`col-span-1 ${
+                      bracketViewMode === 'fit'
+                        ? (bracketActiveTab === 'right' ? 'block space-y-4' : 'hidden')
+                        : (bracketActiveTab === 'right' ? 'block space-y-12' : 'hidden lg:block space-y-12')
+                    }`}>
                       <div className="text-center bg-black/80 border-2 border-indigo-600 py-1 px-1.5 rounded-lg mb-4">
                         <span className="text-[9px] font-black text-white uppercase font-mono tracking-wider">Octavos Der</span>
                       </div>
@@ -938,37 +1034,37 @@ export default function GroupsFixtureView({
                         const winner = bracketWinners[m.id];
 
                         return (
-                          <div key={m.id} className="bg-slate-900/50 border border-slate-800 p-2 rounded-xl space-y-2 relative">
+                          <div key={m.id} className="bg-slate-900/50 border border-slate-800 p-1.5 rounded-xl space-y-1.5 relative">
                             <span className="text-[8px] font-mono text-indigo-400 font-bold block uppercase">OCTAVOS R{idx+1}</span>
                             
                             {/* Team A Slot */}
                             <div
                               onClick={() => t1 && handleSelectWinner(m.id, t1, m.dkeys)}
-                              className={`flex items-center justify-between p-1.5 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t1 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t1 && t1
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '34px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '34px' }}
                             >
-                              <span className="truncate">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Ganador'}</span>
+                              <span className="truncate text-[10px]">{t1 ? `${getFlagByName(t1)} ${t1}` : '❓ Ganador'}</span>
                             </div>
 
                             {/* Team B Slot */}
                             <div
                               onClick={() => t2 && handleSelectWinner(m.id, t2, m.dkeys)}
-                              className={`flex items-center justify-between p-1.5 rounded-lg border text-[10px] transition-all ${
+                              className={`flex items-center justify-between p-1.5 rounded-lg border transition-all ${
                                 t2 ? 'cursor-pointer' : 'opacity-35'
                               } ${
                                 winner === t2 && t2
                                   ? 'bg-[#ef4444] border-black text-white font-black'
                                   : 'bg-white border-black text-black font-extrabold'
                               }`}
-                              style={{ minHeight: '34px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '34px' }}
                             >
-                              <span className="truncate">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Ganador'}</span>
+                              <span className="truncate text-[10px]">{t2 ? `${getFlagByName(t2)} ${t2}` : '❓ Ganador'}</span>
                             </div>
                           </div>
                         );
@@ -976,9 +1072,13 @@ export default function GroupsFixtureView({
                     </div>
 
                     {/* COLUMN 11: Right Round of 32 (Dieciseisavos) */}
-                    <div className={`col-span-2 space-y-4 ${bracketActiveTab === 'right' ? 'block' : 'hidden lg:block'}`}>
-                      <div className="text-center bg-black/80 border-2 border-red-600 py-1.5 px-3 rounded-xl mb-2">
-                        <span className="text-[10px] font-black text-white uppercase font-mono tracking-widest">Dieciseisavos Der.</span>
+                    <div className={
+                      bracketViewMode === 'fit'
+                        ? (bracketActiveTab === 'right' ? 'col-span-1 space-y-2' : 'hidden')
+                        : `col-span-2 space-y-4 ${bracketActiveTab === 'right' ? 'block' : 'hidden lg:block'}`
+                    }>
+                      <div className="text-center bg-black/80 border-2 border-red-600 py-1 px-1.5 rounded-lg mb-2">
+                        <span className="text-[9px] font-black text-white uppercase font-mono tracking-wider">Dieciseisavos Der</span>
                       </div>
                       
                       {[
@@ -993,24 +1093,28 @@ export default function GroupsFixtureView({
                       ].map((m, idx) => {
                         const winner = bracketWinners[m.id];
                         return (
-                          <div key={m.id} className="bg-slate-900/90 border-2 border-black p-2.5 rounded-2xl shadow-md space-y-1.5 relative group">
+                          <div key={m.id} className={`bg-slate-900/90 border-2 border-black rounded-2xl shadow-md relative group ${
+                            bracketViewMode === 'fit' ? 'p-1.5 space-y-1' : 'p-2.5 space-y-1.5'
+                          }`}>
                             <span className="text-[8px] font-mono font-bold text-red-500 block uppercase font-mono">LLAVE {idx+9}</span>
                             
                             {/* Team Local */}
                             <div 
-                              className={`flex items-center justify-between p-2 rounded-xl border-2 transition-all text-xs ${
+                              className={`flex items-center justify-between rounded-xl border-2 transition-all ${
                                 winner === m.l 
-                                  ? 'bg-red-600 border-black text-white font-black' 
+                                  ? 'bg-[#ef4444] border-black text-white font-black' 
                                   : 'bg-white border-black text-black font-extrabold'
+                              } ${
+                                bracketViewMode === 'fit' ? 'p-1' : 'p-2'
                               }`}
-                              style={{ minHeight: '44px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '44px' }}
                             >
                               <div 
                                 onClick={() => handleSelectWinner(m.id, m.l, [m.next, 'qf-R' + Math.ceil((idx+1)/4), 'sf-R', 'final'])}
-                                className="truncate flex items-center gap-1 cursor-pointer flex-1 py-1"
+                                className="truncate flex items-center gap-1 cursor-pointer flex-1 py-0.5"
                               >
                                 <span className="text-lg filter drop-shadow">{getFlagByName(m.l)}</span>
-                                <span className="uppercase tracking-tight text-[11px] truncate">{m.l}</span>
+                                <span className="uppercase tracking-tight text-[10px] truncate">{m.l}</span>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <input 
@@ -1029,27 +1133,29 @@ export default function GroupsFixtureView({
                                       }
                                     }));
                                   }}
-                                  className="w-8 h-7 bg-slate-100 text-black border-2 border-black font-mono text-[11px] text-center rounded outline-none font-bold"
+                                  className="w-7 h-6 bg-slate-100 text-black border border-black font-mono text-[10px] text-center rounded outline-none font-bold"
                                 />
                                 {winner === m.l && <CheckCircle className="w-3.5 h-3.5 text-white shrink-0" />}
                               </div>
                             </div>
-
+ 
                             {/* Team Visitante */}
                             <div 
-                              className={`flex items-center justify-between p-2 rounded-xl border-2 transition-all text-xs ${
+                              className={`flex items-center justify-between rounded-xl border-2 transition-all ${
                                 winner === m.v 
-                                  ? 'bg-red-600 border-black text-white font-black' 
+                                  ? 'bg-[#ef4444] border-black text-white font-black' 
                                   : 'bg-white border-black text-black font-extrabold'
+                              } ${
+                                bracketViewMode === 'fit' ? 'p-1' : 'p-2'
                               }`}
-                              style={{ minHeight: '44px' }}
+                              style={{ minHeight: bracketViewMode === 'fit' ? '28px' : '44px' }}
                             >
                               <div 
                                 onClick={() => handleSelectWinner(m.id, m.v, [m.next, 'qf-R' + Math.ceil((idx+1)/4), 'sf-R', 'final'])}
-                                className="truncate flex items-center gap-1 cursor-pointer flex-1 py-1"
+                                className="truncate flex items-center gap-1 cursor-pointer flex-1 py-0.5"
                               >
                                 <span className="text-lg filter drop-shadow">{getFlagByName(m.v)}</span>
-                                <span className="uppercase tracking-tight text-[11px] truncate">{m.v}</span>
+                                <span className="uppercase tracking-tight text-[10px] truncate">{m.v}</span>
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
                                 <input 
@@ -1068,7 +1174,7 @@ export default function GroupsFixtureView({
                                       }
                                     }));
                                   }}
-                                  className="w-8 h-7 bg-slate-100 text-black border-2 border-black font-mono text-[11px] text-center rounded outline-none font-bold"
+                                  className="w-7 h-6 bg-slate-100 text-black border border-black font-mono text-[10px] text-center rounded outline-none font-bold"
                                 />
                                 {winner === m.v && <CheckCircle className="w-3.5 h-3.5 text-white shrink-0" />}
                               </div>
