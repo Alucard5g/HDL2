@@ -4575,6 +4575,34 @@ export default function App() {
 
             {/* Body */}
             <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar text-center">
+              
+              {/* Premium Welcome Gift Highlight */}
+              <div className="bg-[#11221b] border-2 border-[#11b782] rounded-2xl p-4.5 text-left shadow-[4px_4px_0px_#000] relative overflow-hidden">
+                <div className="absolute top-0 right-0 bg-rose-600 text-white text-[8px] uppercase tracking-widest font-black px-2 py-0.5 border-b-2 border-l-2 border-black rounded-bl-lg">
+                  REGALO DE BIENVENIDA 🎁
+                </div>
+                <h4 className="text-xs font-sans font-black tracking-wide text-white uppercase mb-1">
+                  ¡Tu primera alineación va por nuestra cuenta! ⚽🏆
+                </h4>
+                <p className="text-[11px] text-slate-200 font-sans mb-3 leading-relaxed">
+                  En <strong>Héroes del Deporte</strong> queremos que empieces en lo más alto. Regístrate hoy mismo y reclama tu regalo de bienvenida:
+                </p>
+                <ul className="space-y-2 text-[11px] text-slate-300 font-sans">
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
+                    <span><strong>Desbloquea GRATIS</strong> el equipo que tú elijas.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
+                    <span><strong>Recibe su pack completo</strong> de cromos digitales para empezar a armar tu colección.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
+                    <span><strong>Elige a tus ídolos</strong>, sigue sus estadísticas y demuestra que eres el que más sabe de fútbol.</span>
+                  </li>
+                </ul>
+              </div>
+
               <p className="text-xs text-slate-300 leading-relaxed">
                 ¡Hola, fanático del fútbol! Te damos una cálida y amable bienvenida al <strong>desafío táctico definitivo</strong> de la Copa del Mundo 2026.
               </p>
@@ -4726,6 +4754,35 @@ export default function App() {
                       ⚡ Registrar Cuenta
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* Promotional Sign-Up Reward Reminder inside the form */}
+              {!isLoginMode && !isRecoveryMode && (
+                <div className="bg-[#11221b] border-2 border-[#11b782] rounded-2xl p-3.5 text-left shadow-[3px_3px_0px_rgba(0,0,0,1)] relative overflow-hidden">
+                  <div className="absolute top-0 right-0 bg-[#e11d48] text-white text-[7px] uppercase tracking-widest font-black px-1.5 py-0.5 border-b-2 border-l-2 border-black rounded-bl-lg">
+                    REGALO ⚽
+                  </div>
+                  <h5 className="text-[11px] font-bold text-[#FDDF2B] uppercase mb-1">
+                    ¡Tu primera alineación va por nuestra cuenta! ⚽🏆
+                  </h5>
+                  <p className="text-[10px] text-slate-300 leading-normal">
+                    En Héroes del Deporte queremos que empieces en lo más alto. Regístrate hoy mismo y reclama tu regalo de bienvenida:
+                  </p>
+                  <ul className="mt-2 space-y-1 text-[10px] text-slate-300">
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
+                      <span>Desbloquea GRATIS el equipo que tú elijas.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
+                      <span>Recibe su pack completo de cromos digitales para empezar a armar tu colección.</span>
+                    </li>
+                    <li className="flex items-start gap-1.5">
+                      <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
+                      <span>Elige a tus ídolos, sigue sus estadísticas y demuestra que eres el que más sabe de fútbol.</span>
+                    </li>
+                  </ul>
                 </div>
               )}
 
