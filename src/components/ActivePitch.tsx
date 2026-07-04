@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Player, UserTacticalBoard, Match, getCountryOfPlay } from '../types';
-import { Eye, Check, RefreshCw, Send, HelpCircle, Save, Info } from 'lucide-react';
+import { Eye, Check, RefreshCw, Send, HelpCircle, Save, Info, Sparkles } from 'lucide-react';
+import { DTAvatarRenderer } from './DTAvatarRenderer';
+import { ValeriaRenderer } from './ValeriaRenderer';
 
 function getSafeImageUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
@@ -16,6 +18,7 @@ interface ActivePitchProps {
   savedBoard: UserTacticalBoard | null;
   match: Match;
   onSave: (board: UserTacticalBoard) => void;
+  userAvatarConfig?: any;
 }
 
 // Coordinate blueprints for soccer positions based on selected formation
@@ -88,7 +91,7 @@ const FORMATIONS: {
   }
 };
 
-export default function ActivePitch({ country, players, savedBoard, match, onSave }: ActivePitchProps) {
+export default function ActivePitch({ country, players, savedBoard, match, onSave, userAvatarConfig }: ActivePitchProps) {
   const [formationKey, setFormationKey] = useState<string>(savedBoard?.formation || '4-3-3');
   const [selectedSpots, setSelectedSpots] = useState<{ [posLabel: string]: string | null }>(
     savedBoard?.selectedPlayers || {
@@ -431,6 +434,19 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
               </button>
             );
           })}
+
+          {/* DT Technical Area Sideline Coach Spot */}
+          <div className="absolute left-[6%] bottom-[13%] z-20 flex flex-col items-center">
+            <div className="p-1 bg-slate-950/95 rounded-2xl border-2 border-dashed border-emerald-500/50 flex flex-col items-center shadow-lg hover:border-emerald-400 transition-colors">
+              <DTAvatarRenderer config={userAvatarConfig} size={42} showAccessory={true} glow={true} />
+              <div className="mt-0.5 bg-slate-900 border border-slate-800 rounded px-1 text-[7.5px] font-bold text-[#10b981] uppercase tracking-wider text-center">
+                Área Técnica
+              </div>
+            </div>
+            <span className="text-[7.5px] text-white/50 uppercase font-mono mt-0.5 bg-black/40 px-1 rounded">
+              D.T. Convocado
+            </span>
+          </div>
         </div>
 
         <div className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-400 font-mono bg-slate-950/50 p-2.5 rounded-lg border border-slate-900">
@@ -441,6 +457,27 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
 
       {/* RIGHT: Selected slot detail & Forecast Form */}
       <div className="lg:col-span-5 flex flex-col gap-6">
+
+        {/* Valeria Tactical & Commercial Recommendation Banner */}
+        <div className="bg-gradient-to-r from-emerald-950/40 via-slate-900 to-emerald-950/40 border-2 border-emerald-500/30 rounded-3xl p-4.5 shadow-[4px_4px_0px_rgba(16,185,129,0.15)] relative overflow-hidden flex flex-col sm:flex-row items-center gap-4">
+          <div className="shrink-0 relative">
+            <ValeriaRenderer size={72} state="excited" className="animate-bounce-short" />
+            <span className="absolute -bottom-1 right-0 bg-emerald-500 text-slate-950 text-[7px] font-bold font-mono px-1 rounded uppercase tracking-wider">
+              Asistente AI
+            </span>
+          </div>
+          <div className="space-y-1.5 text-center sm:text-left">
+            <h5 className="text-xs font-black uppercase text-emerald-400 font-mono tracking-wider flex items-center justify-center sm:justify-start gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Sugerencia de Valeria
+            </h5>
+            <p className="text-[11px] text-slate-200 leading-relaxed">
+              ¿Sabías que puedes asegurar el liderato? Al adquirir tus <strong className="text-amber-300">Cromos Digitales Premium</strong> en la sección de compras, sumas instantáneamente <strong className="text-emerald-400">+5 puntos de score</strong> por país y <strong className="text-emerald-400">+15 puntos</strong> por región. 
+            </p>
+            <p className="text-[10px] text-slate-400 font-medium">
+              ¡Mejora tu alineación, sube vertiginosamente en el <strong className="text-amber-300">Ranking Oficial de DT</strong> y participa activamente por los fabulosos premios del torneo de Octavos de Final! 🏆✨
+            </p>
+          </div>
+        </div>
         
         {/* Active Placement Dialog */}
         {activeSlotSelection && (

@@ -48,7 +48,7 @@ export const TactikAiLogo: React.FC<TactikAiLogoProps> = ({
         {/* Text Container aligned with extreme comic novel style */}
         <div className="flex flex-col text-left">
           <div className="flex items-center gap-1 font-bangers tracking-wider uppercase leading-none">
-            <span className="text-2xl md:text-3xl font-extrabold text-[#FFFDEC] drop-shadow-[2.5px_2.5px_0px_#000] tracking-normal">
+            <span className="text-2xl md:text-3xl font-extrabold text-[#11b782] drop-shadow-[2.5px_2.5px_0px_#000] tracking-normal">
               HÉROES
             </span>
             {/* Styled "DEL DEPORTE" letters matching the glowing technology design */}

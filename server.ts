@@ -573,6 +573,7 @@ async function startServer() {
     score: z.number().min(0).optional(),
     subscription: z.string().optional(),
     avatar: z.string().optional(),
+    avatarConfig: z.any().optional(),
     licenseCode: z.string().optional(),
     email: z.string().email("Formato de correo electrónico inválido").or(z.literal("")).optional(),
     tacticalBoards: z.any().optional(),
@@ -1195,6 +1196,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     subscription: string;
     role: string;
     avatar: string;
+    avatarConfig?: any;
     licenseCode: string;
     createdAt: string;
     email?: string;
@@ -2087,9 +2089,20 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     return 0;
   }
 
+  // API Route: Check if email is already in use by another Director Técnico
+  app.get("/api/user/check-email", (req, res) => {
+    const { email } = req.query;
+    if (!email || typeof email !== "string") {
+      return res.json({ exists: false });
+    }
+    const emailLower = email.toLowerCase().trim();
+    const exists = REGISTERED_USERS.some(u => u.email && u.email.toLowerCase().trim() === emailLower);
+    res.json({ exists });
+  });
+
   // API 1.5: Sync User Profile & Game Information automatically with DB
   app.post("/api/user/sync", signupRateLimiter, validateBody(userSyncSchema), (req, res) => {
-    const { id, username, gameCode, unlockedLevels, aciertosOnce, aciertosMarcador, subscription, avatar, licenseCode, email, password, tacticalBoards, referredByEmail, invitedEmails, coins, cashBalance, adminSyncCounter } = req.body;
+    const { id, username, gameCode, unlockedLevels, aciertosOnce, aciertosMarcador, subscription, avatar, avatarConfig, licenseCode, email, password, tacticalBoards, referredByEmail, invitedEmails, coins, cashBalance, adminSyncCounter } = req.body;
     
     const userId = id || "user_me";
 
@@ -2137,6 +2150,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
           unlockedLevels: unlockedLevels !== undefined ? unlockedLevels : (existingUser.unlockedLevels || {}),
           tacticalBoards: tacticalBoards !== undefined ? { ...existingUser.tacticalBoards, ...tacticalBoards } : (existingUser.tacticalBoards || {}),
           avatar: avatar || existingUser.avatar || "👑",
+          avatarConfig: avatarConfig !== undefined ? avatarConfig : (existingUser.avatarConfig || {}),
           adminSyncCounter: serverCounter,
           password: password !== undefined ? password : (existingUser.password || ""),
           email: email !== undefined ? email : (existingUser.email || ""),
@@ -2169,6 +2183,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
           subscription: resolvedSubscription,
           role: isUserAdmin ? "admin" : (resolvedSubscription !== "Ninguna" ? "premium" : "user"),
           avatar: avatar || existingUser.avatar || "👑",
+          avatarConfig: avatarConfig !== undefined ? avatarConfig : (existingUser.avatarConfig || {}),
           licenseCode: resolvedLicense,
           email: email !== undefined ? email : (existingUser.email || ""),
           password: password !== undefined ? password : (existingUser.password || ""),
@@ -2196,6 +2211,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
         subscription: subscription || "Ninguna",
         role: finalRole,
         avatar: avatar || "👑",
+        avatarConfig: avatarConfig || {},
         licenseCode: licenseCode || "",
         createdAt: new Date().toISOString(),
         email: email || "",

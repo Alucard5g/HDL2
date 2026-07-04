@@ -81,6 +81,7 @@ export interface User {
   unlockedStickersCount: number; // Cantidad total de cromos desbloqueados (coincide con unlockedStickers.length)
   totalScore: number;       // Puntaje acumulado dinámico: (cantidad cromos * 1) + (países completos * 5)
   raffleEligibility?: '$1.000 USD (1er Lugar)' | '$500 USD (2do Lugar)' | '$250 USD (3er Lugar)' | 'Ninguno';
+  avatarConfig?: any;
 }
 
 export function getCountryOfPlay(clubStr: string): string {

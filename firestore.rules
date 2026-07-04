@@ -1,8 +1,98 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // 1. Default-deny safety net
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
+    }
+
+    // Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && 
+             request.auth.token.email_verified == true && 
+             (request.auth.token.email == "geovannygrk3d@gmail.com" || 
+              request.auth.token.email == "conscientizarte13@gmail.com");
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // User entity static validation
+    function isValidUser(data) {
+      return data.id is string &&
+             data.username is string &&
+             data.username.size() >= 1 &&
+             data.username.size() <= 100 &&
+             data.gameCode is string &&
+             data.gameCode.size() >= 3;
+    }
+
+    // 2. Collection Rules
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      
+      // Prevent standard user listing to preserve PII (email, password) and restrict user scraping
+      allow list: if isAdmin();
+
+      allow create: if isOwner(userId) && 
+                       isValidUser(request.resource.data) &&
+                       // Default sign-up guard rails to prevent self-assigned premium tiers/points
+                       request.resource.data.subscription == "Ninguna" &&
+                       request.resource.data.score == 0 &&
+                       (request.resource.data.role == "user" || !("role" in request.resource.data));
+
+      allow update: if (isOwner(userId) && 
+                       isValidUser(request.resource.data) &&
+                       // Strict Immutable Value Enforcement for system-controlled or wallet fields
+                       request.resource.data.subscription == resource.data.subscription &&
+                       request.resource.data.score == resource.data.score &&
+                       request.resource.data.coins == resource.data.coins &&
+                       request.resource.data.cashBalance == resource.data.cashBalance &&
+                       (!("role" in request.resource.data) || request.resource.data.role == resource.data.role) &&
+                       (!("licenseCode" in request.resource.data) || request.resource.data.licenseCode == resource.data.licenseCode))
+                       || isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    match /customStickers/{playerId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /customMatches/{matchId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /blogPosts/{postId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /suggestions/{suggestionId} {
+      // Anyone can submit suggestions (even guest users)
+      allow create: if request.resource.data.id == suggestionId &&
+                       request.resource.data.username is string &&
+                       request.resource.data.suggestion is string;
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /customSubscriptionCodes/{codeId} {
+      // Readable for verification by logged in players
+      allow get: if isSignedIn();
+      // Writing/listing restricted to administrators
+      allow list, write: if isAdmin();
     }
   }
 }

@@ -1,0 +1,228 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with their avatar, points, subscription plan, tactical board and game progress.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique user ID matching request.auth.uid"
+        },
+        "username": {
+          "type": "string",
+          "description": "User's selected display name"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "User's email address"
+        },
+        "password": {
+          "type": "string",
+          "description": "Optional encrypted or plain-text password for custom login"
+        },
+        "gameCode": {
+          "type": "string",
+          "description": "Unique 6-character game code like DT-2026"
+        },
+        "avatar": {
+          "type": "string",
+          "description": "Direct indicator or emoji representing current avatar"
+        },
+        "avatarConfig": {
+          "type": "object",
+          "description": "Custom configuration mapping for Hair, Face, Uniform, and Accessories"
+        },
+        "subscription": {
+          "type": "string",
+          "description": "Active subscription tier: Ninguna, Plan Scout Básico, Pase VIP Elite"
+        },
+        "score": {
+          "type": "integer",
+          "description": "Total accumulated tactical and album score points"
+        },
+        "aciertosOnce": {
+          "type": "integer",
+          "description": "Number of correct tactical alignment picks"
+        },
+        "aciertosMarcador": {
+          "type": "integer",
+          "description": "Number of exact match score prediction picks"
+        },
+        "coins": {
+          "type": "integer",
+          "description": "Virtual coins balance"
+        },
+        "cashBalance": {
+          "type": "number",
+          "description": "Virtual Ecuadorian simulated wallet cash balance"
+        },
+        "unlockedLevels": {
+          "type": "object",
+          "description": "Mapping of country name to unlocked levels (e.g. { Ecuador: { '1': true, '2': true, '3': true } })"
+        },
+        "completedCountries": {
+          "type": "array",
+          "description": "List of countries where all 26 stickers have been gathered"
+        },
+        "tacticalBoards": {
+          "type": "object",
+          "description": "Dynamic mapping of country tactical formations and predictions"
+        },
+        "licenseCode": {
+          "type": "string",
+          "description": "Premium serial license activation code"
+        },
+        "role": {
+          "type": "string",
+          "description": "Administrative authorization level: user or admin"
+        },
+        "referredByEmail": {
+          "type": "string",
+          "description": "Email of user who invited this player"
+        },
+        "invitedEmails": {
+          "type": "array",
+          "description": "List of emails this user has recommended"
+        },
+        "adminSyncCounter": {
+          "type": "integer",
+          "description": "Counter representing administrative synchronization edits"
+        }
+      },
+      "required": ["id", "username", "gameCode"]
+    },
+    "CustomStickers": {
+      "title": "CustomStickers",
+      "description": "Administrative overrides for player stickers generated dynamically with fal.ai",
+      "type": "object",
+      "properties": {
+        "imageUrl": {
+          "type": "string",
+          "description": "Direct fal.ai or proxy image URL"
+        }
+      },
+      "required": ["imageUrl"]
+    },
+    "CustomMatches": {
+      "title": "CustomMatches",
+      "description": "Administrative match results overrides with actual goals and status",
+      "type": "object",
+      "properties": {
+        "golesLocal": {
+          "type": "integer"
+        },
+        "golesVisitante": {
+          "type": "integer"
+        },
+        "jugado": {
+          "type": "boolean"
+        }
+      },
+      "required": ["golesLocal", "golesVisitante", "jugado"]
+    },
+    "BlogPosts": {
+      "title": "BlogPosts",
+      "description": "Dynamic blog and football news displayed on page footers",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "imageUrl": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "title", "content"]
+    },
+    "Suggestions": {
+      "title": "Suggestions",
+      "description": "User suggestions and contact logs sent to administration",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "suggestion": {
+          "type": "string"
+        },
+        "sentTo": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "reviewed"]
+        }
+      },
+      "required": ["id", "username", "suggestion", "sentTo"]
+    },
+    "CustomSubscriptionCodes": {
+      "title": "CustomSubscriptionCodes",
+      "description": "Serial codes generated by administrators to activate paid subscriptions",
+      "type": "object",
+      "properties": {
+        "planTier": {
+          "type": "string"
+        },
+        "isUsed": {
+          "type": "boolean"
+        },
+        "usedBy": {
+          "type": "string"
+        },
+        "usedAt": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": ["planTier", "isUsed", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and tactile album settings. Reads/writes are authorized based on uid ownership or admin role."
+    },
+    "/customStickers/{playerId}": {
+      "schema": "CustomStickers",
+      "description": "Admin sticker overrides. Publicly readable, writeable only by admins."
+    },
+    "/customMatches/{matchId}": {
+      "schema": "CustomMatches",
+      "description": "Admin match overrides. Publicly readable, writeable only by admins."
+    },
+    "/blogPosts/{postId}": {
+      "schema": "BlogPosts",
+      "description": "Admin blog posts. Publicly readable, writeable only by admins."
+    },
+    "/suggestions/{suggestionId}": {
+      "schema": "Suggestions",
+      "description": "User feedback. Publicly writeable (anyone can suggest), read/write restricted to admins."
+    },
+    "/customSubscriptionCodes/{codeId}": {
+      "schema": "CustomSubscriptionCodes",
+      "description": "Unused/Used promotion serial codes. Writeable only by admins, readable by logged in users for activation validations."
+    }
+  }
+}

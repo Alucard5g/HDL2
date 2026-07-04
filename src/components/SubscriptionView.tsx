@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { COUNTRIES } from '../data';
+import { DTAvatarRenderer, AvatarConfig } from './DTAvatarRenderer';
 
 const localStorage = (() => {
   try {
@@ -129,6 +130,9 @@ export default function SubscriptionView({
 
   // Warning when unregistered user clicks on any plan
   const [showUnregisteredAlert, setShowUnregisteredAlert] = useState<boolean>(false);
+
+  const [showGoldenGiftModal, setShowGoldenGiftModal] = useState<boolean>(false);
+  const [lastPurchasedDetails, setLastPurchasedDetails] = useState<{ name: string; price: string; contribution: string }>({ name: '', price: '', contribution: '' });
 
   // Charity & Social Impact Module States (Nutrición y Alfabetización Infantil)
   const [personalDonationTotal, setPersonalDonationTotal] = useState<number>(() => {
@@ -287,10 +291,10 @@ export default function SubscriptionView({
     },
     {
       id: 'Plan Scout Básico',
-      name: 'Plan de Suscripción Scout',
+      name: 'Paquete Scout — Pago Único',
       price: getPlanDetails('Plan Scout Básico').price,
-      period: 'Por Selección Individual',
-      desc: 'Compra cromos de selecciones individuales por $5 cada una. Cada selección acreditada te suma +5 puntos de score de DT y desbloquea el país completo.',
+      period: 'Pago Único (Sin Recurrencia)',
+      desc: 'Compra cromos de selecciones individuales por $5 cada una (pago único, sin cargos recurrentes). Cada selección acreditada te suma +5 puntos de score de DT y desbloquea el país completo.',
       features: [
         'Cuesta $5.00 por cada país/selección de tu elección 🎯',
         'Suma inmediata de +5 puntos de score a tu puntuación de DT 📈',
@@ -304,10 +308,10 @@ export default function SubscriptionView({
     },
     {
       id: 'Pase VIP Elite',
-      name: 'Pase VIP Elite (Suscripción VIP)',
+      name: 'Pase VIP Elite — Pago Único',
       price: getPlanDetails('Pase VIP Elite').price,
-      period: 'Por Continente Completo',
-      desc: 'Canjea los cromos de un continente a tu elección por $15. Cada canje de continente te acredita +15 puntos de score de DT y desbloquea todos sus países.',
+      period: 'Pago Único (Sin Recurrencia)',
+      desc: 'Canjea los cromos de un continente a tu elección por $15 (pago único, sin cargos recurrentes). Cada canje de continente te acredita +15 puntos de score de DT y desbloquea todos sus países.',
       features: [
         'Cuesta $15.00 por continente (América, Europa o África/Asia/Oceanía juntas) 🌍',
         'Suma inmediata de +15 puntos de score a tu puntuación de DT por cada continente canjeado 👑',
@@ -320,6 +324,24 @@ export default function SubscriptionView({
       color: 'border-amber-500 bg-amber-500/5 text-amber-400'
     }
   ];
+
+  const getAvatarConfig = (): AvatarConfig => {
+    try {
+      const saved = localStorage.getItem('dt_avatar_custom_config');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return {
+      avatarType: 'vector',
+      hair: 'punta',
+      face: 'determinado',
+      jersey: 'ecuador',
+      accessory: 'none'
+    };
+  };
 
   const handleApplyPromo = () => {
     setPromoError('');
@@ -335,14 +357,6 @@ export default function SubscriptionView({
   // Check registration and open either warning or billing modal
   const handlePlanSelection = (planId: string) => {
     if (planId === 'Ninguna') return;
-    
-    // Check if user is logged in / registered (non-guest account with real email)
-    const isUnregistered = currentUserId === 'user_me' || !userEmail || userEmail.trim() === '';
-    
-    if (isUnregistered) {
-      setShowUnregisteredAlert(true);
-      return;
-    }
 
     setPaymentError('');
     setCardName('');
@@ -357,6 +371,18 @@ export default function SubscriptionView({
     setCashCodeVal('');
     
     setShowPaymentModal(planId);
+  };
+
+  const triggerGoldenGiftSticker = (planTier: string) => {
+    const details = getPlanDetails(planTier);
+    const costAmount = details.amount || 5.00;
+    const contributionValue = (costAmount * 0.05).toFixed(2);
+    setLastPurchasedDetails({
+      name: planTier === 'Pase VIP Elite' ? `Continente ${selectedContinentToPurchase}` : `Selección ${selectedCountryToPurchase}`,
+      price: details.price,
+      contribution: `$${contributionValue}`
+    });
+    setShowGoldenGiftModal(true);
   };
 
   const executePaymentSubmit = async () => {
@@ -471,6 +497,7 @@ export default function SubscriptionView({
       onAddTransaction(transactionDesc, -coste, 'cash');
       onUpdateSubscription(showPaymentModal);
       
+      triggerGoldenGiftSticker(showPaymentModal);
       setSuccessMsg(`¡Canje de "${showPaymentModal}" activado con éxito! Se han descontado ${getPlanDetails(showPaymentModal).price} de tu saldo de cuenta y desbloqueado tus cromos.`);
       setShowPaymentModal(null);
       return;
@@ -543,12 +570,14 @@ export default function SubscriptionView({
           if (subData.status === 'success') {
             processPurchaseUnlocks(showPaymentModal);
             onUpdateSubscription(showPaymentModal);
+            triggerGoldenGiftSticker(showPaymentModal);
             setSuccessMsg(`¡Pago validado con éxito! Has canjeado "${showPaymentModal}". Tu ID de transacción es ${data.transactionId}.`);
             setShowPaymentModal(null);
           } else {
             // Simulated fallback client unlock
             processPurchaseUnlocks(showPaymentModal);
             onUpdateSubscription(showPaymentModal);
+            triggerGoldenGiftSticker(showPaymentModal);
             setSuccessMsg(`¡Pago de Payphone simulado con éxito! Has desbloqueado "${showPaymentModal}" y tus puntos.`);
             setShowPaymentModal(null);
           }
@@ -591,6 +620,7 @@ export default function SubscriptionView({
         const isTransfer = paymentGateway === 'transferencia';
         if (data.status === 'success') {
           onUpdateSubscription(showPaymentModal);
+          triggerGoldenGiftSticker(showPaymentModal);
           if (isTransfer) {
             setSuccessMsg(`¡Transferencia y Código Verificados! El comprobante al Banco de Guayaquil (#${referenceVal}) ha sido convalidado exitosamente con el código del administrador. Tu plan "${showPaymentModal}" se ha activado.`);
           } else {
@@ -598,6 +628,7 @@ export default function SubscriptionView({
           }
         } else {
           onUpdateSubscription(showPaymentModal);
+          triggerGoldenGiftSticker(showPaymentModal);
           if (isTransfer) {
             setSuccessMsg(`¡Transferencia y Código Verificados! El comprobante al Banco de Guayaquil (#${referenceVal}) ha sido convalidado exitosamente con el código del administrador. Tu plan "${showPaymentModal}" se ha activado.`);
           } else {
@@ -612,6 +643,7 @@ export default function SubscriptionView({
         let cost = getPlanDetails(showPaymentModal).amount;
         onAddTransaction(transactionDesc, -cost, 'cash');
         onUpdateSubscription(showPaymentModal);
+        triggerGoldenGiftSticker(showPaymentModal);
         setSuccessMsg(`¡Suscripción desbloqueada con éxito! Disfruta de tu plan premium "${showPaymentModal}" y tus puntos.`);
       } finally {
         setSubmittingPayment(false);
@@ -1693,6 +1725,77 @@ export default function SubscriptionView({
                 </p>
               </div>
 
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showGoldenGiftModal && (
+        <div className="fixed inset-0 z-[160] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 30 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-[#0c0f1d] border-4 border-amber-400 text-white rounded-3xl w-full max-w-md p-6 overflow-hidden shadow-[0_0_35px_rgba(234,179,8,0.35)] flex flex-col items-center relative text-center"
+          >
+            {/* Shimmer overlay effect */}
+            <div className="absolute top-2 left-2 text-amber-400 opacity-60"><Sparkles className="w-5 h-5 animate-pulse" /></div>
+            <div className="absolute top-2 right-2 text-amber-400 opacity-60"><Sparkles className="w-5 h-5 animate-spin" /></div>
+            
+            {/* Golden Header Badge */}
+            <div className="bg-gradient-to-r from-amber-500 to-yellow-300 text-slate-950 font-black text-[10px] uppercase tracking-widest px-4 py-1 rounded-full shadow border border-amber-200 mt-2 font-mono">
+              ★ REGALO EXCLUSIVO: CROMO GOLDEN ★
+            </div>
+
+            {/* The Actual Golden Cromo Box */}
+            <div className="my-6 relative bg-gradient-to-b from-amber-400/20 via-yellow-500/5 to-slate-950 border-3 border-amber-400 p-5 rounded-2xl w-full max-w-[280px] shadow-[0_10px_25px_rgba(234,179,8,0.2)] text-center relative overflow-hidden group">
+              {/* Inner glowing badge */}
+              <div className="absolute top-1 right-1 bg-amber-400 text-slate-950 font-black text-[8px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                GOLDEN DT
+              </div>
+
+              {/* Avatar renderer with golden halo */}
+              <div className="relative mx-auto w-36 h-36 flex items-center justify-center rounded-full bg-gradient-to-tr from-amber-400/30 via-slate-900/95 to-amber-500/30 p-1.5 border-2 border-amber-300 shadow-[0_0_20px_rgba(234,179,8,0.4)] overflow-hidden">
+                <DTAvatarRenderer config={getAvatarConfig()} size={120} glow={true} />
+              </div>
+
+              {/* Player / Hero Label */}
+              <h5 className="text-sm font-extrabold text-amber-300 uppercase tracking-wide mt-4 font-mono">
+                ¡HÉROE DEL DEPORTE!
+              </h5>
+              <div className="text-[10px] uppercase font-mono text-white/90 tracking-wider bg-amber-400/10 border border-amber-400/25 py-1 px-2.5 rounded-lg mt-1.5 inline-block">
+                Socio Colaborador
+              </div>
+
+              {/* Ribbon Seal */}
+              <div className="text-[8px] font-mono text-amber-400/80 mt-3 border-t border-amber-400/20 pt-2 flex items-center justify-center gap-1">
+                <Heart className="w-3 h-3 text-rose-500 fill-rose-500" /> Aporte del 5% del Canje
+              </div>
+            </div>
+
+            {/* Social Cause Explanation */}
+            <div className="space-y-3 px-2">
+              <h4 className="text-sm font-bold text-white uppercase tracking-wide">
+                ¡Gracias por tu contribución social!
+              </h4>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Con tu compra de <strong className="text-amber-300 font-bold">{lastPurchasedDetails.name}</strong> ({lastPurchasedDetails.price}), estás donando el <strong className="text-emerald-400 font-extrabold">5% ({lastPurchasedDetails.contribution})</strong> directamente para proyectos de ayuda social de la <span className="text-amber-300 font-black">Fundación Guerreros de Luz</span>.
+              </p>
+              <div className="bg-slate-950/80 border border-amber-400/30 p-2.5 rounded-xl flex items-center gap-2 text-left text-[10.5px] text-amber-200">
+                <Gift className="w-5 h-5 shrink-0 text-amber-400 animate-bounce" />
+                <span className="leading-normal font-medium">
+                  Gracias héroe del deporte, con tu contribución ayudas a proyectos de ayuda social para la fundación Guerreros de Luz. Este cromo dorado de edición especial es tuyo.
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="w-full mt-5 flex flex-col gap-2">
+              <button
+                onClick={() => setShowGoldenGiftModal(false)}
+                className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-[4px_4px_0px_#000] border-2 border-slate-950 active:translate-y-0.5 transition cursor-pointer"
+              >
+                Reclamar Cromo Dorado ✨
+              </button>
             </div>
           </motion.div>
         </div>

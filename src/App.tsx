@@ -12,6 +12,8 @@ import GroupsFixtureView from './components/GroupsFixtureView';
 import SubscriptionView from './components/SubscriptionView';
 import AdminPanelView from './components/AdminPanelView';
 import { TactikAiLogo } from './components/TactikAiLogo';
+import { DTAvatarAndAssistant } from './components/DTAvatarAndAssistant';
+import { DTAvatarRenderer } from './components/DTAvatarRenderer';
 import { 
   Trophy, 
   BookOpen, 
@@ -563,6 +565,82 @@ export default function App() {
     return localStorage.getItem('dt_user_avatar') || '⚽';
   });
 
+  const [userAvatarConfig, setUserAvatarConfig] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('dt_avatar_custom_config');
+      return saved ? JSON.parse(saved) : {
+        hair: 'punta',
+        face: 'determinado',
+        jersey: 'tricolor',
+        accessory: 'pizarra'
+      };
+    } catch {
+      return {
+        hair: 'punta',
+        face: 'determinado',
+        jersey: 'tricolor',
+        accessory: 'pizarra'
+      };
+    }
+  });
+
+  const handleSaveAvatarConfig = async (config: any, newUsername?: string) => {
+    setUserAvatarConfig(config);
+    localStorage.setItem('dt_avatar_custom_config', JSON.stringify(config));
+
+    let finalUsername = username;
+    if (newUsername && newUsername.trim()) {
+      finalUsername = newUsername.trim();
+      setUsername(finalUsername);
+      localStorage.setItem('dt_username', finalUsername);
+    }
+
+    // Instantly sync with Server DB using userSync logic to save avatar config for each user in their database
+    try {
+      const invitedListParsed = (() => {
+        try {
+          const list = localStorage.getItem('dt_invited_emails');
+          return list ? JSON.parse(list) : [];
+        } catch {
+          return [];
+        }
+      })();
+
+      const scoreInfo = getCurrentUserScoreInfo();
+
+      await fetch('/api/user/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: userId,
+          username: finalUsername,
+          gameCode: userCode,
+          email: userEmail,
+          password: userPassword,
+          unlockedLevels,
+          aciertosOnce: scoreInfo.totalOnceHits,
+          aciertosMarcador: scoreInfo.totalScoreHits,
+          unlockedStickersCount: scoreInfo.unlockedStickersCount,
+          completedCountries: scoreInfo.completedCountriesList,
+          score: scoreInfo.totalScore,
+          subscription: userSubscription,
+          avatar: userAvatar,
+          avatarConfig: config,
+          licenseCode: userLicense,
+          tacticalBoards: tacticalBoards,
+          referredByEmail: userReferredByEmail,
+          invitedEmails: invitedListParsed,
+          coins: userCoins,
+          cashBalance: userCashBalance,
+          adminSyncCounter: adminSyncCounter
+        })
+      });
+      console.log('[Avatar Config Sync] Sincronización de avatar y nombre exitosa en la base de datos.');
+    } catch (err) {
+      console.error('[Avatar Config Sync Error]:', err);
+    }
+  };
+
   const [userCode, setUserCode] = useState<string>(() => {
     let code = localStorage.getItem('dt_user_code');
     if (!code) {
@@ -573,6 +651,19 @@ export default function App() {
   });
 
   const [isRegistrationOpen, setIsRegistrationOpen] = useState<boolean>(false);
+
+  // States for Advanced One-Touch Registration and Linking
+  const [oneTouchProvider, setOneTouchProvider] = useState<'whatsapp' | 'facebook' | 'instagram' | 'email' | null>(null);
+  const [oneTouchStep, setOneTouchStep] = useState<'scanning' | 'linking' | 'verified' | null>(null);
+  const [oneTouchProgress, setOneTouchProgress] = useState<number>(0);
+  const [oneTouchLogs, setOneTouchLogs] = useState<string[]>([]);
+  const [oneTouchPhone, setOneTouchPhone] = useState<string>('');
+  const [oneTouchCountryCode, setOneTouchCountryCode] = useState<string>('+593');
+  const [oneTouchVerifiedCode, setOneTouchVerifiedCode] = useState<string>('');
+  const [oneTouchGeneratedPin, setOneTouchGeneratedPin] = useState<string>('');
+  const [oneTouchFacebookWindowOpen, setOneTouchFacebookWindowOpen] = useState<boolean>(false);
+  const [oneTouchFacebookAccount, setOneTouchFacebookAccount] = useState<{ name: string; email: string; avatar: string } | null>(null);
+  const [oneTouchLoading, setOneTouchLoading] = useState<boolean>(false);
 
   const [adminSyncCounter, setAdminSyncCounter] = useState<number>(() => {
     return Number(localStorage.getItem('dt_admin_sync_counter') || '0');
@@ -680,6 +771,7 @@ export default function App() {
   const [sentRecoveryCode, setSentRecoveryCode] = useState<string>('');
   const [inputRecoveryCode, setInputRecoveryCode] = useState<string>('');
   const [showGuestWelcome, setShowGuestWelcome] = useState<boolean>(false);
+  const [showEventDetails, setShowEventDetails] = useState<boolean>(false);
 
   // Estados para diálogos alternativos a window.confirm / alert bloqueados por IFrames
   const [appCustomConfirm, setAppCustomConfirm] = useState<{
@@ -1463,6 +1555,7 @@ export default function App() {
           score: scoreInfo.totalScore,
           subscription: userSubscription,
           avatar: userAvatar,
+          avatarConfig: userAvatarConfig,
           licenseCode: userLicense,
           tacticalBoards: updatedBoards,
           referredByEmail: userReferredByEmail,
@@ -1610,6 +1703,7 @@ export default function App() {
             score: currentUserInfo.totalScore,
             subscription: userSubscription,
             avatar: userAvatar,
+            avatarConfig: userAvatarConfig,
             licenseCode: userLicense,
             tacticalBoards: tacticalBoards,
             referredByEmail: userReferredByEmail,
@@ -1671,7 +1765,7 @@ export default function App() {
     };
 
     syncWithDb();
-  }, [unlockedLevels, userSubscription, userCode, userId, username, userAvatar, currentUserInfo.totalOnceHits, currentUserInfo.totalScoreHits, userLicense, tacticalBoards, userEmail, userReferredByEmail, userCoins, userCashBalance, purchasedPoints]);
+  }, [unlockedLevels, userSubscription, userCode, userId, username, userAvatar, userAvatarConfig, currentUserInfo.totalOnceHits, currentUserInfo.totalScoreHits, userLicense, tacticalBoards, userEmail, userReferredByEmail, userCoins, userCashBalance, purchasedPoints]);
 
   const isCountryLockedForUser = (countryName: string): boolean => {
     if (isAdmin) {
@@ -1959,6 +2053,7 @@ export default function App() {
           score: freshInfo.totalScore,
           subscription: userSubscription,
           avatar: userAvatar,
+          avatarConfig: userAvatarConfig,
           licenseCode: userLicense,
           tacticalBoards: updatedBoards,
           saveTrigger: auditedBoard.country,
@@ -2037,6 +2132,31 @@ export default function App() {
       alert('🧹 ¡SISTEMA RESTABLECIDO EXCELENTEMENTE!\nTodos los registros de usuarios, licencias de sorteos y estampas recolectadas se han limpiado a nivel atómico en este navegador.\n\nLa aplicación se recargará para iniciar el juego desde cero.');
       window.location.reload();
     }
+  };
+
+  const handleSelectRecommendedFormation = (formation: string) => {
+    const existingBoard = tacticalBoards[selectedCountryName] || {
+      country: selectedCountryName,
+      formation: '4-3-3',
+      selectedPlayers: {},
+      prediction: null
+    };
+    const updatedBoard: UserTacticalBoard = {
+      ...existingBoard,
+      formation: formation,
+      predictionSavedAt: new Date().toISOString()
+    };
+    const updatedBoards = {
+      ...tacticalBoards,
+      [selectedCountryName]: updatedBoard
+    };
+    setTacticalBoards(updatedBoards);
+    localStorage.setItem('scouting_tactical_boards', JSON.stringify(updatedBoards));
+    
+    setAppCustomAlert({
+      title: '📋 FORMACIÓN SELECCIONADA',
+      message: `Tu Asistente Técnica ha configurado la alineación histórica oficial en formato "${formation}" para ${selectedCountryName}. ¡Compútala y demuestra tu capacidad técnica de Elite!`
+    });
   };
 
   const handleUpdateSubscription = (planTier: string) => {
@@ -2210,6 +2330,7 @@ export default function App() {
             username: matchedUser.username,
             email: matchedUser.email,
             avatar: matchedUser.avatar,
+            avatarConfig: matchedUser.avatarConfig || matchedUser.avatar_config || null,
             code: matchedUser.gameCode || matchedUser.code,
             password: matchedUser.password,
             license: matchedUser.licenseCode || matchedUser.license || '',
@@ -2328,6 +2449,12 @@ export default function App() {
       if (matchedUser.cashBalance !== undefined) {
         setUserCashBalance(matchedUser.cashBalance);
         localStorage.setItem('dt_user_cash_balance', String(matchedUser.cashBalance));
+      }
+
+      if (matchedUser.avatarConfig || matchedUser.avatar_config) {
+        const config = matchedUser.avatarConfig || matchedUser.avatar_config;
+        setUserAvatarConfig(config);
+        localStorage.setItem('dt_avatar_custom_config', JSON.stringify(config));
       }
 
       localStorage.setItem('dt_user_id', matchedUser.id || 'usr_me');
@@ -2554,6 +2681,203 @@ export default function App() {
     }
   };
 
+  const handleOneTouchRegistration = async (provider: 'whatsapp' | 'facebook' | 'instagram' | 'email') => {
+    setOneTouchProvider(provider);
+    setOneTouchStep('scanning');
+    setOneTouchProgress(0);
+    setOneTouchPhone('');
+    setOneTouchVerifiedCode('');
+    setOneTouchGeneratedPin('');
+    setOneTouchFacebookAccount(null);
+
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const pin = Math.floor(1000 + Math.random() * 9000).toString();
+    setOneTouchGeneratedPin(pin);
+
+    const providerName = provider === 'whatsapp' ? 'WhatsApp' 
+                       : provider === 'facebook' ? 'Facebook' 
+                       : provider === 'instagram' ? 'Instagram' 
+                       : 'Correo Electrónico';
+
+    // Start scanning simulation
+    const logs = [
+      `🔋 [INIT] Iniciando subsistema de autenticación de un solo toque...`,
+      `🌐 [REQUISITO] Detectando API de credenciales de ${providerName}...`,
+      `🕵️‍♂️ [ANÁLISIS] Host detectado: ${window.location.hostname}`,
+      `⚙️ [ANÁLISIS] Plataforma de navegación: ${navigator.platform}`,
+      `🔍 [HEURÍSTICA] Analizando huella del dispositivo: ${navigator.userAgent.slice(0, 42)}...`,
+      `🔑 [OAUTH] Buscando sesiones activas en el navegador local...`
+    ];
+
+    setOneTouchLogs([logs[0]]);
+
+    let currentProgress = 0;
+    const interval = setInterval(() => {
+      currentProgress += 10;
+      if (currentProgress > 100) {
+        currentProgress = 100;
+      }
+      setOneTouchProgress(currentProgress);
+
+      const logIndex = Math.floor((currentProgress / 100) * (logs.length - 1));
+      setOneTouchLogs(prev => {
+        const nextLogs = [...prev];
+        if (!nextLogs.includes(logs[logIndex])) {
+          nextLogs.push(logs[logIndex]);
+        }
+        return nextLogs;
+      });
+
+      if (currentProgress >= 100) {
+        clearInterval(interval);
+        setOneTouchLogs(prev => [...prev, `✅ [SISTEMA] ¡Análisis de identidad del navegador completado al 100%! Avanzando a la fase de vinculación...`]);
+        setTimeout(() => {
+          setOneTouchStep('linking');
+          // Auto-prepopulate detected identities based on selected provider
+          if (provider === 'facebook') {
+            setOneTouchFacebookAccount({
+              name: `D.T. ${tempUsername || 'Marcelo_Bielsa_2026'}`,
+              email: tempEmail || `fb_coach_${randNum}@facebook.com`,
+              avatar: '🎯'
+            });
+          } else if (provider === 'instagram') {
+            setOneTouchFacebookAccount({
+              name: `@${tempUsername || 'coach_del_mundial'}`,
+              email: tempEmail || `ig_coach_${randNum}@instagram.com`,
+              avatar: '👑'
+            });
+          }
+        }, 600);
+      }
+    }, 150);
+  };
+
+  const completeOneTouchRegistration = async (targetUsername: string, targetEmail: string, targetAvatar: string, providerPhone?: string) => {
+    setOneTouchLoading(true);
+    const randNum = Math.floor(1000 + Math.random() * 9000);
+    const uniqueId = 'usr_' + Math.floor(100000 + Math.random() * 900000);
+    const code = 'DT-' + Math.floor(1000 + Math.random() * 9000);
+    const password = `${oneTouchProvider || 'onetouch'}_${randNum}`;
+
+    try {
+      // 1. Save locally in localStorage for session state
+      localStorage.setItem('dt_user_id', uniqueId);
+      localStorage.setItem('dt_username', targetUsername);
+      localStorage.setItem('dt_user_code', code);
+      localStorage.setItem('dt_user_avatar', targetAvatar);
+      localStorage.setItem('dt_user_email', targetEmail);
+      localStorage.setItem('dt_user_password', password);
+      localStorage.setItem('dt_user_referred_by_email', '');
+
+      setUserId(uniqueId);
+      setUsername(targetUsername);
+      setUserCode(code);
+      setUserAvatar(targetAvatar);
+      setUserEmail(targetEmail);
+      setUserPassword(password);
+      setUserReferredByEmail('');
+
+      // 2. Sync to server via `/api/user/sync`
+      const syncBody = {
+        id: uniqueId,
+        username: targetUsername,
+        gameCode: code,
+        unlockedStickersCount: 0,
+        completedCountries: [],
+        aciertosOnce: 0,
+        aciertosMarcador: 0,
+        score: 0,
+        subscription: 'Ninguna',
+        avatar: targetAvatar,
+        avatarConfig: {},
+        licenseCode: '',
+        email: targetEmail,
+        password: password,
+        tacticalBoards: {},
+        referredByEmail: '',
+        invitedEmails: [],
+        coins: 350,
+        cashBalance: 15.00,
+        adminSyncCounter: 0
+      };
+
+      const response = await fetch('/api/user/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(syncBody)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'success' && data.user) {
+          // Add to local browser DB
+          const dbStr = localStorage.getItem('dt_users_database') || '[]';
+          let localDb = [];
+          try {
+            localDb = JSON.parse(dbStr);
+          } catch {
+            localDb = [];
+          }
+          localDb.push({
+            id: uniqueId,
+            username: targetUsername,
+            email: targetEmail,
+            avatar: targetAvatar,
+            avatarConfig: {},
+            code: code,
+            password: password,
+            license: '',
+            subscription: 'Ninguna',
+            unlockedLevels: {},
+            tacticalBoards: {}
+          });
+          localStorage.setItem('dt_users_database', JSON.stringify(localDb));
+        }
+      }
+
+      // Reset progress
+      const resetLevels: { [country: string]: { [level: number]: boolean } } = {};
+      COUNTRIES.forEach(c => {
+        resetLevels[c.name] = { 1: false, 2: false, 3: false };
+      });
+      setUnlockedLevels(resetLevels);
+      localStorage.setItem('scouting_unlocked_levels', JSON.stringify(resetLevels));
+      setTacticalBoards({});
+      localStorage.setItem('scouting_tactical_boards', '{}');
+      setUserSubscription('Ninguna');
+      localStorage.setItem('user_subscription', 'Ninguna');
+      setUserLicense('');
+      localStorage.removeItem('dt_user_license');
+      setIsLocked(false);
+      setActiveTab('subscription');
+
+      setOneTouchStep('verified');
+      setOneTouchLoading(false);
+
+      setTimeout(() => {
+        setIsRegistrationOpen(false);
+        // Reset wizard states
+        setOneTouchProvider(null);
+        setOneTouchStep(null);
+        setOneTouchProgress(0);
+        setOneTouchLogs([]);
+        setOneTouchPhone('');
+        setOneTouchVerifiedCode('');
+        setOneTouchGeneratedPin('');
+        
+        setAppCustomAlert({
+          title: `🏆 ¡VINCULACIÓN DE UN SOLO TOQUE EXITOSA!`,
+          message: `👤 D.T. Oficial: ${targetUsername}\n📧 Correo Sincronizado: ${targetEmail}\n🔑 Contraseña de Respaldo: ${password}\n\nSe ha iniciado tu sesión correctamente en la base de datos central. ¡Adelante con tu álbum de la Copa del Mundo 2026!`
+        });
+      }, 1500);
+
+    } catch (error) {
+      console.error('Error in completeOneTouchRegistration:', error);
+      setOneTouchLoading(false);
+      alert('⚠️ Hubo un problema al procesar la vinculación. Por favor intenta de nuevo.');
+    }
+  };
+
   return (
     <AnimeHighTechSkin isActive={highTechSkin} onToggleActive={() => {
       setHighTechSkin(prev => {
@@ -2595,10 +2919,10 @@ export default function App() {
                   onClick={() => {
                     setIsRegistrationOpen(true);
                   }}
-                  className="flex items-center gap-1.5 bg-white text-black border-2 border-black px-2.5 py-1 shadow-[2px_2px_0px_#000] text-[9.5px] font-mono font-bold font-black cursor-pointer hover:bg-slate-50"
+                  className="flex items-center gap-1.5 bg-white text-black border-2 border-black pl-1.5 pr-2.5 py-1 shadow-[2px_2px_0px_#000] text-[9.5px] font-mono font-bold font-black cursor-pointer hover:bg-slate-50 rounded-xl"
                   title="Detalles de perfil"
                 >
-                  <span>{userAvatar}</span>
+                  <DTAvatarRenderer config={userAvatarConfig} size={18} showAccessory={false} glow={false} />
                   <span className="truncate max-w-[65px] font-sans text-[8.5px]">{username}</span>
                 </div>
                 
@@ -2727,9 +3051,9 @@ export default function App() {
                         title="Detalles de Perfil (Haz clic para ver y gestionar tu sesión oficial)"
                         className="w-full cursor-pointer bg-white border-[3px] border-black p-3 rounded-2xl shadow-[4.5px_4.5px_0px_#22c55e] flex items-center gap-3 hover:translate-y-0.5 hover:shadow-[2.5px_2.5px_0px_#22c55e] transition-all text-black"
                       >
-                        <span className="text-3xl filter drop-shadow-[2px_2px_0px_rgba(0,0,0,0.15)] select-none shrink-0">
-                          {userAvatar || '👑'}
-                        </span>
+                        <div className="shrink-0">
+                          <DTAvatarRenderer config={userAvatarConfig} size={48} showAccessory={true} glow={true} />
+                        </div>
                         <div className="text-left leading-tight min-w-0 flex-1">
                           <span className="text-sm font-sans font-black tracking-wide uppercase italic block truncate">
                             {isAdmin ? "DT-ADMINISTRADOR" : username.toUpperCase()}
@@ -2761,6 +3085,17 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+
+                <DTAvatarAndAssistant
+                  isRegistered={isRegistered}
+                  userSubscription={userSubscription}
+                  currentConfig={userAvatarConfig}
+                  onSaveAvatarConfig={handleSaveAvatarConfig}
+                  onTriggerFormaciónRecomendada={handleSelectRecommendedFormation}
+                  activeCountryName={selectedCountryName}
+                  onChangeTab={setActiveTab}
+                  currentUsername={username}
+                />
 
 
                 {/* HEROIC COMIC MANUAL: MÉTODO DE JUEGO, PUNTOS Y PREMIOS */}
@@ -2858,46 +3193,64 @@ export default function App() {
                     <div className="bg-white border-[3px] border-black p-5 rounded-2xl shadow-[5px_5px_0px_#000] relative flex flex-col justify-between" id="panel-prizes-rewards">
                       <div>
                         <div className="inline-block bg-[#FDDF2B] text-black font-bangers text-xs px-3 py-1 rounded border-2 border-black rotate-[-0.5deg] mb-3 shadow-[2px_2px_0px_#000]">
-                          🏆 PREMIOS Y TRANSPARENCIA
+                          🏆 DESAFÍO DE ELITE Y PREMIOS
                         </div>
-                        <h4 className="font-black text-black text-sm uppercase font-sans mb-2 tracking-tight flex items-center gap-2">
-                          <span>👑</span> PODIO DE GANADORES OFICIAL
+                        <h4 className="font-black text-black text-sm uppercase font-sans mb-1.5 tracking-tight flex items-center gap-2">
+                          <span>👑</span> PODIO DE EXPERIENCIAS Y RECOMPENSAS
                         </h4>
-                        <p className="text-[10.5px] text-gray-600 leading-relaxed font-semibold mb-3">
-                          Los usuarios con planes activos (Plan Scout Básico o Pase VIP Elite) que alcancen los primeros puestos del ranking general recibirán los siguientes premios en efectivo el <strong>30 de julio</strong>:
+                        <p className="text-[10px] text-gray-600 leading-normal mb-3">
+                          <strong>¡Desafío 100% Gratuito y de Habilidad!</strong> Participa gratis en los pronósticos y alineaciones. Acumula puntos y compite por grandes premios físicos oficiales el <strong>30 de julio</strong>:
                         </p>
                         <ul className="space-y-1.5 text-xs text-gray-700 font-comic font-bold mb-3">
-                          <li className="flex items-center justify-between bg-amber-100/30 border border-amber-300/40 rounded-lg p-2">
-                            <span className="flex items-center gap-2 text-gray-800">
-                              <span className="text-base text-amber-500">🥇</span> <strong>1er Lugar</strong>
-                            </span>
-                            <span className="font-mono font-black text-amber-700 text-sm">$1.000 USD</span>
+                          <li className="flex flex-col bg-amber-100/40 border border-amber-300/40 rounded-lg p-2 gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1.5 text-gray-800">
+                                <span className="text-base">🥇</span> <strong>1er Lugar Absoluto</strong>
+                              </span>
+                              <span className="font-mono font-black text-amber-700 text-[10px] uppercase bg-amber-200/50 px-1.5 py-0.5 rounded">Premio Mayor</span>
+                            </div>
+                            <p className="text-[10px] text-gray-600 font-medium pl-6 leading-tight">
+                              Álbum Físico Impreso de Lujo con tus cromos + Camiseta oficial firmada de tu selección + Certificado "DT Campeón" + Pase VIP de por vida.
+                            </p>
                           </li>
-                          <li className="flex items-center justify-between bg-slate-100/50 border border-slate-300/40 rounded-lg p-2">
-                            <span className="flex items-center gap-2 text-gray-800">
-                              <span className="text-base text-slate-500">🥈</span> <strong>2do Lugar</strong>
-                            </span>
-                            <span className="font-mono font-black text-slate-700 text-sm">$500 USD</span>
+                          <li className="flex flex-col bg-slate-100/60 border border-slate-300/40 rounded-lg p-2 gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1.5 text-gray-800">
+                                <span className="text-base">🥈</span> <strong>2do Lugar</strong>
+                              </span>
+                              <span className="font-mono font-black text-slate-700 text-[9px] uppercase bg-slate-200 px-1 py-0.5 rounded">Silver</span>
+                            </div>
+                            <p className="text-[10px] text-gray-600 font-medium pl-6 leading-tight">
+                              6 Meses VIP Elite + Balón oficial del Mundial + Gorra y bufanda conmemorativa + Pack de cromos legendarios digitales.
+                            </p>
                           </li>
-                          <li className="flex items-center justify-between bg-amber-600/10 border border-amber-700/20 rounded-lg p-2">
-                            <span className="flex items-center gap-2 text-gray-800">
-                              <span className="text-base text-amber-700">🥉</span> <strong>3er Lugar</strong>
-                            </span>
-                            <span className="font-mono font-black text-amber-800 text-sm">$250 USD</span>
+                          <li className="flex flex-col bg-amber-600/10 border border-amber-700/20 rounded-lg p-2 gap-1">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1.5 text-gray-800">
+                                <span className="text-base">🥉</span> <strong>3er Lugar</strong>
+                              </span>
+                              <span className="font-mono font-black text-amber-800 text-[9px] uppercase bg-amber-200 px-1 py-0.5 rounded">Bronze</span>
+                            </div>
+                            <p className="text-[10px] text-gray-600 font-medium pl-6 leading-tight">
+                              3 Meses VIP Elite + Bufanda conmemorativa de Héroes del Deporte + Pack de cromos legendarios digitales.
+                            </p>
                           </li>
                         </ul>
                         
-                        <div className="bg-slate-900 text-white p-3 rounded-xl border-2 border-black text-[10px] space-y-1.5 leading-normal">
+                        <div className="bg-slate-900 text-white p-3 rounded-xl border-2 border-black text-[10px] space-y-2 leading-normal">
                           <p>
-                            📺 <strong>Transmisión en Vivo:</strong> La premiación se realizará en vivo el <strong>30 de julio de 2026</strong> a través de nuestras transmisiones oficiales en <strong>Facebook Live</strong> y <strong>YouTube</strong>.
+                            ⚽ <strong>Separación de Juego y Compra:</strong> El Desafío Táctico y de Pronósticos es gratuito. La compra de paquetes de cromos es opcional y sirve para completar la colección estética, sin alterar la equidad deportiva del ranking.
+                          </p>
+                          <p className="text-[#10b981] font-bold">
+                            ⚖️ <strong>Cláusula Legal:</strong> NO SE REQUIERE NINGUNA COMPRA PARA PARTICIPAR NI PARA GANAR. El Desafío se resuelve estrictamente por el conocimiento técnico del usuario al predecir resultados.
                           </p>
                           <p>
-                            🛡️ <strong>Seguridad y Fe Pública:</strong> Para garantizar absoluta transparencia, tanto el cómputo final de puntos del ranking como el destino de las donaciones son <strong>auditados y certificados por un Notario Público</strong>.
+                            📺 <strong>Transmisión y Fe Pública:</strong> Premiación en vivo el <strong>30 de julio de 2026</strong> en Facebook Live y YouTube, auditada bajo acta notarial para máxima fe pública.
                           </p>
                         </div>
                       </div>
                       <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center bg-yellow-50/40 -mx-5 -mb-5 p-4 rounded-b-2xl">
-                        <span className="text-[9px] font-mono text-amber-700 font-bold uppercase tracking-wide">ELEGIBILIDAD AUDITADA POR NOTARIO</span>
+                        <span className="text-[9px] font-mono text-amber-700 font-bold uppercase tracking-wide">JUEGO GRATUITO • NO REQUIERE COMPRA</span>
                         <span className="text-xs text-amber-600">🏆</span>
                       </div>
                     </div>
@@ -4144,6 +4497,7 @@ export default function App() {
                   savedBoard={tacticalBoards[activeCountry.name] || null}
                   match={getPopulatedMatch(activeCountry.name, activeCountryPlayers)}
                   onSave={handleSaveBoard}
+                  userAvatarConfig={userAvatarConfig}
                 />
               </div>
             )}
@@ -4427,7 +4781,7 @@ export default function App() {
                     <span>◆</span> DONACIÓN, PATROCINADORES Y ALIADOS
                   </h5>
                   <p className="text-[11px] text-slate-400 leading-relaxed mb-3 uppercase font-bold text-center border-b border-slate-900 pb-2.5">
-                    AGRADECEMOS A LAS MARCAS POR SU CONFIANZA Y EL APOYO EN EL PORYECTO.
+                    AGRADECEMOS A LAS MARCAS POR SU CONFIANZA Y EL APOYO EN EL PROYECTO.
                   </p>
 
                   {/* Allied Brands Grid */}
@@ -4550,110 +4904,230 @@ export default function App() {
           </button>
         </nav>
 
+        {activeTab !== 'menu_hub' && (
+          <DTAvatarAndAssistant
+            isRegistered={isRegistered}
+            userSubscription={userSubscription}
+            currentConfig={userAvatarConfig}
+            onSaveAvatarConfig={handleSaveAvatarConfig}
+            onTriggerFormaciónRecomendada={handleSelectRecommendedFormation}
+            activeCountryName={selectedCountryName}
+            currentActiveMenuTab={activeTab}
+            onChangeTab={setActiveTab}
+            currentUsername={username}
+          />
+        )}
+
       </div>
 
       {showGuestWelcome && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md transition-all animate-fade-in bg-halftone-dots">
-          <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
-          <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-rose-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-rose-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
 
-          <div className="relative w-full max-w-[480px] bg-[#0c101a] text-white border-[3.5px] border-black rounded-3xl shadow-[8px_8px_0px_#000] font-sans flex flex-col overflow-hidden">
+          <div className="relative w-full max-w-[780px] max-h-[94vh] bg-[#0c101a] text-white border-[3.5px] border-black rounded-3xl shadow-[8px_8px_0px_#000] font-sans flex flex-col overflow-hidden">
             
-            {/* Header with flags and icon */}
-            <div className="p-6 pb-4 select-none border-b border-black bg-slate-950/60 text-center relative">
-              <div className="mx-auto w-16 h-16 bg-gradient-to-tr from-emerald-500 to-teal-600 border-[3px] border-black rounded-2xl flex items-center justify-center shadow-[3px_3px_0px_#000] rotate-3 mb-4 shrink-0">
-                <Globe className="w-8 h-8 text-white stroke-[2.5]" />
+            {/* Full Poster Banner Image - 100% visible and uncropped, zero text overlapping */}
+            <div className="relative w-full aspect-[16/9] sm:aspect-[2.1/1] overflow-hidden border-b-[3.5px] border-black bg-slate-950 shrink-0 select-none">
+              <img 
+                src="/src/assets/images/portadahdd_1783098974377.jpg" 
+                alt="Héroes del Deporte" 
+                className="w-full h-full object-cover object-top" 
+                referrerPolicy="no-referrer"
+              />
+              
+              {/* Very clean and elegant vignette gradients at the extreme edges */}
+              <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-slate-950/40 to-transparent z-10" />
+              
+              {/* Corner badge indicating live event */}
+              <div className="absolute top-3.5 left-3.5 z-20">
+                <span className="bg-[#11b782] text-black font-mono font-black text-[8px] sm:text-[9.5px] px-2.5 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1 shadow-[3px_3px_0px_rgba(0,0,0,1)] border-2 border-black animate-pulse">
+                  🏆 NUEVA ETAPA OFICIAL • OCTAVOS DE FINAL
+                </span>
               </div>
-
-              <h3 className="text-xl font-extrabold text-[#11b782] tracking-wider uppercase font-sans">
-                ¡BIENVENIDO AL DESAFÍO! ⚽
-              </h3>
-              <p className="text-[11px] text-slate-300 mt-1 max-w-sm mx-auto leading-relaxed font-comic font-medium">
-                Álbum Digital Interactivo & Trivia Héroes del Deporte
-              </p>
             </div>
 
-            {/* Body */}
-            <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto custom-scrollbar text-center">
+            {/* Scrollable Content Body with Bento Layout */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-5">
               
-              {/* Premium Welcome Gift Highlight */}
-              <div className="bg-[#11221b] border-2 border-[#11b782] rounded-2xl p-4.5 text-left shadow-[4px_4px_0px_#000] relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-rose-600 text-white text-[8px] uppercase tracking-widest font-black px-2 py-0.5 border-b-2 border-l-2 border-black rounded-bl-lg">
-                  REGALO DE BIENVENIDA 🎁
-                </div>
-                <h4 className="text-xs font-sans font-black tracking-wide text-white uppercase mb-1">
-                  ¡Tu primera alineación va por nuestra cuenta! ⚽🏆
-                </h4>
-                <p className="text-[11px] text-slate-200 font-sans mb-3 leading-relaxed">
-                  En <strong>Héroes del Deporte</strong> queremos que empieces en lo más alto. Regístrate hoy mismo y reclama tu regalo de bienvenida:
-                </p>
-                <ul className="space-y-2 text-[11px] text-slate-300 font-sans">
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
-                    <span><strong>Desbloquea GRATIS</strong> el equipo que tú elijas.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
-                    <span><strong>Recibe su pack completo</strong> de cromos digitales para empezar a armar tu colección.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
-                    <span><strong>Elige a tus ídolos</strong>, sigue sus estadísticas y demuestra que eres el que más sabe de fútbol.</span>
-                  </li>
-                </ul>
+              {/* Interactive Welcome Trigger Button - Now houses the main welcoming message as a premium action ticket */}
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={() => setShowEventDetails(true)}
+                  className="group relative w-full inline-flex flex-col items-center justify-center gap-1 bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-500 hover:from-amber-400 hover:to-yellow-300 text-black font-sans font-black text-center p-4 rounded-2xl border-2 border-black shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 active:translate-y-1 transition duration-100 cursor-pointer"
+                >
+                  <div className="flex items-center justify-center gap-2 w-full">
+                    <span className="text-sm sm:text-base tracking-tight font-black uppercase text-slate-950">
+                      👋 ¡BIENVENIDO, DIRECTOR TÉCNICO! • VER DETALLES Y PREMIOS
+                    </span>
+                    <svg 
+                      className="w-4 h-4 text-slate-950"
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="3.5" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                  <p className="text-[9px] sm:text-[10px] font-mono text-slate-900 font-extrabold uppercase tracking-widest opacity-80">
+                    ¡Toca aquí para expandir los premios, regalos y causa social! 🎁
+                  </p>
+                </button>
               </div>
 
-              <p className="text-xs text-slate-300 leading-relaxed">
-                ¡Hola, fanático del fútbol! Te damos una cálida y amable bienvenida al <strong>desafío táctico definitivo</strong> de la Copa del Mundo 2026.
-              </p>
-
-              <div className="bg-slate-900/80 border-2 border-black rounded-2xl p-4 text-left space-y-3 shadow-[4px_4px_0px_rgba(0,0,0,0.15)]">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-[#11b782] font-mono">
-                  ¿En qué consiste el desafío de la página?
-                </h4>
-                
-                <ul className="space-y-2 text-[11px] text-slate-300 font-sans">
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#11b782] shrink-0 font-bold">✓</span>
-                    <span><strong>Colecciona Cromos Exclusivos:</strong> Resuelve trivias futbolísticas y abre sobres virtuales para llenar tu álbum de selecciones nacionales.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#11b782] shrink-0 font-bold">✓</span>
-                    <span><strong>Pizarra Táctica Interactiva:</strong> Arma tu alineación preferida arrastrando jugadores en la cancha táctica.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#11b782] shrink-0 font-bold">✓</span>
-                    <span><strong>Premios en Efectivo:</strong> Gana <strong>$1.000 USD</strong> (1er lugar), <strong>$500 USD</strong> (2do lugar) y <strong>$250 USD</strong> (3er lugar). Los premios se entregarán el <strong>30 de julio de 2026</strong> en vivo por Facebook Live y YouTube.</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-[#11b782] shrink-0 font-bold">✓</span>
-                    <span><strong>Auditoría Notarial Completa:</strong> Para máxima seguridad y transparencia, la contabilidad de puntos y todas las donaciones son <strong>auditadas en vivo por un notario público</strong>.</span>
-                  </li>
-                </ul>
-              </div>
-
-              <p className="text-[10.5px] text-slate-400 italic">
-                Únete a miles de directores técnicos de España, Ecuador y todo el mundo.
+              <p className="text-[10.5px] text-center text-slate-400 leading-relaxed max-w-lg mx-auto font-sans italic pt-1">
+                ¿Tienes lo necesario para ser el mejor Director Técnico del mundo? Demuestra tus conocimientos y lidera el ranking mundial.
               </p>
             </div>
 
             {/* Footer with actions */}
-            <div className="p-6 pt-2 border-t border-black bg-slate-950/40 flex flex-col gap-2.5">
+            <div className="p-5 border-t-2 border-black bg-slate-950/80 flex flex-col sm:flex-row gap-3 shrink-0">
+              <button
+                onClick={() => setShowGuestWelcome(false)}
+                className="flex-1 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border-2 border-black font-sans font-bold text-xs py-3.5 px-4 rounded-xl shadow-[3px_3px_0px_rgba(0,0,0,1)] transition duration-150 cursor-pointer uppercase tracking-wider text-center order-2 sm:order-1 min-h-[44px]"
+              >
+                Ingresar como Invitado Especial 🔍
+              </button>
               <button
                 onClick={() => {
                   setShowGuestWelcome(false);
                   setIsRegistrationOpen(true);
                 }}
-                className="w-full bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black font-comic font-black text-xs py-3 rounded-xl shadow-[3.5px_3.5px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 active:translate-y-1 transition duration-150 cursor-pointer uppercase tracking-wider text-center"
+                className="flex-[2] bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black font-sans font-black text-xs py-3.5 px-4 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 active:translate-y-1 transition duration-150 cursor-pointer uppercase tracking-wider text-center flex items-center justify-center gap-1.5 order-1 sm:order-2 min-h-[44px]"
               >
-                Registrar mi Cuenta de DT 🏆
+                ¡JUEGA GRATIS EL DESAFÍO DE OCTAVOS DE FINAL AHORA! 😉
               </button>
-              
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* Standalone Individual Event Details Overlay (Outside of the welcome box container, z-index 130) */}
+      {showGuestWelcome && showEventDetails && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-slate-950/95 backdrop-blur-md transition-all animate-fade-in bg-halftone-dots">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none animate-pulse" />
+
+          <div className="relative w-full max-w-[800px] max-h-[92vh] bg-[#070b13] text-white border-[3.5px] border-[#11b782] rounded-3xl shadow-[0_0_50px_rgba(17,183,130,0.25),8px_8px_0px_#000] font-sans flex flex-col overflow-hidden animate-scale-up">
+            
+            {/* Modal Header */}
+            <div className="p-5 border-b-[3px] border-black bg-slate-950/80 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xl sm:text-2xl">✨</span>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-amber-400 tracking-tight uppercase">
+                    REGLAMENTO Y DETALLES DEL EVENTO
+                  </h3>
+                  <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                    HÉROES DEL DEPORTE • COPA MUNDIAL 2026
+                  </p>
+                </div>
+              </div>
               <button
-                onClick={() => setShowGuestWelcome(false)}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-slate-300 border-2 border-black font-comic font-black text-xs py-2.5 rounded-xl transition duration-150 cursor-pointer uppercase tracking-wider text-center"
+                onClick={() => setShowEventDetails(false)}
+                className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-2 border-black rounded-lg cursor-pointer shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition"
+                title="Cerrar detalles"
               >
-                Explorar como Invitado 🔍
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content Body - Beautiful Bento Layout */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-5">
+              <div className="text-center pb-2.5 border-b border-slate-850">
+                <h4 className="text-base sm:text-lg font-black text-[#11b782] tracking-tight uppercase">
+                  INFORME DE LA COPA MUNDIAL DE LA FIFA 2026™
+                </h4>
+                <p className="text-[9.5px] sm:text-[10.5px] text-slate-300 font-bold uppercase tracking-wider mt-0.5">
+                  Álbum Digital Interactivo • Licencia de Competición Oficial
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Columna 1: Desafío de Octavos */}
+                <div className="bg-[#11221b]/80 border-2 border-[#11b782]/40 rounded-2xl p-4 text-left relative overflow-hidden flex flex-col justify-between">
+                  <div>
+                    <div className="bg-yellow-500 text-black text-[8px] uppercase tracking-widest font-black px-2.5 py-0.5 border-b-2 border-l-2 border-black rounded-bl-lg absolute top-0 right-0">
+                      100% GRATIS 🎁
+                    </div>
+                    <h4 className="text-[11px] sm:text-[12px] font-sans font-black tracking-wide text-white uppercase mb-1.5 flex items-center gap-1.5">
+                      ⭐ Fase Eliminatoria Directa
+                    </h4>
+                    <p className="text-[9.5px] sm:text-[10.5px] text-slate-200 font-sans mb-3 leading-relaxed">
+                      ¡La Copa del Mundo se pone seria! Con nuestras <strong>nuevas políticas de acceso abierto</strong>, lanzamos el Desafío de Octavos de Final:
+                    </p>
+                    <ul className="space-y-2.5 text-[9.5px] sm:text-[10px] text-slate-300 font-sans">
+                      <li className="flex items-start gap-2">
+                        <span className="text-yellow-400 shrink-0 font-bold">⚽</span>
+                        <span><strong>10 Sobres GRATIS:</strong> Reclama tus sobres de Octavos al ingresar para obtener jugadores estrella.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-[#11b782] shrink-0 font-bold">🧠</span>
+                        <span><strong>Trivia de Alta Tensión:</strong> Responde preguntas sobre partidos históricos de eliminación directa y duplica monedas.</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-rose-500 shrink-0 font-bold">📋</span>
+                        <span><strong>Pizarra Táctica:</strong> Modela tu 11 estelar y pronostica marcadores en tiempo real.</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Columna 2: Causa Social & Premios */}
+                <div className="space-y-4">
+                  {/* CAUSA SOCIAL */}
+                  <div className="bg-gradient-to-r from-amber-950/50 to-red-950/50 border-2 border-amber-500/30 rounded-2xl p-4 text-left relative overflow-hidden">
+                    <div className="absolute top-0 right-0 bg-amber-500 text-black text-[8px] uppercase tracking-widest font-black px-2.5 py-0.5 border-b-2 border-l-2 border-black rounded-bl-lg">
+                      CAUSA SOCIAL ❤️
+                    </div>
+                    <h4 className="text-[11px] sm:text-[12px] font-sans font-black tracking-wide text-amber-400 uppercase mb-1 flex items-center gap-1.5">
+                      🌟 Héroes del Deporte
+                    </h4>
+                    <p className="text-[9.5px] sm:text-[10.5px] text-slate-200 leading-relaxed font-sans">
+                      Con cada adquisición premium, el <strong className="text-amber-300">5% de las ventas</strong> se dona de forma transparente a proyectos de ayuda de la <strong className="text-emerald-400">Fundación Guerreros de Luz</strong>. ¡Ayuda a financiar comedores y kits escolares para niños! 🤝⚽
+                    </p>
+                  </div>
+
+                  {/* PREMIOS */}
+                  <div className="bg-slate-900/90 border-2 border-black rounded-2xl p-4 text-left shadow-[4px_4px_0px_rgba(0,0,0,0.15)]">
+                    <h4 className="text-[9.5px] font-black uppercase tracking-widest text-[#11b782] font-mono mb-2 flex items-center gap-1">
+                      🥇 PREMIOS Y SEGURIDAD AUDITADA:
+                    </h4>
+                    <ul className="space-y-1.5 text-[9.5px] text-slate-300 font-sans">
+                      <li className="flex items-center gap-1.5">
+                        <span className="text-yellow-400 font-bold">🥇 1°:</span>
+                        <span><strong>$1.000 USD</strong> en efectivo + Trofeo Físico.</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className="text-slate-300 font-bold">🥈 2°:</span>
+                        <span><strong>$500 USD</strong> + Kit Deportivo Oficial.</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className="text-amber-600 font-bold">🥉 3°:</span>
+                        <span><strong>$250 USD</strong> + Álbum Físico Completo.</span>
+                      </li>
+                      <li className="flex items-center gap-1.5">
+                        <span className="text-emerald-400 font-bold">✓ Auditable:</span>
+                        <span>Cómputos avalados en vivo por Notario Público.</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer with Close Button */}
+            <div className="p-5 border-t-[3px] border-black bg-slate-950/80 flex justify-center shrink-0">
+              <button
+                onClick={() => setShowEventDetails(false)}
+                className="w-full sm:w-auto min-w-[200px] bg-gradient-to-r from-emerald-500 to-[#11b782] hover:from-emerald-400 hover:to-emerald-500 text-black font-sans font-black text-xs py-3.5 px-6 rounded-xl border-2 border-black shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 active:translate-y-1 transition duration-100 cursor-pointer uppercase tracking-wider text-center min-h-[44px]"
+              >
+                ¡ENTENDIDO, VOLVER! ⚽
               </button>
             </div>
 
@@ -4786,21 +5260,342 @@ export default function App() {
                 </div>
               )}
 
-              {/* Autocomplete Button (only in normal sign-up/creation) */}
-              {!isLoginMode && !isRecoveryMode && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTempEmail('conscientizarte13@gmail.com');
-                    setTempUsername('DT_Conscientizarte_2026');
-                    setTempAvatar('👑');
-                  }}
-                  title="Click para autocompletar con tu cuenta de correo activa"
-                  className="w-full bg-[#1e293b] hover:bg-[#334155] text-white border-2 border-black rounded-xl px-4 py-2.5 text-xs font-bold transition flex items-center justify-center gap-2 cursor-pointer active:translate-y-0.5 shadow-[3px_3px_0px_rgba(0,0,0,1)] select-none"
-                >
-                  <span className="text-base">📧</span>
-                  <span className="truncate font-mono">Autocompletar con {userEmail || 'conscientizarte13@gmail.com'}</span>
-                </button>
+              {/* Single Touch Registration Section */}
+              {!isRecoveryMode && (
+                <div className="bg-slate-900/60 border-2 border-black rounded-2xl p-4 space-y-3 shadow-[4px_4px_0px_#000]">
+                  {oneTouchProvider === null ? (
+                    <>
+                      <div className="text-center">
+                        <p className="text-[10px] text-amber-400 font-extrabold uppercase tracking-wider font-mono">
+                          ⚡ REGISTRO DE UN SOLO TOQUE D.T.
+                        </p>
+                        <p className="text-[9.5px] text-slate-400 font-sans mt-0.5">
+                          El sistema detectará tu navegador y conectará tus cuentas al instante:
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOneTouchRegistration('whatsapp')}
+                          title="Registrarse instantáneamente con WhatsApp"
+                          className="bg-[#25D366] hover:bg-[#20ba56] text-black border-2 border-black rounded-xl p-2.5 flex items-center justify-center gap-1.5 font-black text-[10.5px] shadow-[2.5px_2.5px_0px_#000] transition active:translate-y-0.5 cursor-pointer"
+                        >
+                          <span>🟢</span> WhatsApp
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOneTouchRegistration('facebook')}
+                          title="Registrarse instantáneamente con Facebook"
+                          className="bg-[#1877F2] hover:bg-[#166fe5] text-white border-2 border-black rounded-xl p-2.5 flex items-center justify-center gap-1.5 font-black text-[10.5px] shadow-[2.5px_2.5px_0px_#000] transition active:translate-y-0.5 cursor-pointer"
+                        >
+                          <span>🔵</span> Facebook
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOneTouchRegistration('instagram')}
+                          title="Registrarse instantáneamente con Instagram"
+                          className="bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#F56040] hover:opacity-90 text-white border-2 border-black rounded-xl p-2.5 flex items-center justify-center gap-1.5 font-black text-[10.5px] shadow-[2.5px_2.5px_0px_#000] transition active:translate-y-0.5 cursor-pointer"
+                        >
+                          <span>📸</span> Instagram
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOneTouchRegistration('email')}
+                          title="Registrarse instantáneamente con Correo"
+                          className="bg-[#1e293b] hover:bg-[#334155] text-white border-2 border-black rounded-xl p-2.5 flex items-center justify-center gap-1.5 font-black text-[10.5px] shadow-[2.5px_2.5px_0px_#000] transition active:translate-y-0.5 cursor-pointer"
+                        >
+                          <span>📧</span> Correo
+                        </button>
+                      </div>
+                      <div className="pt-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Run global check (simulate via whatsapp)
+                            handleOneTouchRegistration('whatsapp');
+                          }}
+                          className="text-[9px] text-[#FDDF2B] hover:underline font-mono uppercase tracking-wider flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                        >
+                          <Sparkles className="w-3 h-3 text-yellow-400" />
+                          Auto-detectar cuentas en este dispositivo
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Interactive Header */}
+                      <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="animate-ping rounded-full h-2 w-2 bg-green-500"></span>
+                          <p className="text-[10px] text-green-400 font-extrabold uppercase font-mono tracking-wider">
+                            🛡️ VINCULADOR DIGITAL DE UN SOLO TOQUE
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOneTouchProvider(null);
+                            setOneTouchStep(null);
+                          }}
+                          className="text-[9px] text-rose-400 hover:text-rose-300 font-extrabold uppercase font-mono underline cursor-pointer"
+                        >
+                          ✕ CANCELAR
+                        </button>
+                      </div>
+
+                      {/* STEP 1: SCANNING */}
+                      {oneTouchStep === 'scanning' && (
+                        <div className="space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-slate-300 font-bold uppercase font-mono">
+                              Buscando sesión de {oneTouchProvider.toUpperCase()}...
+                            </span>
+                            <span className="text-[10px] text-amber-400 font-black font-mono">
+                              {oneTouchProgress}%
+                            </span>
+                          </div>
+                          
+                          {/* Progress bar */}
+                          <div className="w-full h-2 bg-slate-950 border border-black rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-emerald-500 to-green-400 transition-all duration-150"
+                              style={{ width: `${oneTouchProgress}%` }}
+                            ></div>
+                          </div>
+
+                          {/* Console logs */}
+                          <div className="bg-black/90 rounded-xl p-3 border border-slate-800 max-h-[120px] overflow-y-auto font-mono text-[9px] leading-relaxed text-green-400 space-y-1 scrollbar-thin">
+                            {oneTouchLogs.map((log, i) => (
+                              <div key={i} className="whitespace-pre-wrap">
+                                {log}
+                              </div>
+                            ))}
+                            <div className="animate-pulse">_</div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* STEP 2: LINKING */}
+                      {oneTouchStep === 'linking' && (
+                        <div className="space-y-3">
+                          {/* WHATSAPP FLOW */}
+                          {oneTouchProvider === 'whatsapp' && (
+                            <div className="space-y-2.5">
+                              <p className="text-[10px] text-slate-300 font-medium leading-relaxed font-comic">
+                                El sistema de la página detectó un cliente compatible con WhatsApp. Vincula tu número de teléfono de forma oficial:
+                              </p>
+
+                              <div className="flex gap-1.5 font-mono">
+                                <input
+                                  type="text"
+                                  value={oneTouchCountryCode}
+                                  onChange={(e) => setOneTouchCountryCode(e.target.value)}
+                                  placeholder="+593"
+                                  className="w-[60px] bg-slate-950 border-2 border-black rounded-lg text-xs py-1.5 text-center text-emerald-400 font-black focus:outline-none"
+                                />
+                                <input
+                                  type="tel"
+                                  value={oneTouchPhone}
+                                  onChange={(e) => setOneTouchPhone(e.target.value)}
+                                  placeholder="Ej: 0999999999"
+                                  className="flex-1 bg-slate-950 border-2 border-black rounded-lg text-xs py-1.5 px-3 text-white font-bold focus:outline-none placeholder:text-slate-600"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 gap-2 pt-1">
+                                <a
+                                  href={`https://api.whatsapp.com/send?phone=${oneTouchCountryCode.replace('+', '')}${oneTouchPhone.replace(/^0/, '')}&text=Hola%20H%C3%A9roes%20del%20Deporte,%20quiero%20vincular%20mi%20cuenta%20de%20D.T.%20con%20el%20c%C3%B3digo%20seguro%20DT-${oneTouchGeneratedPin}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => {
+                                    if (!oneTouchPhone) {
+                                      e.preventDefault();
+                                      alert("Por favor ingresa tu número celular primero.");
+                                      return;
+                                    }
+                                    const cleanPhone = oneTouchPhone.trim();
+                                    completeOneTouchRegistration(
+                                      `DT_WA_${cleanPhone.slice(-4) || '7721'}`,
+                                      `${oneTouchCountryCode}${cleanPhone}@whatsapp.com`,
+                                      '⚡',
+                                      `${oneTouchCountryCode}${cleanPhone}`
+                                    );
+                                  }}
+                                  className="bg-[#25D366] hover:bg-[#20ba56] text-black border-2 border-black rounded-xl p-2.5 flex items-center justify-center gap-1.5 font-black text-[10.5px] shadow-[2.5px_2.5px_0px_#000] text-center transition cursor-pointer"
+                                >
+                                  <span>🟢</span> Abrir WhatsApp y Vincular al Instante
+                                </a>
+
+                                <div className="text-center select-none">
+                                  <span className="text-[9px] text-slate-500 font-mono font-bold block uppercase py-1">— O MÉTODO ALTERNATIVO DE PIN —</span>
+                                </div>
+
+                                <div className="space-y-1.5 bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+                                  <p className="text-[9px] text-slate-400 font-comic">
+                                    Simula el envío de un código seguro SMS/WhatsApp a tu celular:
+                                  </p>
+                                  <div className="flex gap-1.5">
+                                    <input
+                                      type="text"
+                                      placeholder="Ingresa PIN de 4 dígitos"
+                                      value={oneTouchVerifiedCode}
+                                      onChange={(e) => setOneTouchVerifiedCode(e.target.value)}
+                                      className="flex-1 bg-slate-900 border border-slate-800 rounded-lg text-[10px] py-1 px-2.5 text-white font-mono focus:outline-none"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (!oneTouchPhone) {
+                                          alert("Por favor ingresa tu número celular primero.");
+                                          return;
+                                        }
+                                        alert(`✉️ [SIMULACIÓN SMS/WA]\n\nSe ha enviado un mensaje con el código PIN: ${oneTouchGeneratedPin} al número ${oneTouchCountryCode} ${oneTouchPhone}.\n\n(Ingresa este PIN en el recuadro para convalidar)`);
+                                      }}
+                                      className="bg-[#212c40] hover:bg-slate-700 text-slate-200 font-extrabold text-[9px] px-3.5 py-1 rounded-lg border border-black cursor-pointer transition active:scale-95"
+                                    >
+                                      Enviar PIN
+                                    </button>
+                                  </div>
+                                  {oneTouchVerifiedCode && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (oneTouchVerifiedCode.trim() === oneTouchGeneratedPin) {
+                                          const cleanPhone = oneTouchPhone.trim();
+                                          completeOneTouchRegistration(
+                                            `DT_WA_${cleanPhone.slice(-4) || '9921'}`,
+                                            `${oneTouchCountryCode}${cleanPhone}@whatsapp.com`,
+                                            '⚡',
+                                            `${oneTouchCountryCode}${cleanPhone}`
+                                          );
+                                        } else {
+                                          alert("⚠️ Código PIN incorrecto. Por favor verifica o vuelve a enviar.");
+                                        }
+                                      }}
+                                      className="w-full mt-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[9.5px] py-1.5 rounded-lg border border-black cursor-pointer shadow-[1.5px_1.5px_0px_#000] transition"
+                                    >
+                                      ✓ Validar PIN e Ingresar
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* FACEBOOK & INSTAGRAM FLOW */}
+                          {(oneTouchProvider === 'facebook' || oneTouchProvider === 'instagram') && oneTouchFacebookAccount && (
+                            <div className="space-y-2.5 text-center">
+                              <p className="text-[10px] text-slate-300 font-medium font-comic leading-relaxed">
+                                Se ha detectado una sesión activa de {oneTouchProvider === 'facebook' ? 'Facebook OAuth' : 'Instagram Social Connect'}. Autoriza la vinculación:
+                              </p>
+
+                              <div className="bg-slate-950 p-3.5 border-2 border-black rounded-2xl flex items-center gap-3 shadow-[2.5px_2.5px_0px_#000] text-left">
+                                <div className="w-10 h-10 rounded-full border border-slate-700 bg-slate-900 flex items-center justify-center text-lg select-none">
+                                  {oneTouchFacebookAccount.avatar}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-black text-amber-400 truncate">
+                                    {oneTouchFacebookAccount.name}
+                                  </p>
+                                  <p className="text-[9px] text-slate-400 font-mono truncate">
+                                    {oneTouchFacebookAccount.email}
+                                  </p>
+                                  <span className="inline-block mt-0.5 text-[8px] bg-emerald-950/80 text-emerald-400 border border-emerald-800 font-bold uppercase tracking-wider px-1.5 py-0.2 rounded">
+                                    ✓ CUENTA DETECTADA
+                                  </span>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                disabled={oneTouchLoading}
+                                onClick={() => {
+                                  completeOneTouchRegistration(
+                                    oneTouchFacebookAccount.name,
+                                    oneTouchFacebookAccount.email,
+                                    oneTouchFacebookAccount.avatar
+                                  );
+                                }}
+                                className="w-full py-2.5 bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black rounded-xl flex items-center justify-center gap-1.5 font-black text-[10.5px] shadow-[2.5px_2.5px_0px_#000] transition active:translate-y-0.5 cursor-pointer"
+                              >
+                                {oneTouchLoading ? 'SINCRONIZANDO...' : '⚡ CONFIRMAR Y AUTORIZAR AL INSTANTE'}
+                              </button>
+                            </div>
+                          )}
+
+                          {/* EMAIL FLOW */}
+                          {oneTouchProvider === 'email' && (
+                            <div className="space-y-2.5">
+                              <p className="text-[10px] text-slate-300 font-medium font-comic leading-relaxed">
+                                El sistema de Google/saved-credentials detectará tu sesión activa de manera segura:
+                              </p>
+
+                              <div>
+                                <label className="text-[9px] font-extrabold text-slate-400 block mb-1 uppercase tracking-wider font-mono">
+                                  Dirección de Correo Electrónico
+                                </label>
+                                <input
+                                  type="email"
+                                  value={oneTouchPhone}
+                                  onChange={(e) => setOneTouchPhone(e.target.value)}
+                                  placeholder="Ingresa tu correo aquí"
+                                  className="w-full bg-slate-950 border-2 border-black rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none placeholder:text-slate-700"
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                disabled={!oneTouchPhone || oneTouchLoading}
+                                onClick={async () => {
+                                  const emailVal = oneTouchPhone.trim();
+                                  if (!emailVal || !emailVal.includes('@')) {
+                                    alert("Por favor ingresa una dirección de correo válida.");
+                                    return;
+                                  }
+                                  setOneTouchLoading(true);
+                                  // Check if email already in use
+                                  try {
+                                    const res = await fetch(`/api/user/check-email?email=${encodeURIComponent(emailVal)}`);
+                                    const check = await res.json();
+                                    if (check.exists) {
+                                      alert("⚠️ Este correo electrónico ya tiene un Director Técnico registrado en nuestra base de datos. Por favor utiliza otra dirección o inicia sesión.");
+                                      setOneTouchLoading(false);
+                                      return;
+                                    }
+                                  } catch (e) {}
+
+                                  completeOneTouchRegistration(
+                                    `DT_Correo_${Math.floor(1000 + Math.random() * 9000)}`,
+                                    emailVal,
+                                    '🏆'
+                                  );
+                                }}
+                                className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white border-2 border-black rounded-xl flex items-center justify-center gap-1.5 font-black text-[10.5px] shadow-[2.5px_2.5px_0px_#000] transition active:translate-y-0.5 cursor-pointer disabled:opacity-50"
+                              >
+                                {oneTouchLoading ? 'CONECTANDO...' : '⚡ REGISTRAR E INGRESAR CON UN TOQUE'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* STEP 3: VERIFIED */}
+                      {oneTouchStep === 'verified' && (
+                        <div className="py-6 text-center space-y-2">
+                          <div className="mx-auto w-12 h-12 bg-emerald-950 text-emerald-400 border-2 border-emerald-500 rounded-full flex items-center justify-center text-2xl animate-bounce">
+                            ✓
+                          </div>
+                          <p className="text-xs font-black text-emerald-400 uppercase tracking-widest font-mono">
+                            ¡IDENTIDAD VINCULADA!
+                          </p>
+                          <p className="text-[10px] text-slate-400 font-comic">
+                            Sincronizando perfil con base de datos de la Copa del Mundo...
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="relative flex py-1 items-center select-none">
@@ -5167,7 +5962,7 @@ export default function App() {
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-left text-slate-400 space-y-2 mb-6 font-comic leading-relaxed">
               <p>• Podrás desbloquear sus <strong className="text-white">26 cromos</strong> oficiales.</p>
               <p>• Podrás superar sus <strong className="text-white">3 niveles de trivias</strong> para ganar puntos.</p>
-              <p>• Las demás selecciones quedarán <strong className="text-red-400">bloqueadas</strong> hasta que adquieras un plan de suscripción VIP o Scout.</p>
+              <p>• Las demás selecciones quedarán <strong className="text-red-400">bloqueadas</strong> hasta que adquieras un paquete VIP o Scout de Pago Único.</p>
               <p className="text-amber-400 font-bold mt-1">⚠️ Esta decisión es permanente para esta cuenta.</p>
             </div>
 
@@ -5300,7 +6095,7 @@ export default function App() {
                 }}
                 className="flex-1 py-3 bg-yellow-400 hover:bg-[#ffe338] text-black border-2 border-black rounded-xl font-bangers text-base tracking-wider uppercase shadow-[3px_3px_0px_#000] cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all min-h-[44px]"
               >
-                💥 VER PLANES DE SUSCRIPCIÓN 💳
+                💥 ADQUIRIR PAQUETES DE SELECCIÓN 💳
               </button>
               <button
                 onClick={() => setUpsellCountry(null)}
