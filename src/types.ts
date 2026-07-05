@@ -47,6 +47,8 @@ export interface Match {
   fase?: string;
   equipo_local?: string;
   equipo_visitante?: string;
+  penalesReal?: { penalesLocal: number; penalesVisitante: number };
+  detallesExtra?: string;
 }
 
 export interface UserPrediction {

@@ -44,10 +44,38 @@ export default function GroupsFixtureView({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [knockoutMode, setKnockoutMode] = useState<'list' | 'bracket'>('bracket');
   
+  // Helper to pre-populate winners from played real matches
+  const getOfficialKnockoutWinners = () => {
+    const officialWinners: { [id: string]: string } = {};
+    KNOCKOUT_FIXTURES.forEach(m => {
+      if (m.jugado && m.marcadorReal) {
+        if (m.marcadorReal.golesLocal > m.marcadorReal.golesVisitante) {
+          officialWinners[m.id] = m.local;
+        } else if (m.marcadorReal.golesVisitante > m.marcadorReal.golesLocal) {
+          officialWinners[m.id] = m.visitante;
+        } else if (m.penalesReal) {
+          if (m.penalesReal.penalesLocal > m.penalesReal.penalesVisitante) {
+            officialWinners[m.id] = m.local;
+          } else {
+            officialWinners[m.id] = m.visitante;
+          }
+        } else {
+          // Fallback based on known outcomes
+          if (m.id === 'ko-3') officialWinners[m.id] = 'Paraguay';
+          if (m.id === 'ko-4') officialWinners[m.id] = 'Marruecos';
+          if (m.id === 'ko-14') officialWinners[m.id] = 'Argentina';
+          if (m.id === 'ko-16') officialWinners[m.id] = 'Egipto';
+        }
+      }
+    });
+    return officialWinners;
+  };
+
   // Local bracket simulator selections loaded from userBoards if exists
   const [bracketWinners, setBracketWinners] = useState<{ [id: string]: string }>(() => {
     const saved = userBoards['__playoffPredictions'];
-    return (saved as any)?.winners || {};
+    const officialWinners = getOfficialKnockoutWinners();
+    return { ...((saved as any)?.winners || {}), ...officialWinners };
   });
 
   const [playoffScores, setPlayoffScores] = useState<{ [matchId: string]: { golesLocal: number; golesVisitante: number } }>(() => {
@@ -61,8 +89,13 @@ export default function GroupsFixtureView({
 
   useEffect(() => {
     const saved = userBoards['__playoffPredictions'];
+    const officialWinners = getOfficialKnockoutWinners();
+    setBracketWinners(prev => ({
+      ...prev,
+      ...((saved as any)?.winners || {}),
+      ...officialWinners
+    }));
     if (saved) {
-      setBracketWinners((saved as any).winners || {});
       setPlayoffScores((saved as any).scores || {});
     }
   }, [userBoards]);
@@ -215,7 +248,7 @@ export default function GroupsFixtureView({
           <Award className="w-3.5 h-3.5 text-yellow-400" />
           <span>
             {subTab === 'knockouts' 
-              ? 'Fase Eliminatoria: 32 Selecciones • 16 Llaves de Dieciseisavos' 
+              ? 'Fase Eliminatoria: 16 Selecciones • 8 Llaves de Octavos' 
               : 'Fase de Grupos: 48 Selecciones • 12 Grupos • 36 Partidos'}
           </span>
         </div>
@@ -235,7 +268,7 @@ export default function GroupsFixtureView({
                   FASE DE ELIMINACIÓN DIRECTA
                 </span>
                 <h2 className="text-2xl font-black text-white mt-2 uppercase tracking-tight font-sans">
-                  DIECISEISAVOS DE FINAL - HÉROES DEL DEPORTE
+                  OCTAVOS DE FINAL - HÉROES DEL DEPORTE
                 </h2>
                 <p className="text-xs text-gray-400 font-mono mt-1">
                   Hora de Ecuador (ECT) • Sorteo y Emparejamientos Oficiales Confirmados
@@ -327,17 +360,33 @@ export default function GroupsFixtureView({
 
                         {/* VS Bubble */}
                         <div className="flex flex-col items-center justify-center">
-                          <div className="w-12 h-12 rounded-full bg-black border-4 border-red-600 text-white font-mono font-black text-sm flex items-center justify-center shadow-lg transform rotate-[-8deg] shrink-0">
-                            VS
-                          </div>
-                          {winner ? (
-                            <div className="mt-3 bg-red-600 border-2 border-black text-white text-[9px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider skew-x-[-6deg] animate-pulse">
-                              {winner} AVANZA
+                          {match.jugado && match.marcadorReal ? (
+                            <div className="space-y-1">
+                              <span className="text-[10px] uppercase font-bold text-gray-550 font-mono block">FINAL REAL</span>
+                              <div className="bg-slate-950 font-mono text-base font-extrabold text-red-500 border border-slate-850 px-3 py-1.5 rounded-xl inline-block shadow-inner">
+                                {match.marcadorReal.golesLocal} - {match.marcadorReal.golesVisitante}
+                              </div>
+                              {match.detallesExtra && (
+                                <span className="text-[9px] font-mono text-yellow-400 font-bold block bg-black/60 px-1.5 py-0.5 rounded border border-slate-800/85 mt-1">
+                                  {match.detallesExtra}
+                                </span>
+                              )}
                             </div>
                           ) : (
-                            <span className="text-[9px] font-mono text-gray-550 uppercase font-bold mt-2 tracking-wide block">
-                              Haz click para avanzar
-                            </span>
+                            <>
+                              <div className="w-12 h-12 rounded-full bg-black border-4 border-red-600 text-white font-mono font-black text-sm flex items-center justify-center shadow-lg transform rotate-[-8deg] shrink-0">
+                                VS
+                              </div>
+                              {winner ? (
+                                <div className="mt-3 bg-red-600 border-2 border-black text-white text-[9px] font-black px-2.5 py-1 rounded-md uppercase tracking-wider skew-x-[-6deg] animate-pulse">
+                                  {winner} AVANZA
+                                </div>
+                              ) : (
+                                <span className="text-[9px] font-mono text-gray-550 uppercase font-bold mt-2 tracking-wide block">
+                                  Haz click para avanzar
+                                </span>
+                              )}
+                            </>
                           )}
                         </div>
 

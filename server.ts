@@ -2967,6 +2967,88 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     res.json({ status: "success", message: `Promotor ${cleanId} eliminado correctamente.` });
   });
 
+  // POST /api/assistant
+  app.post("/api/assistant", async (req, res) => {
+    const { message, context } = req.body || {};
+    
+    if (!message) {
+      return res.status(400).json({ error: "Falta el mensaje del usuario." });
+    }
+
+    const {
+      currentActiveMenuTab,
+      activeCountryName,
+      coins,
+      score,
+      unlockedStickersCount,
+      currentUsername,
+      userSubscription,
+      formation,
+    } = context || {};
+
+    const tabName = currentActiveMenuTab || "menu_hub";
+    const country = activeCountryName || "Ecuador";
+    const userCoins = coins !== undefined ? coins : 0;
+    const userScore = score !== undefined ? score : 0;
+    const stickersCount = unlockedStickersCount !== undefined ? unlockedStickersCount : 0;
+    const username = currentUsername || "Director Técnico";
+    const subscription = userSubscription || "Gratuito";
+    const activeFormation = formation || "4-3-3";
+
+    if (!ai || isGeminiQuotaDepleted) {
+      // Offline fallback responses with soccer flavor
+      let responseText = `¡Hola, DT ${username}! Como tu asistente táctica SophIA, he analizado tu plantilla actual de ${country}. `;
+      if (tabName === "board") {
+        responseText += `Para tu pizarra táctica con la formación ${activeFormation}, te sugiero posicionar a tus jugadores con mayor química. ¡Recuerda que si compras cromos en la tienda sumas puntos extra de patrocinio!`;
+      } else if (tabName === "album") {
+        responseText += `Llevas ${stickersCount} cromos coleccionados. Para completarlo más rápido, responde las trivias para sumar más puntos de D.T. (tienes ${userScore} puntos) o adquiere tus sobres nacionales o regionales en la tienda.`;
+      } else {
+        responseText += `Actualmente estás en el menú principal. Tu puntuación actual es de ${userScore} puntos. ¿En qué te puedo asesorar hoy para llevar a tu equipo a la gloria?`;
+      }
+      return res.json({ response: responseText });
+    }
+
+    try {
+      const systemInstruction = `Eres SophIA (Valeria AI), la Asistente de Campo y Asesora Táctica Oficial de la aplicación "Álbum Trivia Mundial 2026".
+Tu tono es el de una Directora Técnica experta, enérgica, analítica y apasionada por el fútbol. Utilizas terminología de fútbol real y motivas constantemente al usuario ("D.T. ${username}").
+Debes responder de manera concisa (máximo 120 palabras), directa y enfocada en ayudar al usuario a ganar basándote en la información actual de la página.
+
+INFORMACIÓN CONTEXTUAL DE LA PÁGINA:
+- D.T. Activo: ${username}
+- Menú o Tab que está viendo en la pantalla: "${tabName}" (esto te indica lo que el usuario está viendo ahora mismo. Si pregunta algo sobre esta sección, guíalo en cómo usarla).
+- País seleccionado activo: "${country}"
+- Puntuación actual del usuario: ${userScore} puntos
+- Cromos (stickers) desbloqueados: ${stickersCount} de 26 para el país actual.
+- Tipo de licencia o pase: "${subscription}" (puede ser "Gratuito", "Pase Nacional", o "Pase Regional").
+- Formación táctica en la pizarra: "${activeFormation}"
+
+Reglas clave para tus respuestas:
+1. Sé súper específica y adáptate a la sección que está viendo el usuario ("${tabName}").
+2. Si el usuario te pregunta tácticas de Ecuador, recomiéndale jugadores ecuatorianos o formaciones como un 4-3-3 de alta intensidad.
+3. Si está en la pizarra ("board"), recomiéndale comprar cromos para sumar puntos de patrocinio y así ganar los premios de $1.000 USD, $500 USD o $250 USD.
+4. Si está en el álbum ("album"), dile que responda trivias para acumular puntos de D.T. o que compre el pase para desbloquear todos los cromos al instante.
+5. Usa de vez en cuando palabras futbolísticas como: "Pizarra", "D.T.", "Cromo", "Trivia", "Goleador", "Al ángulo", "Táctica", "Estrategia", "Presión alta", "Ecuador Tricolor".
+6. Nunca respondas con más de 120 palabras. Mantén la respuesta sumamente compacta y bien estructurada.`;
+
+      const response = await generateContentWithRetry(ai, {
+        model: "gemini-3.5-flash",
+        contents: message,
+        config: {
+          systemInstruction,
+          temperature: 0.7,
+        }
+      });
+
+      const responseText = response.text?.trim() || "No pude formular una respuesta. ¿Qué tal si intentamos otra jugada, DT?";
+      res.json({ response: responseText });
+    } catch (error: any) {
+      console.error("Error in SophIA AI Assistant:", error);
+      res.json({
+        response: `¡Atención, D.T. ${username}! Detecto una interferencia en la conexión táctica con el satélite de la Copa Mundial 2026. Sigamos entrenando con la estrategia local: enfócate en completar tus cromos de ${country} y pulir el parado ${activeFormation} en la pizarra.`
+      });
+    }
+  });
+
   // Serve static files / Vite middleware
   const isProd = process.env.NODE_ENV === "production";
 

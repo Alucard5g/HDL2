@@ -14,6 +14,13 @@ interface DTAvatarAndAssistantProps {
   currentActiveMenuTab?: string; // Tab being viewed in App.tsx
   onChangeTab?: (tab: 'menu_hub' | 'album' | 'board' | 'leaderboard' | 'groups_fixture' | 'flutter' | 'subscription' | 'admin') => void;
   currentUsername?: string;
+  isExpanded?: boolean;
+  onToggleExpanded?: (expanded: boolean) => void;
+  // Context adaptation properties passed from App.tsx
+  coins?: number;
+  score?: number;
+  unlockedStickersCount?: number;
+  activeFormation?: string;
 }
 
 const HAIR_OPTIONS = [
@@ -50,7 +57,7 @@ const ACCESSORY_OPTIONS = [
   { id: 'auriculares', name: 'Auriculares Radio', icon: '🎧', perk: 'Conexión cabina' }
 ];
 
-// Complete menu-by-menu dialogue database for Valeria the Tactical Assistant
+// Complete menu-by-menu dialogue database for SophIA the Tactical Assistant
 const TAB_EXPLANATIONS: { [key: string]: { text: string; state: 'explaining' | 'happy' | 'excited' | 'thinking'; badge: string } } = {
   menu_hub: {
     text: "¡Bienvenido a tu Centro de Control Táctico, DT! Desde aquí puedes acceder al álbum de cromos, pronosticar el fixture, armar tu alineación en la pizarra táctica, competir en las Ligas de Honor y adquirir paquetes de selección.",
@@ -58,7 +65,7 @@ const TAB_EXPLANATIONS: { [key: string]: { text: string; state: 'explaining' | '
     badge: "CENTRO DE CONTROL"
   },
   album: {
-    text: "¡Este es tu Álbum Oficial de Cromos! Aquí coleccionas las plantillas de 26 jugadores por país. Responde las trivias para ganar monedas de oro, compra sobres y sube el nivel de tus cromos para ser un estratega legendario.",
+    text: "¡Este es tu Álbum Oficial de Cromos! Aquí coleccionas las plantillas de 26 jugadores por país. Responde las trivias para ganar puntos, desbloquea cromos y sube el nivel de tus plantillas para ser un estratega legendario.",
     state: "explaining",
     badge: "ÁLBUM DE CROMOS"
   },
@@ -96,17 +103,17 @@ const TAB_EXPLANATIONS: { [key: string]: { text: string; state: 'explaining' | '
 
 const GENERAL_GUIDE_STEPS = [
   {
-    text: "¡Hola, DT! Soy Valeria, tu Asistente de Campo. ¡Bienvenido al cuartel general táctico! Tu misión es coleccionar cromos, superar trivias de fútbol y armar alineaciones perfectas para liderar el ranking mundial.",
+    text: "¡Hola, DT! Soy SophIA, tu Asistente de Campo. ¡Bienvenido al cuartel general táctico! Tu misión es coleccionar cromos, superar trivias de fútbol y armar alineaciones perfectas para liderar el ranking mundial.",
     state: "happy",
     badge: "INICIO"
   },
   {
-    text: "En el menú 'Álbum', cada país tiene 26 cromos que desbloqueas respondiendo trivias y ganando monedas de oro para abrir sobres.",
+    text: "En el menú 'Álbum', cada país tiene 26 cromos que desbloqueas respondiendo trivias y acumulando puntos para abrir tus sobres.",
     state: "explaining",
     badge: "ÁLBUM"
   },
   {
-    text: "En la 'Pizarra Táctica' diseñas tu once inicial. Si colocas jugadores que coinciden con la alineación titular oficial del partido real, ¡sumas toneladas de puntos extra de precisión!",
+    text: "En la 'Pizarra Táctica' diseñas tu once inicial. Si colocas jugadores que coinciden con la alineación titular oficial del partido real, ¡sumas muchos puntos extra de precisión!",
     state: "excited",
     badge: "TÁCTICA"
   },
@@ -131,7 +138,13 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
   activeCountryName = 'Ecuador',
   currentActiveMenuTab = 'menu_hub',
   onChangeTab,
-  currentUsername = 'Invitado (Director Técnico)'
+  currentUsername = 'Invitado (Director Técnico)',
+  isExpanded,
+  onToggleExpanded,
+  coins = 350,
+  score = 0,
+  unlockedStickersCount = 0,
+  activeFormation = '4-3-3'
 }) => {
   // Config state
   const [avatar, setAvatar] = useState<AvatarConfig>(() => {
@@ -157,7 +170,9 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
   const [activeTab, setActiveTab] = useState<'asistente' | 'avatar'>('asistente');
   const [generalStep, setGeneralStep] = useState<number>(0);
   const [showBubble, setShowBubble] = useState<boolean>(true);
-  const [isCompanionExpanded, setIsCompanionExpanded] = useState<boolean>(false);
+  const [localIsCompanionExpanded, setLocalIsCompanionExpanded] = useState<boolean>(false);
+  const isCompanionExpanded = isExpanded !== undefined ? isExpanded : localIsCompanionExpanded;
+  const setIsCompanionExpanded = onToggleExpanded ? onToggleExpanded : setLocalIsCompanionExpanded;
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
   
   // State for editing username / DT name
@@ -241,6 +256,8 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
     ? GENERAL_GUIDE_STEPS[generalStep].state 
     : tabExplanation.state;
 
+  const activeDialogueState = currentDialogueState as "normal" | "thinking" | "excited" | "tactical" | "happy";
+
   const currentDialogueBadge = isMenuHub 
     ? GENERAL_GUIDE_STEPS[generalStep].badge 
     : tabExplanation.badge;
@@ -258,6 +275,8 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
     setShowBubble(true);
     setActiveTab('asistente');
   };
+
+
 
   // Render Core content for DT Avatar configuration
   const renderAvatarCreator = () => (
@@ -503,26 +522,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
   if (!isMenuHub) {
     return (
       <>
-        {/* Floating companion trigger icon at bottom right of the page */}
-        <div className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-[90] flex flex-col items-end gap-2.5">
-          <AnimatePresence>
-            {!isCompanionExpanded && (
-              <motion.button
-                initial={{ scale: 0, rotate: -45 }}
-                animate={{ scale: 1, rotate: 0 }}
-                exit={{ scale: 0, rotate: 45 }}
-                onClick={() => setIsCompanionExpanded(true)}
-                className="relative p-2 bg-[#0b1411] hover:bg-emerald-950 text-white rounded-full border-4 border-black shadow-[4px_4px_0px_#000] cursor-pointer hover:scale-105 active:scale-95 transition-all flex items-center justify-center group"
-              >
-                {/* Micro bubble badge for alert */}
-                <span className="absolute -top-1 -left-1 bg-[#EF4444] border-2 border-black text-white text-[8px] font-bold px-1 rounded-full animate-bounce">
-                  DT AI
-                </span>
-                <ValeriaRenderer size={52} state="happy" />
-              </motion.button>
-            )}
-          </AnimatePresence>
-        </div>
+        {/* Floating trigger button removed to avoid bottom-right obstruction. Toggled from header now. */}
 
         {/* Collapsible Tactical Panel floating dialog */}
         <AnimatePresence>
@@ -562,10 +562,10 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
               </div>
 
               {activeTab === 'asistente' ? (
-                <div className="space-y-3.5">
+                <div className="space-y-3.5 max-h-[480px] overflow-y-auto pr-0.5">
                   {/* Dialog bubble */}
                   <div className="flex gap-3 items-center">
-                    <ValeriaRenderer size={70} state={currentDialogueState} />
+                    <ValeriaRenderer size={70} state={activeDialogueState} />
                     <div className="flex-1 bg-white border-2 border-black rounded-xl p-3 shadow-[2.5px_2.5px_0px_#000] relative">
                       <div className="absolute top-1/2 -left-2.5 -translate-y-1/2 w-0 h-0 border-t-[5px] border-t-transparent border-r-[5px] border-r-black border-b-[5px] border-b-transparent" />
                       <span className="text-[7.5px] font-black text-emerald-600 font-mono tracking-widest uppercase block mb-0.5">
@@ -594,7 +594,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                       
                       <div className="bg-slate-950 border border-[#22c55e]/30 rounded-xl p-2.5 text-[10.5px] leading-snug text-slate-300 font-sans space-y-2 shadow-inner text-left">
                         <p className="font-extrabold text-[#11b782] flex items-center gap-1 text-[11px] uppercase tracking-wide">
-                          💎 ¡Estrategia de Valeria para Ganar!
+                          💎 ¡Estrategia de SophIA para Ganar!
                         </p>
                         <p className="text-[10px] text-slate-350">
                           Al adquirir <strong>cromos digitales oficiales</strong> completas tu plantilla de inmediato, lo que te otorga <strong>puntos masivos de bonificación de patrocinio</strong> para escalar en el Ranking General de DT y asegurar los premios en efectivo.
@@ -615,7 +615,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                   )}
 
                   <div className="text-[9px] text-slate-500 text-center font-mono leading-none">
-                    Valeria te asiste automáticamente en cada menú.
+                    SophIA te asiste automáticamente en cada menú.
                   </div>
                 </div>
               ) : (
@@ -628,7 +628,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                     }}
                     className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border-2 border-black font-sans font-black text-[10px] uppercase rounded-xl transition-all cursor-pointer"
                   >
-                    Regresar a Consejos de Valeria 📋
+                    Regresar a Consejos de SophIA 📋
                   </button>
                 </div>
               )}
@@ -658,7 +658,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                 : 'bg-slate-900 text-slate-400 hover:text-white'
             }`}
           >
-            📋 TÁCTICA VALERIA
+            📋 TÁCTICA SOPHIA
           </button>
           <button
             onClick={() => setActiveTab('avatar')}
@@ -673,7 +673,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
         </div>
 
         <span className="font-mono text-[9px] text-slate-500 uppercase tracking-widest hidden sm:inline opacity-30 select-none">
-          SYS_AUDIT: ENGAGE_VALERIA_V2
+          SYS_AUDIT: ENGAGE_SOPHIA_V2
         </span>
       </div>
 
@@ -691,7 +691,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                 {/* Premium Animated Valeria Vector */}
                 <div className="md:col-span-3 flex justify-center shrink-0">
                   <div className="relative group">
-                    <ValeriaRenderer size={84} state={currentDialogueState} />
+                    <ValeriaRenderer size={84} state={activeDialogueState} />
                     <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#11b782] rounded-full animate-ping" />
                     <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-[#11b782] rounded-full border border-black" />
                   </div>
@@ -704,7 +704,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                     
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="bg-[#11b782] text-black text-[9px] font-black uppercase px-2 py-0.5 rounded border border-black">
-                        Valeria - Asistente de Campo
+                        SophIA - Asistente de Campo
                       </span>
                       <span className="text-[10px] font-mono text-slate-500">
                         Paso {generalStep + 1} de {GENERAL_GUIDE_STEPS.length}
@@ -720,7 +720,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                   <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                     <button
                       onClick={() => setShowBubble(false)}
-                      className="px-2 py-1 text-slate-400 hover:text-white text-[10px] uppercase font-black tracking-wider transition-all"
+                      className="px-2 py-1 text-slate-400 hover:text-white text-[10px] uppercase font-black tracking-wider transition-all cursor-pointer"
                     >
                       Omitir Introducción
                     </button>
@@ -736,16 +736,17 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="bg-slate-950/80 border-2 border-dashed border-slate-800 rounded-2xl p-6 text-center space-y-3">
-                <p className="text-xs text-slate-400 font-medium">
-                  Valeria está observando el campo de entrenamiento. Si necesitas su ayuda táctica para el menú, puedes reiniciar el diálogo guía.
-                </p>
+              <div className="bg-slate-950/80 border-2 border-dashed border-slate-800 rounded-2xl p-4 text-center flex flex-wrap items-center justify-between gap-3">
+                <div className="text-left">
+                  <p className="text-xs text-slate-200 font-extrabold uppercase">Guía de Campo de SophIA</p>
+                  <p className="text-[10.5px] text-slate-400 font-medium">Revisa los tutoriales de bienvenida en cualquier momento.</p>
+                </div>
                 <button
                   onClick={handleResetGeneralGuide}
-                  className="px-4 py-2 bg-[#11b782] hover:bg-emerald-500 text-black text-[10px] font-black uppercase rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5"
+                  className="px-3.5 py-1.5 bg-[#11b782] hover:bg-emerald-500 text-black text-[9.5px] font-black uppercase rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1"
                 >
-                  <RefreshCw size={12} className="animate-spin-slow" />
-                  Reiniciar Guía Táctica
+                  <RefreshCw size={11} className="animate-spin-slow" />
+                  Reiniciar Guía
                 </button>
               </div>
             )}

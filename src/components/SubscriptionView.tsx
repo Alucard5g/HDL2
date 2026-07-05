@@ -139,7 +139,12 @@ export default function SubscriptionView({
     return Number(localStorage.getItem('album_user_donations_total') || '0');
   });
   const [communityBasePool, setCommunityBasePool] = useState<number>(() => {
-    return Number(localStorage.getItem('album_community_donations_base') || '14250');
+    const stored = localStorage.getItem('album_community_donations_base');
+    if (!stored || stored === '14250') {
+      localStorage.setItem('album_community_donations_base', '50');
+      return 50;
+    }
+    return Number(stored);
   });
   const [donationInput, setDonationInput] = useState<string>('10');
   const [chosenCharityCause, setChosenCharityCause] = useState<'nutrition' | 'literacy' | 'all'>('all');
@@ -1061,12 +1066,7 @@ export default function SubscriptionView({
               </div>
             </div>
 
-            <div className="bg-amber-500/10 border border-amber-500/25 p-3 rounded-xl text-[10.5px] text-amber-300 leading-normal flex items-start gap-2">
-              <Info className="w-4 h-4 shrink-0 mt-0.5 text-amber-450" />
-              <span>
-                Simulación solidaria totalmente interactiva. Haz tus aportes ficticios de ayuda mediante transferencias o Deuna para ver cómo el pozo total crece. ¡Hagamos la diferencia!
-              </span>
-            </div>
+
           </div>
 
           {/* Right form widget */}

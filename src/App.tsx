@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { COUNTRIES, generatePlayersForCountry, getPopulatedMatch, MATCH_FIXTURES } from './data';
+import { COUNTRIES, generatePlayersForCountry, getPopulatedMatch, MATCH_FIXTURES, KNOCKOUT_FIXTURES } from './data';
 import { Player, UserTacticalBoard, Match, getCountryOfPlay } from './types';
 import { motion, AnimatePresence } from 'motion/react';
 import { DigitalStickerCard } from './components/DigitalStickerCard';
@@ -334,19 +334,26 @@ export default function App() {
         if (data && data.status === 'success' && data.matches) {
           setCustomMatches(data.matches);
           
-          // Apply changes directly to MATCH_FIXTURES in data
+          // Apply changes directly to MATCH_FIXTURES and KNOCKOUT_FIXTURES in data
           let modified = false;
           Object.entries(data.matches).forEach(([matchId, val]: [string, any]) => {
-            const m = MATCH_FIXTURES.find(f => f.id === matchId);
+            const m = MATCH_FIXTURES.find(f => f.id === matchId) || KNOCKOUT_FIXTURES.find(f => f.id === matchId);
             if (m) {
               if (
                 !m.marcadorReal ||
                 m.marcadorReal.golesLocal !== val.golesLocal ||
                 m.marcadorReal.golesVisitante !== val.golesVisitante ||
-                m.jugado !== val.jugado
+                m.jugado !== val.jugado ||
+                (val.detallesExtra && m.detallesExtra !== val.detallesExtra)
               ) {
                 m.marcadorReal = { golesLocal: val.golesLocal, golesVisitante: val.golesVisitante };
                 m.jugado = val.jugado;
+                if (val.penalesReal) {
+                  m.penalesReal = val.penalesReal;
+                }
+                if (val.detallesExtra) {
+                  m.detallesExtra = val.detallesExtra;
+                }
                 modified = true;
               }
             }
@@ -508,6 +515,8 @@ export default function App() {
   const [highTechSkin, setHighTechSkin] = useState<boolean>(() => {
     return localStorage.getItem('dt_high_tech_skin') !== 'false';
   });
+
+  const [valeriaExpanded, setValeriaExpanded] = useState<boolean>(false);
 
   const handleUpdatePassword = (newPassword: string) => {
     if (newPassword) {
@@ -788,6 +797,7 @@ export default function App() {
   // Estados para el blog de noticias en footer y sugerencias
   const [footerBlogPosts, setFooterBlogPosts] = useState<any[]>([]);
   const [loadingFooterBlog, setLoadingFooterBlog] = useState<boolean>(false);
+  const [selectedBlogPost, setSelectedBlogPost] = useState<any | null>(null);
   const [footerSuggestName, setFooterSuggestName] = useState<string>('');
   const [footerSuggestEmail, setFooterSuggestEmail] = useState<string>('');
   const [footerSuggestContent, setFooterSuggestContent] = useState<string>('');
@@ -2892,16 +2902,60 @@ export default function App() {
       <div className="flex flex-col min-h-screen w-full font-sans">
         
         {/* COMPACT TOP NAVIGATION BRAND BAR */}
-        <header className="border-b-[4px] border-black bg-[#041208] text-white sticky top-0 z-40 p-3 flex items-center justify-between shadow-[0_4px_0px_#EF4444] shrink-0 select-none">
-          <div 
-            onClick={() => { setActiveTab('menu_hub'); setActiveTrivia(null); }}
-            className="cursor-pointer active:scale-95 transition-all"
-            title="Héroes del Deporte - Volver al Menú Principal"
-          >
-            <TactikAiLogo layout="horizontal" />
+        <header className="border-b-[4px] border-black bg-[#041208] text-white sticky top-0 z-40 p-3 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-[0_4px_0px_#EF4444] shrink-0 select-none">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full md:w-auto">
+            <div 
+              onClick={() => { setActiveTab('menu_hub'); setActiveTrivia(null); }}
+              className="cursor-pointer active:scale-95 transition-all shrink-0"
+              title="Héroes del Deporte - Volver al Menú Principal"
+            >
+              <TactikAiLogo layout="horizontal" />
+            </div>
+
+            {/* --- TOP HEADER CONTROLS FOR SOPHIA & SKIN DE INTERFAZ --- */}
+            <div className="flex items-center gap-2">
+              {/* SophIA (Valeria DT AI) Toggle Button */}
+              <button
+                onClick={() => setValeriaExpanded(prev => !prev)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border-2 border-black text-[10px] font-mono font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all shadow-[2.5px_2.5px_0px_#000] ${
+                  valeriaExpanded 
+                    ? 'bg-[#11b782] text-black hover:bg-emerald-400' 
+                    : 'bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title={valeriaExpanded ? "Cerrar Panel de SophIA (Asistencia Táctica)" : "Abrir Panel de SophIA (Asistencia Táctica)"}
+              >
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${valeriaExpanded ? 'bg-black' : 'bg-emerald-400'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${valeriaExpanded ? 'bg-black' : 'bg-[#11b782]'}`}></span>
+                </span>
+                <span>🕵️ SophIA AI</span>
+                <span className="hidden sm:inline text-[8px] bg-black/20 px-1 py-0.5 rounded text-slate-400">
+                  {valeriaExpanded ? 'ABIERTO' : 'CERRADO'}
+                </span>
+              </button>
+
+              {/* Skin de Interfaz Toggle Button */}
+              <button
+                onClick={() => {
+                  setHighTechSkin(prev => {
+                    const next = !prev;
+                    localStorage.setItem('dt_high_tech_skin', String(next));
+                    return next;
+                  });
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border-2 border-black text-[10px] font-mono font-black uppercase tracking-wider cursor-pointer active:scale-95 transition-all shadow-[2.5px_2.5px_0px_#000] ${
+                  highTechSkin 
+                    ? 'bg-[#11b782] text-black hover:bg-emerald-400' 
+                    : 'bg-slate-900 text-slate-300 hover:text-white hover:bg-slate-800'
+                }`}
+                title={highTechSkin ? "Cambiar a Estilo Cómic Retro" : "Cambiar a Estilo Anime High-Tech"}
+              >
+                <span>🎨 SKIN: {highTechSkin ? 'HIGH-TECH' : 'CÓMIC'}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 w-full md:w-auto justify-end">
 
 
             {userId === 'user_me' ? (
@@ -3095,6 +3149,11 @@ export default function App() {
                   activeCountryName={selectedCountryName}
                   onChangeTab={setActiveTab}
                   currentUsername={username}
+                  coins={userCoins}
+                  score={currentUserInfo.totalScore}
+                  unlockedStickersCount={currentUserInfo.unlockedStickersCount}
+                  currentActiveMenuTab={activeTab}
+                  activeFormation={tacticalBoards[selectedCountryName]?.formation || "4-3-3"}
                 />
 
 
@@ -3466,7 +3525,6 @@ export default function App() {
                           {userSubscription === 'Ninguna' ? 'ESTÁNDAR GRATIS' : 'PROVEEDOR ACTIVO'}
                         </span>
                         <span className={!isRegistered ? 'text-slate-500' : 'text-emerald-400'}>${userCashBalance.toFixed(2)} USD</span>
-                        <span className={!isRegistered ? 'text-slate-500' : 'text-amber-400'}>| {userCoins} 🪙</span>
                       </div>
                       <span className={`flex items-center gap-0.5 px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform ${!isRegistered ? 'bg-slate-900 text-slate-500' : 'bg-[#11b782] text-black'}`}>
                         BILLETERA <ChevronRight className={`w-3 h-3 inline stroke-[3] ${!isRegistered ? 'text-slate-500' : 'text-black'}`} />
@@ -4679,15 +4737,23 @@ export default function App() {
                       <div className="text-[11px] font-mono text-slate-500">No hay publicaciones de administración todavía.</div>
                     ) : (
                       footerBlogPosts.slice(0, 3).map((post) => (
-                        <div key={post.id} className="flex gap-2.5 items-start p-2 bg-slate-900/50 rounded-xl border border-slate-900 group hover:border-[#10B981]/30 transition">
+                        <div 
+                          key={post.id} 
+                          onClick={() => setSelectedBlogPost(post)}
+                          className="flex gap-2.5 items-start p-2 bg-slate-900/50 rounded-xl border border-slate-900 group hover:border-[#10B981]/50 hover:bg-slate-900/80 transition cursor-pointer select-none"
+                          title="Hacer click para leer de manera grande y cómoda"
+                        >
                           <img 
                             src={post.imageUrl || "https://images.unsplash.com/photo-1540747737956-378724044602?q=80&w=800&auto=format&fit=crop"} 
                             alt="Noticia" 
                             className="w-10 h-10 object-cover rounded-lg border border-black shrink-0"
                             referrerPolicy="no-referrer"
                           />
-                          <div className="min-w-0">
-                            <h6 className="text-[11px] font-black text-slate-200 uppercase truncate group-hover:text-[#10B981] transition">{post.title}</h6>
+                          <div className="min-w-0 flex-1">
+                            <h6 className="text-[11px] font-black text-slate-200 uppercase truncate group-hover:text-[#10B981] transition flex items-center justify-between gap-1">
+                              <span>{post.title}</span>
+                              <span className="text-[8px] font-normal text-yellow-500 font-mono italic shrink-0">Leer más ➜</span>
+                            </h6>
                             <p className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">{post.content}</p>
                             <span className="text-[8px] text-slate-600 font-mono mt-0.5 block">{new Date(post.createdAt).toLocaleDateString()}</span>
                           </div>
@@ -4742,8 +4808,6 @@ export default function App() {
                       className="w-full bg-slate-900 border-2 border-black text-[10px] text-indigo-300 py-1.5 px-2.5 rounded-lg focus:outline-none font-bold"
                     >
                       <option value="conscientizarte13@gmail.com">Sugerencia a: conscientizarte13@gmail.com</option>
-                      <option value="roly3d@hotmail.com">Soporte a: roly3d@hotmail.com</option>
-                      <option value="roly3d.rg@gmail.com">Licencias a: roly3d.rg@gmail.com</option>
                     </select>
                   </div>
 
@@ -4817,7 +4881,7 @@ export default function App() {
                   <button 
                     onClick={() => setAppCustomAlert({
                       title: '🎗️ Donaciones Directas de Patrocinio',
-                      message: 'Si deseas transferir por Deuna, Banco Pichincha o cooperativas aliadas de Ecuador para aparecer en la lista de marcas del álbum, por favor contáctanos escribiendo a conscientizarte13@gmail.com o roly3d@hotmail.com.'
+                      message: 'Si deseas transferir por Deuna, Banco Pichincha o cooperativas aliadas de Ecuador para aparecer en la lista de marcas del álbum, por favor contáctanos escribiendo a conscientizarte13@gmail.com.'
                     })}
                     className="py-2 px-3 bg-[#e11d48] hover:bg-[#be123c] text-white font-bangers text-[11px] uppercase tracking-wide rounded-lg border border-black cursor-pointer shadow-[2px_2px_0px_#000] active:translate-y-0.5 transition"
                   >
@@ -4904,7 +4968,7 @@ export default function App() {
           </button>
         </nav>
 
-        {activeTab !== 'menu_hub' && (
+        {(activeTab !== 'menu_hub' || valeriaExpanded) && (
           <DTAvatarAndAssistant
             isRegistered={isRegistered}
             userSubscription={userSubscription}
@@ -4912,9 +4976,15 @@ export default function App() {
             onSaveAvatarConfig={handleSaveAvatarConfig}
             onTriggerFormaciónRecomendada={handleSelectRecommendedFormation}
             activeCountryName={selectedCountryName}
-            currentActiveMenuTab={activeTab}
+            currentActiveMenuTab={activeTab === 'menu_hub' ? 'board' : activeTab}
             onChangeTab={setActiveTab}
             currentUsername={username}
+            isExpanded={valeriaExpanded}
+            onToggleExpanded={setValeriaExpanded}
+            coins={userCoins}
+            score={currentUserInfo.totalScore}
+            unlockedStickersCount={currentUserInfo.unlockedStickersCount}
+            activeFormation={tacticalBoards[selectedCountryName]?.formation || "4-3-3"}
           />
         )}
 
@@ -5068,7 +5138,7 @@ export default function App() {
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-[#11b782] shrink-0 font-bold">🧠</span>
-                        <span><strong>Trivia de Alta Tensión:</strong> Responde preguntas sobre partidos históricos de eliminación directa y duplica monedas.</span>
+                        <span><strong>Trivia de Alta Tensión:</strong> Responde preguntas sobre partidos históricos de eliminación directa y acumula puntos.</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-rose-500 shrink-0 font-bold">📋</span>
@@ -6238,6 +6308,82 @@ export default function App() {
                   Entendido
                 </button>
               </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* LARGE BLOG READER MODAL */}
+      {selectedBlogPost && (
+        <div 
+          className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50 backdrop-blur-md transition-all" 
+          id="large-blog-reader-modal"
+          onClick={() => setSelectedBlogPost(null)}
+        >
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 30, scale: 0.95 }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-[#0b1329] border-[4px] border-black text-white rounded-3xl w-full max-w-2xl shadow-[8px_8px_0px_#000] overflow-hidden flex flex-col max-h-[90vh]"
+          >
+            {/* Header */}
+            <div className="bg-[#10B981] text-black p-4 font-bangers text-lg sm:text-xl tracking-wider border-b-4 border-black flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>📰</span>
+                <span>NOTICIA OFICIAL DE HÉROES DEL DEPORTE</span>
+              </div>
+              <button 
+                onClick={() => setSelectedBlogPost(null)}
+                className="w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 text-black font-black flex items-center justify-center cursor-pointer transition text-base"
+                title="Cerrar lectura"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto flex-1 p-6 space-y-5">
+              {/* Cover Image */}
+              <div className="relative w-full h-52 sm:h-64 rounded-2xl border-2 border-black overflow-hidden shadow-md">
+                <img 
+                  src={selectedBlogPost.imageUrl || "https://images.unsplash.com/photo-1540747737956-378724044602?q=80&w=800&auto=format&fit=crop"} 
+                  alt={selectedBlogPost.title} 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute top-3 left-3 bg-[#0b1329] text-[#10B981] font-mono text-[9px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg border border-[#10B981]/30 shadow-lg">
+                  Publicado
+                </div>
+              </div>
+
+              {/* Title & Metadata */}
+              <div className="space-y-1.5 border-b border-slate-800 pb-4">
+                <h3 className="text-xl sm:text-2xl font-black text-yellow-400 uppercase tracking-tight leading-tight">
+                  {selectedBlogPost.title}
+                </h3>
+                <div className="flex items-center gap-2.5 text-xs text-slate-400 font-mono">
+                  <span>📅 {new Date(selectedBlogPost.createdAt).toLocaleDateString('es-EC', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                  <span>•</span>
+                  <span className="text-[#10B981] font-bold uppercase">Por: Director de Juego (DT)</span>
+                </div>
+              </div>
+
+              {/* Body Text */}
+              <div className="text-slate-100 font-sans text-sm sm:text-base leading-relaxed space-y-4 whitespace-pre-wrap">
+                {selectedBlogPost.content}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-950 border-t-2 border-black flex items-center justify-between text-xs font-mono text-slate-500">
+              <span>Modo Lectura Cómoda Activo</span>
+              <button
+                onClick={() => setSelectedBlogPost(null)}
+                className="px-5 py-1.5 border-2 border-black bg-yellow-400 hover:bg-yellow-500 text-black text-xs font-bold uppercase rounded-xl cursor-pointer shadow-[2px_2px_0px_#000] active:translate-y-0.5"
+              >
+                Cerrar Lectura
+              </button>
             </div>
           </motion.div>
         </div>

@@ -509,38 +509,7 @@ export const AnimeHighTechSkin: React.FC<AnimeHighTechSkinProps> = ({ children, 
         {/* Particle Overlay */}
         {isActive && <HighTechCanvasBg />}
 
-        {/* Floating Toggle Skin Control Panel */}
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3">
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className={`flex items-center gap-2.5 p-2 px-3.5 rounded-full border-[2.5px] border-black bg-[#08150d]/90 backdrop-blur-md shadow-[4px_4px_0px_#000] text-white select-none ${isActive ? 'border-[#22c55e]/50 shadow-[0_0_15px_rgba(34,197,94,0.25)]' : ''}`}
-          >
-            <div className="relative flex h-3.5 w-3.5 shrink-0">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isActive ? 'bg-red-500' : 'bg-emerald-400'}`}></span>
-              <span className={`relative inline-flex rounded-full h-3.5 w-3.5 ${isActive ? 'bg-emerald-500' : 'bg-emerald-500'}`}></span>
-            </div>
-
-            <div className="flex flex-col text-left leading-none">
-              <span className="text-[9.5px] font-bold uppercase tracking-wider font-mono text-slate-400">Skin de Interfaz</span>
-              <span className="text-[11px] font-black uppercase font-sans tracking-wide text-white">
-                {isActive ? '🌌 ANIME HIGH-TECH' : '🎨 CÓMIC RETRO'}
-              </span>
-            </div>
-
-            <button
-              onClick={onToggleActive}
-              className="ml-1.5 p-1.5 rounded-lg bg-black/40 hover:bg-black/60 border border-slate-700 hover:border-slate-500 text-white transition-all cursor-pointer active:scale-95 flex items-center justify-center"
-              title={isActive ? "Cambiar a Estilo Cómic Retro" : "Cambiar a Estilo Anime High-Tech (Honkai: Star Rail Style)"}
-            >
-              {isActive ? (
-                <EyeOff className="w-3.5 h-3.5 text-red-500" />
-              ) : (
-                <Eye className="w-3.5 h-3.5 text-emerald-400" />
-              )}
-            </button>
-          </motion.div>
-        </div>
+        {/* Floating Toggle Skin Control Panel removed to prevent obstruction at the bottom. Moved to header instead. */}
 
         {/* Floating Tech Corners overlay to accent the theme when active */}
         {isActive && (

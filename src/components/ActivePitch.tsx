@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, UserTacticalBoard, Match, getCountryOfPlay } from '../types';
-import { Eye, Check, RefreshCw, Send, HelpCircle, Save, Info, Sparkles } from 'lucide-react';
+import { Eye, Check, RefreshCw, Send, HelpCircle, Save, Info, Sparkles, Flame, Trash2 } from 'lucide-react';
 import { DTAvatarRenderer } from './DTAvatarRenderer';
 import { ValeriaRenderer } from './ValeriaRenderer';
 
@@ -279,41 +279,65 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8" id="tactical-board-section">
       {/* LEFT: Green Field (Tactical Canvas) */}
       <div className="lg:col-span-7 flex flex-col">
-        <div className="flex items-center justify-between bg-slate-900 border border-slate-800/80 rounded-2xl p-4 mb-4">
-          <div className="flex items-center gap-3">
-            <span className="text-sm font-mono text-emerald-400 font-bold uppercase tracking-wider">Alineación</span>
-            <select
-              value={formationKey}
-              onChange={(e) => setFormationKey(e.target.value)}
-              className="bg-slate-950 text-white text-xs border border-slate-800/80 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-medium"
-            >
-              {Object.entries(FORMATIONS).map(([key, info]) => (
-                <option className="bg-[#0f172a] text-white" key={key} value={key}>{info.label}</option>
-              ))}
-            </select>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between bg-slate-900 border border-slate-800/80 rounded-2xl p-4 gap-3.5 mb-4 shadow-[0_4px_20px_rgba(0,0,0,0.3)]">
+          <div className="flex flex-wrap items-center gap-3.5">
+            {/* DT Avatar in the Header */}
+            <div className="flex items-center gap-2.5 bg-slate-950/80 px-3 py-1.5 rounded-xl border border-slate-800/60 shadow-inner">
+              <DTAvatarRenderer config={userAvatarConfig} size={34} showAccessory={true} glow={true} />
+              <div className="flex flex-col">
+                <span className="text-[7.5px] text-[#10b981] font-mono font-bold uppercase tracking-wider leading-none">D.T. Convocado</span>
+                <span className="text-[11px] text-white font-extrabold font-sans mt-0.5 max-w-[90px] truncate leading-none">Área Técnica</span>
+              </div>
+            </div>
+
+            <div className="h-8 w-[1px] bg-slate-800 hidden md:block" />
+
+            {/* Formation Selector */}
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-emerald-400 font-bold uppercase tracking-wider">Alineación:</span>
+              <select
+                value={formationKey}
+                onChange={(e) => setFormationKey(e.target.value)}
+                className="bg-slate-950 text-white text-xs border border-slate-800/80 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold cursor-pointer transition-all"
+              >
+                {Object.entries(FORMATIONS).map(([key, info]) => (
+                  <option className="bg-[#0f172a] text-white" key={key} value={key}>{info.label}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="flex gap-2">
+
+          {/* Grouped Action Buttons with premium layout */}
+          <div className="flex flex-wrap items-center gap-2 justify-start xl:justify-end border-t border-slate-800/60 xl:border-t-0 pt-3 xl:pt-0">
             <button
               onClick={() => setShowHeatmap(!showHeatmap)}
-              className={`text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-bold transition cursor-pointer select-none ${
+              className={`text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 font-bold transition-all cursor-pointer select-none active:scale-95 ${
                 showHeatmap 
-                  ? 'bg-gradient-to-r from-red-600/30 to-amber-600/30 text-rose-300 border-rose-500/50 shadow-[0_0_12px_rgba(239,68,68,0.2)]' 
-                  : 'bg-slate-950 text-slate-400 border-slate-800 hover:border-slate-700'
+                  ? 'bg-gradient-to-r from-red-600/20 to-amber-600/20 text-rose-300 border-rose-500/50 shadow-[0_0_12px_rgba(239,68,68,0.25)]' 
+                  : 'bg-slate-950 text-slate-400 border-slate-850 hover:text-white hover:border-slate-700'
               }`}
+              title="Alternar mapa de calor para identificar debilidades de cobertura"
             >
-              🔥 {showHeatmap ? 'Ocultar Mapa' : 'Mapa de Calor'}
+              <Flame className={`w-3.5 h-3.5 ${showHeatmap ? 'text-red-500 animate-pulse' : 'text-slate-400'}`} />
+              <span>{showHeatmap ? 'Ocultar Mapa' : 'Mapa de Calor'}</span>
             </button>
+
             <button
               onClick={handleQuickAutoFill}
-              className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 font-medium transition cursor-pointer"
+              className="text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border-2 border-emerald-500/30 hover:border-emerald-500/50 font-bold transition-all cursor-pointer active:scale-95"
+              title="Completar automáticamente el once inicial titular con tus mejores cromos desbloqueados"
             >
-              <RefreshCw className="w-3.5 h-3.5" /> Auto-completar XI
+              <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Autocompletar XI</span>
             </button>
+
             <button
               onClick={handleClearBoard}
-              className="text-xs hover:text-white text-gray-400 transition"
+              className="text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/5 text-red-400 hover:bg-red-500/10 border-2 border-transparent hover:border-red-500/30 font-bold transition-all cursor-pointer active:scale-95"
+              title="Quitar todos los jugadores posicionados en la pizarra"
             >
-              Limpiar
+              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+              <span>Limpiar</span>
             </button>
           </div>
         </div>
@@ -434,19 +458,6 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
               </button>
             );
           })}
-
-          {/* DT Technical Area Sideline Coach Spot */}
-          <div className="absolute left-[6%] bottom-[13%] z-20 flex flex-col items-center">
-            <div className="p-1 bg-slate-950/95 rounded-2xl border-2 border-dashed border-emerald-500/50 flex flex-col items-center shadow-lg hover:border-emerald-400 transition-colors">
-              <DTAvatarRenderer config={userAvatarConfig} size={42} showAccessory={true} glow={true} />
-              <div className="mt-0.5 bg-slate-900 border border-slate-800 rounded px-1 text-[7.5px] font-bold text-[#10b981] uppercase tracking-wider text-center">
-                Área Técnica
-              </div>
-            </div>
-            <span className="text-[7.5px] text-white/50 uppercase font-mono mt-0.5 bg-black/40 px-1 rounded">
-              D.T. Convocado
-            </span>
-          </div>
         </div>
 
         <div className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-400 font-mono bg-slate-950/50 p-2.5 rounded-lg border border-slate-900">
@@ -468,7 +479,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
           </div>
           <div className="space-y-1.5 text-center sm:text-left">
             <h5 className="text-xs font-black uppercase text-emerald-400 font-mono tracking-wider flex items-center justify-center sm:justify-start gap-1">
-              <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Sugerencia de Valeria
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Sugerencia de SophIA
             </h5>
             <p className="text-[11px] text-slate-200 leading-relaxed">
               ¿Sabías que puedes asegurar el liderato? Al adquirir tus <strong className="text-amber-300">Cromos Digitales Premium</strong> en la sección de compras, sumas instantáneamente <strong className="text-emerald-400">+5 puntos de score</strong> por país y <strong className="text-emerald-400">+15 puntos</strong> por región. 
