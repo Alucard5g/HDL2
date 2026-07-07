@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { COUNTRIES, generatePlayersForCountry, MATCH_FIXTURES, KNOCKOUT_FIXTURES } from '../data';
+import { DTAvatarRenderer } from './DTAvatarRenderer';
 
 function getSafeImageUrl(url: string | undefined): string | undefined {
   if (!url) return undefined;
@@ -61,6 +62,7 @@ interface ActiveUser {
   subscription: string;
   role: string;
   avatar: string;
+  avatarConfig?: any;
   licenseCode?: string;
   email?: string;
   password?: string;
@@ -1133,7 +1135,9 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                         >
                           <td className="py-3 px-3">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm">{u.avatar || '⚽'}</span>
+                              <div className="w-8 h-8 rounded-full overflow-hidden flex items-center justify-center shrink-0 bg-slate-900 border border-slate-800">
+                                <DTAvatarRenderer config={u.avatarConfig} size={28} showAccessory={false} glow={false} />
+                              </div>
                               <div>
                                 <span className={`block font-bold text-xs ${isMe ? 'text-indigo-400 font-extrabold' : 'text-slate-200'}`}>
                                   {u.username} {isMe && <span className="text-[8px] bg-indigo-500 text-white font-mono rounded-lg px-1.5 ml-1 inline-block uppercase font-black">Admin</span>}
@@ -1830,7 +1834,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
           {/* Sorteo Prizes breakdown visualization */}
           <div className="bg-brand-sidebar border border-slate-850 rounded-2xl p-5 shadow-xl">
             <h3 className="font-bold text-white text-xs uppercase tracking-wider text-indigo-400 font-mono mb-4 flex items-center gap-1.5">
-              <Award className="w-4.5 h-4.5" /> Ganadores Proyectados al 30 de Julio
+              <Award className="w-4.5 h-4.5" /> Ganadores Proyectados al 31 de Diciembre
             </h3>
             
             <div className="space-y-3">
@@ -1841,7 +1845,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                   </div>
                   <div>
                     <h5 className="text-xs font-bold text-white">1er Lugar ($1.000 USD)</h5>
-                    <p className="text-[10px] text-gray-450 mt-0.5">Mejor puntaje acumulado al 30 de julio</p>
+                    <p className="text-[10px] text-gray-450 mt-0.5">Mejor puntaje acumulado al 31 de diciembre</p>
                   </div>
                 </div>
                 <div className="text-right">

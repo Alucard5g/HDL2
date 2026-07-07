@@ -133,6 +133,7 @@ export default function SubscriptionView({
 
   const [showGoldenGiftModal, setShowGoldenGiftModal] = useState<boolean>(false);
   const [lastPurchasedDetails, setLastPurchasedDetails] = useState<{ name: string; price: string; contribution: string }>({ name: '', price: '', contribution: '' });
+  const [addDonation, setAddDonation] = useState<boolean>(true);
 
   // Charity & Social Impact Module States (Nutrición y Alfabetización Infantil)
   const [personalDonationTotal, setPersonalDonationTotal] = useState<number>(() => {
@@ -321,7 +322,7 @@ export default function SubscriptionView({
         'Cuesta $15.00 por continente (América, Europa o África/Asia/Oceanía juntas) 🌍',
         'Suma inmediata de +15 puntos de score a tu puntuación de DT por cada continente canjeado 👑',
         'Desbloqueo automático al 100% de todos los cromos de todos los países de ese continente 🏆',
-        'Corte final de puntuaciones realizado el día 30 de julio de 2026',
+        'Corte final de puntuaciones realizado el día 31 de diciembre de 2026',
         'Insignia dorada VIP de DT verificado en el panel de control'
       ],
       buttonText: 'Adquirir Continente ($15.00)',
@@ -378,6 +379,27 @@ export default function SubscriptionView({
     setShowPaymentModal(planId);
   };
 
+  const incrementDonationsPools = (planTier: string, addedDonationActive: boolean) => {
+    const isVIP = planTier === 'Pase VIP Elite';
+    const autoAmount = isVIP ? 0.75 : 0.25;
+    const suggestedAmount = isVIP ? 1.50 : 0.50;
+    
+    const communityAdd = autoAmount;
+    const personalAdd = addedDonationActive ? suggestedAmount : 0;
+    
+    if (communityAdd > 0) {
+      const newCommunity = communityBasePool + communityAdd;
+      setCommunityBasePool(newCommunity);
+      localStorage.setItem('album_community_donations_base', String(newCommunity));
+    }
+    
+    if (personalAdd > 0) {
+      const newPersonal = personalDonationTotal + personalAdd;
+      setPersonalDonationTotal(newPersonal);
+      localStorage.setItem('album_user_donations_total', String(newPersonal));
+    }
+  };
+
   const triggerGoldenGiftSticker = (planTier: string) => {
     const details = getPlanDetails(planTier);
     const costAmount = details.amount || 5.00;
@@ -387,6 +409,7 @@ export default function SubscriptionView({
       price: details.price,
       contribution: `$${contributionValue}`
     });
+    incrementDonationsPools(planTier, addDonation);
     setShowGoldenGiftModal(true);
   };
 
@@ -1678,6 +1701,62 @@ export default function SubscriptionView({
                 </div>
               )}
 
+              {/* Desglose Social y Donación Sugerida 10% */}
+              {showPaymentModal && showPaymentModal !== 'Ninguna' && (() => {
+                const isVIP = showPaymentModal === 'Pase VIP Elite';
+                const baseCost = getPlanDetails(showPaymentModal).amount || 0;
+                const suggestedDonation = baseCost * 0.10;
+                return (
+                  <div className="bg-slate-950 border-2 border-black p-4 rounded-2xl space-y-3 text-left">
+                    <div className="flex items-center justify-between border-b border-slate-850 pb-2">
+                      <span className="text-xs text-gray-400">Precio Base del Plan:</span>
+                      <span className="text-xs text-white font-mono font-bold">{getPlanDetails(showPaymentModal).price}</span>
+                    </div>
+                    
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-2.5 rounded-xl text-left space-y-1">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-emerald-400 font-bold flex items-center gap-1">🌱 Aporte Social Automático (5%):</span>
+                        <span className="text-white font-mono font-bold">
+                          {isVIP ? '$0.75' : '$0.25'} USD
+                        </span>
+                      </div>
+                      <p className="text-[9.5px] text-gray-400 leading-normal">
+                        Incluido automáticamente con tu compra. Con el plan de $5 se donan $0.25 y con el de $15 se donan $0.75 para financiar la creación de los proyectos de la <strong className="text-white">Fundación Guerreros de Luz</strong> (guerrerosdeluz.com) que se detallan en la página.
+                      </p>
+                    </div>
+
+                    <div className="bg-[#EF4444]/10 border border-[#EF4444]/20 p-3 rounded-xl text-left space-y-2">
+                      <label className="flex items-start gap-2.5 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={addDonation}
+                          onChange={(e) => setAddDonation(e.target.checked)}
+                          className="mt-1 w-4 h-4 rounded border-black text-[#EF4444] bg-slate-900 focus:ring-[#EF4444] cursor-pointer"
+                        />
+                        <div className="space-y-1">
+                          <span className="text-xs font-black text-rose-400 uppercase font-mono tracking-wide flex items-center gap-1">
+                            💖 Donación voluntaria del 10% (+{isVIP ? '$1.50' : '$0.50'} USD)
+                          </span>
+                          <p className="text-[10px] text-slate-350 leading-relaxed">
+                            Súmate a la causa. Sugerimos un 10% adicional (ej. $0.50 en paquete de $5) para financiar los proyectos de la <strong className="text-white">Fundación Guerreros de Luz</strong> de ayuda social detallados en guerrerosdeluz.com.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-slate-850">
+                      <span className="text-xs text-white font-bold">Total Neto a Pagar:</span>
+                      <span className="text-sm text-yellow-450 font-mono font-extrabold animate-pulse">
+                        {pricingLocation === 'España' 
+                          ? `${(baseCost + (addDonation ? suggestedDonation : 0)).toFixed(2)} €`
+                          : `$${(baseCost + (addDonation ? suggestedDonation : 0)).toFixed(2)} USD`
+                        }
+                      </span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Payment Alert error feedback */}
               {paymentError && (
                 <div className="bg-rose-500/10 border-2 border-black text-rose-400 text-xs p-3 rounded-2xl flex items-center gap-2 font-mono leading-relaxed">
@@ -1711,7 +1790,13 @@ export default function SubscriptionView({
                 ) : (
                   <>
                     <ShieldCheck className="w-4.5 h-4.5" /> 
-                    Confirmar Pago de {getPlanDetails(showPaymentModal).price}
+                    Confirmar Pago de {(() => {
+                      const baseCost = getPlanDetails(showPaymentModal).amount || 0;
+                      const suggestedDonation = baseCost * 0.10;
+                      return pricingLocation === 'España'
+                        ? `${(baseCost + (addDonation ? suggestedDonation : 0)).toFixed(2)} €`
+                        : `$${(baseCost + (addDonation ? suggestedDonation : 0)).toFixed(2)} USD`;
+                    })()}
                   </>
                 )}
               </button>

@@ -208,13 +208,39 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        const base64String = reader.result as string;
-        setAvatar(prev => ({
-          ...prev,
-          avatarType: 'photo',
-          uploadedPhoto: base64String
-        }));
-        setSaveSuccess(false);
+        const img = new window.Image();
+        img.src = reader.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const max_size = 180; // 180px is perfect for avatars
+          let width = img.width;
+          let height = img.height;
+          if (width > height) {
+            if (width > max_size) {
+              height *= max_size / width;
+              width = max_size;
+            }
+          } else {
+            if (height > max_size) {
+              width *= max_size / height;
+              height = max_size;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+            // Compress as JPEG with 0.75 quality for minimum storage footprint (usually ~10-15KB)
+            const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+            setAvatar(prev => ({
+              ...prev,
+              avatarType: 'photo',
+              uploadedPhoto: compressedBase64
+            }));
+            setSaveSuccess(false);
+          }
+        };
       };
       reader.readAsDataURL(file);
     }

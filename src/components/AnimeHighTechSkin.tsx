@@ -182,8 +182,8 @@ export const AnimeHighTechSkin: React.FC<AnimeHighTechSkinProps> = ({ children, 
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
           }
 
-          .high-tech-active .bg-\\[\\#000000\\] {
-            background: #090a0a !important;
+          .high-tech-active .bg-\\[\\#0c0e15\\] {
+            background: #0c0e15 !important;
             background-image: none !important;
           }
 
@@ -505,7 +505,7 @@ export const AnimeHighTechSkin: React.FC<AnimeHighTechSkinProps> = ({ children, 
       )}
 
       {/* Main Skin Layout wrapper */}
-      <div className={`${isActive ? 'high-tech-active high-tech-scanlines bg-[#020503] text-slate-100' : ''} transition-all duration-350 relative min-h-screen`}>
+      <div className={`${isActive ? 'high-tech-active high-tech-scanlines bg-[#0c0e15] text-slate-100' : ''} transition-all duration-350 relative min-h-screen`}>
         {/* Particle Overlay */}
         {isActive && <HighTechCanvasBg />}
 

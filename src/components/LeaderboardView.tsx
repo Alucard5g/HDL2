@@ -147,10 +147,22 @@ export default function LeaderboardView({
     }
   });
 
-  // Calculate scores on the fly: 1 point per sticker, 5 points extra per completed country
+  let completedTriviaLevelsCount = 0;
+  Object.values(unlockedLevels).forEach(levels => {
+    if (levels && typeof levels === 'object') {
+      Object.values(levels).forEach(completed => {
+        if ((completed as any) === true || (completed as any) === 'true') {
+          completedTriviaLevelsCount++;
+        }
+      });
+    }
+  });
+  const triviaScore = completedTriviaLevelsCount * 10;
+
+  // Calculate scores on the fly: 1 point per sticker, 5 points extra per completed country, 10 points per trivia completed
   const albumStickerScore = unlockedCromosCount * 1;
   const albumCountryBonusScore = completedCountriesCount * 5;
-  const totalAlbumScore = albumStickerScore + albumCountryBonusScore;
+  const totalAlbumScore = albumStickerScore + albumCountryBonusScore + triviaScore;
 
   // React effect to synchronize score and fetch rankings from the backend APIs
   React.useEffect(() => {
@@ -471,11 +483,11 @@ export default function LeaderboardView({
   // Find user rank index
   const userRank = displayedRanking.findIndex(item => item.username.includes('Tú') || item.username.includes('Director')) + 1;
 
-  // Define prize targets based on ranking as of July 30th
+  // Define prize targets based on ranking as of December 31, 2026
   const prizes = [
-    { rank: 1, title: 'Gran Premio de Clasificación', name: 'Premio en Efectivo: $1.000 USD', desc: 'Otorgado al primer lugar absoluto en puntaje de D.T. al corte final del 30 de julio, auditado por un notario público.', icon: <Trophy className="w-5.5 h-5.5 text-yellow-450" />, badge: 'bg-yellow-500/15 border-yellow-500 text-yellow-405' },
-    { rank: 2, title: 'Segundo Premio de Clasificación', name: 'Premio en Efectivo: $500 USD', desc: 'Otorgado al segundo lugar absoluto en puntaje de D.T. al corte final del 30 de julio, auditado por un notario público.', icon: <Award className="w-5.5 h-5.5 text-slate-300" />, badge: 'bg-slate-300/15 border-slate-300 text-slate-300' },
-    { rank: 3, title: 'Tercer Premio de Clasificación', name: 'Premio en Efectivo: $250 USD', desc: 'Otorgado al tercer lugar absoluto en puntaje de D.T. al corte final del 30 de julio, auditado por un notario público.', icon: <Coins className="w-5.5 h-5.5 text-amber-500" />, badge: 'bg-amber-600/15 border-amber-600 text-amber-600' }
+    { rank: 1, title: 'Gran Premio de Clasificación', name: 'Premio en Efectivo: $1.000 USD', desc: 'Otorgado al primer lugar absoluto en puntaje de D.T. al corte final del 31 de diciembre de 2026, auditado por un notario público.', icon: <Trophy className="w-5.5 h-5.5 text-yellow-450" />, badge: 'bg-yellow-500/15 border-yellow-500 text-yellow-405' },
+    { rank: 2, title: 'Segundo Premio de Clasificación', name: 'Premio en Efectivo: $500 USD', desc: 'Otorgado al segundo lugar absoluto en puntaje de D.T. al corte final del 31 de diciembre de 2026, auditado por un notario público.', icon: <Award className="w-5.5 h-5.5 text-slate-300" />, badge: 'bg-slate-300/15 border-slate-300 text-slate-300' },
+    { rank: 3, title: 'Tercer Premio de Clasificación', name: 'Premio en Efectivo: $250 USD', desc: 'Otorgado al tercer lugar absoluto en puntaje de D.T. al corte final del 31 de diciembre de 2026, auditado por un notario público.', icon: <Coins className="w-5.5 h-5.5 text-amber-500" />, badge: 'bg-amber-600/15 border-amber-600 text-amber-600' }
   ];
 
   const isPaidPlan = currentUserSubscription === 'Plan Scout Básico' || currentUserSubscription === 'Pase VIP Elite';
@@ -492,7 +504,7 @@ export default function LeaderboardView({
             <span className="text-[9.5px] font-mono font-bold text-indigo-400 uppercase tracking-widest block mb-1">AUDITORÍA DE RENDIMIENTO D.T.</span>
             <h2 className="text-xl font-extrabold text-white">Desglose de tus Puntos Oficiales</h2>
             <p className="text-xs text-gray-400 mt-1 max-w-xl">
-              Tus puntuaciones se calculan dinámicamente: cada cromo individual reclutado añade exactly <strong className="text-indigo-300">1 punto</strong>, y completar un país otorga <strong className="text-emerald-405">5 puntos extra</strong> automáticamente.
+              Tus puntuaciones se calculan dinámicamente: cada cromo individual reclutado añade exactly <strong className="text-indigo-300">1 punto</strong>, completar un país otorga <strong className="text-emerald-405">5 puntos extra</strong>, y resolver trivias de selecciones (y próximamente clubes) acumula <strong className="text-yellow-450">10 puntos</strong> por cada nivel completado con éxito. Todo es acumulativo.
             </p>
           </div>
 
@@ -509,6 +521,13 @@ export default function LeaderboardView({
               <span className="text-[8.5px] font-mono text-gray-500 uppercase block">Países Completos</span>
               <span className="text-2xl font-black font-mono text-white block mt-0.5">{completedCountriesCount}</span>
               <span className="text-[10px] text-emerald-400 font-mono mt-0.5">+{albumCountryBonusScore} Pts</span>
+            </div>
+
+            {/* Trivia points box */}
+            <div className="bg-slate-950 border border-slate-850 p-3.5 rounded-2xl flex-1 lg:flex-none min-w-[110px]">
+              <span className="text-[8.5px] font-mono text-gray-500 uppercase block">Trivias Resueltas</span>
+              <span className="text-2xl font-black font-mono text-white block mt-0.5">{completedTriviaLevelsCount}</span>
+              <span className="text-[10px] text-yellow-405 font-mono mt-0.5">+{triviaScore} Pts</span>
             </div>
 
             {/* Tactical Predictions */}
@@ -670,7 +689,7 @@ export default function LeaderboardView({
               <div>
                 <h4 className="font-extrabold text-sm text-amber-400 uppercase font-mono tracking-wider">Inscripción a Premios Deshabilitada (Plan de Pago Requerido)</h4>
                 <p className="text-[11.5px] text-gray-300 leading-relaxed mt-0.5 max-w-2xl">
-                  Estás registrado con un <strong>Plan Gratuito Amateur</strong>. Tus puntos oficiales se registran en el ranking pero <strong>no eres elegible para recibir los premios en efectivo</strong> ($1.000, $500 o $250 USD). Los premios y donaciones se auditan con notario público y se entregarán el 30 de julio en vivo por Facebook Live y YouTube. ¡Adquiere el Pase VIP o el Plan Scout Básico para habilitar tu elegibilidad auditable!
+                  Estás registrado con un <strong>Plan Gratuito Amateur</strong>. Tus puntos oficiales se registran en el ranking pero <strong>no eres elegible para recibir los premios en efectivo</strong> ($1.000, $500 o $250 USD). El desafío, juego y puntos son totalmente acumulativos en todos los desafíos o juegos de la página. Los premios y donaciones se auditan con notario público y se entregarán el 31 de diciembre del 2026 en vivo por Facebook Live y YouTube. ¡Adquiere el Pase VIP o el Plan Scout Básico para habilitar tu elegibilidad auditable!
                 </p>
               </div>
             </div>

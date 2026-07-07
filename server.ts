@@ -1070,12 +1070,12 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
           };
         });
 
-        const prompt = `Actúa como el Orquestador de Datos en Tiempo Real de la FIFA para el Mundial 2026.
+        const prompt = `Actúa como el Orquestador de Datos en Tiempo Real para el Mundial 2026.
 Usa tu herramienta de Google Search Grounding para buscar los resultados de partidos oficiales reales más recientes (incluyendo marcador de goles, rival y alineación inicial de titulares) de las siguientes selecciones de fútbol:
 ${JSON.stringify(countriesContext, null, 2)}
 
 Para cada país, investiga:
-1. El rival oficial más reciente de la selección (en su partido oficial más reciente en la Copa Mundial o eliminatorias de la Copa Mundial, o amistoso internacional de la FIFA).
+1. El rival oficial más reciente de la selección (en su partido oficial más reciente en la Copa Mundial o eliminatorias de la Copa Mundial, o amistoso internacional).
 2. El marcador de ese partido oficial más reciente (goles que anotó la selección de interés y los goles que anotó el rival).
 3. Los jugadores titulares que jugaron en ese once inicial de ese partido. Compara esos jugadores reales con la lista de jugadores disponibles "playerNamesAvailableInRoster" para cada país para identificar cuáles de nuestros nombres listados corresponden a esos titulares.
 
@@ -1409,14 +1409,42 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     // 4. Blog Posts
     try {
       const blogSnapshot = await db.collection("blogPosts").get();
+      const localPosts = [...BLOG_POSTS_DB];
       if (!blogSnapshot.empty) {
         const loadedPosts: any[] = [];
         blogSnapshot.forEach((doc: any) => {
           loadedPosts.push(doc.data());
         });
-        loadedPosts.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
-        BLOG_POSTS_DB = loadedPosts;
-        console.log(`[Firebase/Firestore] Hydrated ${BLOG_POSTS_DB.length} blog posts from Firestore.`);
+
+        // Sync local modifications or new posts to Firestore
+        for (const localPost of localPosts) {
+          const matchingCloudPost = loadedPosts.find((p: any) => p.id === localPost.id);
+          if (!matchingCloudPost || matchingCloudPost.title !== localPost.title || matchingCloudPost.content !== localPost.content) {
+            console.log(`[Firebase/Firestore Sync] Upserting updated or new local blog post: ${localPost.id}`);
+            await saveBlogPostToFirestore(localPost);
+            if (matchingCloudPost) {
+              Object.assign(matchingCloudPost, localPost);
+            } else {
+              loadedPosts.push(localPost);
+            }
+          }
+        }
+
+        // Delete old/unwanted posts from Firestore that are not in localPosts
+        const localPostIds = new Set(localPosts.map(p => p.id));
+        for (const cloudPost of loadedPosts) {
+          if (!localPostIds.has(cloudPost.id)) {
+            console.log(`[Firebase/Firestore Sync] Deleting outdated cloud blog post: ${cloudPost.id}`);
+            await saveBlogPostToFirestore({ id: cloudPost.id }, true);
+          }
+        }
+
+        // Keep only those present in localPosts
+        const syncedPosts = loadedPosts.filter(p => localPostIds.has(p.id));
+
+        syncedPosts.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+        BLOG_POSTS_DB = syncedPosts;
+        console.log(`[Firebase/Firestore] Hydrated ${BLOG_POSTS_DB.length} blog posts from Firestore (aligned with local database).`);
       } else {
         console.log("[Firebase/Firestore] No blog posts found in cloud. Bootstrapping...");
         if (BLOG_POSTS_DB.length > 0) {
@@ -1664,23 +1692,30 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
   // - Score prediction accurate = 20 pt
   function getScoreFromUnlockedLevels(unlockedLevels: any, aciertosOnce: number, aciertosMarcador: number) {
     let unlockedStickersCount = 0;
+    let completedTriviaLevelsCount = 0;
     const completedCountries: string[] = [];
 
     if (unlockedLevels) {
       Object.entries(unlockedLevels).forEach(([country, levels]: [string, any]) => {
-        let lvl1 = levels[1] || false;
-        let lvl2 = levels[2] || false;
-        let lvl3 = levels[3] || false;
+        if (levels && typeof levels === 'object') {
+          let lvl1 = levels[1] || levels['1'] || false;
+          let lvl2 = levels[2] || levels['2'] || false;
+          let lvl3 = levels[3] || levels['3'] || false;
 
-        let countryCount = 0;
-        if (lvl1) countryCount += 9;
-        if (lvl2) countryCount += 9;
-        if (lvl3) countryCount += 8;
+          if (lvl1 === true || lvl1 === 'true') completedTriviaLevelsCount++;
+          if (lvl2 === true || lvl2 === 'true') completedTriviaLevelsCount++;
+          if (lvl3 === true || lvl3 === 'true') completedTriviaLevelsCount++;
 
-        unlockedStickersCount += countryCount;
+          let countryCount = 0;
+          if (lvl1) countryCount += 9;
+          if (lvl2) countryCount += 9;
+          if (lvl3) countryCount += 8;
 
-        if (lvl1 && lvl2 && lvl3) {
-          completedCountries.push(country);
+          unlockedStickersCount += countryCount;
+
+          if (lvl1 && lvl2 && lvl3) {
+            completedCountries.push(country);
+          }
         }
       });
     }
@@ -1689,7 +1724,8 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     const countryBonus = completedCountries.length * 5;
     const onceScore = (aciertosOnce || 0) * 10;
     const marcadorScore = (aciertosMarcador || 0) * 20;
-    const totalScore = stickersScore + countryBonus + onceScore + marcadorScore;
+    const triviaScore = completedTriviaLevelsCount * 10;
+    const totalScore = stickersScore + countryBonus + onceScore + marcadorScore + triviaScore;
 
     return {
       unlockedStickersCount,
@@ -1698,6 +1734,8 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
       countryBonus,
       onceScore,
       marcadorScore,
+      completedTriviaLevelsCount,
+      triviaScore,
       totalScore
     };
   }
@@ -3117,7 +3155,7 @@ function getSeededTrivia(country: string, level: number) {
         },
         {
           id: 3,
-          pregunta: "¿Cuántos Mundiales de la FIFA ha ganado Argentina en su historia (hasta Catar 2022)?",
+          pregunta: "¿Cuántos Mundiales ha ganado Argentina en su historia (hasta Catar 2022)?",
           opciones: ["1 Mundial", "2 Mundiales", "3 Mundiales", "4 Mundiales"],
           correcta: "3 Mundiales"
         }
@@ -3179,7 +3217,7 @@ function getSeededTrivia(country: string, level: number) {
         },
         {
           id: 3,
-          pregunta: "¿Cuántos campeonatos del mundo de la FIFA posee Brasil actualmente (Pentacampeón)?",
+          pregunta: "¿Cuántos campeonatos del mundo posee Brasil actualmente (Pentacampeón)?",
           opciones: ["3 copas", "4 copas", "5 copas", "6 copas"],
           correcta: "5 copas"
         }
@@ -3242,7 +3280,7 @@ function getSeededTrivia(country: string, level: number) {
     preguntas: [
       {
         id: 1,
-        pregunta: `¿Cuál es el principal enfoque táctico o apodo de ${country} cuando compite en un Mundial de la FIFA?`,
+        pregunta: `¿Cuál es el principal enfoque táctico o apodo de ${country} cuando compite en un Mundial?`,
         opciones: [
           "Juego rápido de transiciones y contraataques fluidos",
           "Un fútbol vistoso basado en la tenencia del balón",

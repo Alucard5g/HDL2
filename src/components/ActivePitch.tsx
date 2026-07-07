@@ -485,7 +485,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
               ¿Sabías que puedes asegurar el liderato? Al adquirir tus <strong className="text-amber-300">Cromos Digitales Premium</strong> en la sección de compras, sumas instantáneamente <strong className="text-emerald-400">+5 puntos de score</strong> por país y <strong className="text-emerald-400">+15 puntos</strong> por región. 
             </p>
             <p className="text-[10px] text-slate-400 font-medium">
-              ¡Mejora tu alineación, sube vertiginosamente en el <strong className="text-amber-300">Ranking Oficial de DT</strong> y participa activamente por los fabulosos premios del torneo de Octavos de Final! 🏆✨
+              ¡Mejora tu alineación, sube vertiginosamente en el <strong className="text-amber-300">Ranking Oficial de DT</strong> y participa activamente por los fabulosos premios del Desafío Mundial! 🏆✨
             </p>
           </div>
         </div>

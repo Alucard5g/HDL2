@@ -1663,12 +1663,24 @@ export default function App() {
       }
     });
 
+    let completedTriviaLevelsCount = 0;
+    Object.values(unlockedLevels).forEach(levels => {
+      if (levels && typeof levels === 'object') {
+        Object.values(levels).forEach(completed => {
+          if (completed === true || completed === 'true') {
+            completedTriviaLevelsCount++;
+          }
+        });
+      }
+    });
+
     const stickerScore = unlockedStickersCount * 1;
     const bonusScore = completedCountriesList.length * 5;
     const onceScore = totalOnceHits * 10;
     const predictScore = totalScoreHits * 20;
+    const triviaScore = completedTriviaLevelsCount * 10;
     const totalScore = isRegistered 
-      ? (stickerScore + bonusScore + onceScore + predictScore + referralPoints + purchasedPoints)
+      ? (stickerScore + bonusScore + onceScore + predictScore + referralPoints + purchasedPoints + triviaScore)
       : 0;
 
     return {
@@ -1677,6 +1689,8 @@ export default function App() {
       totalOnceHits,
       totalScoreHits,
       referralPoints,
+      completedTriviaLevelsCount,
+      triviaScore,
       totalScore
     };
   };
@@ -2896,7 +2910,7 @@ export default function App() {
         return next;
       });
     }}>
-      <div className="min-h-screen bg-[#000000] bg-halftone-dots text-slate-100 font-sans flex flex-col antialiased selection:bg-[#EF4444] selection:text-white border-[8px] border-black">
+      <div className="min-h-screen bg-[#0c0e15] bg-halftone-dots text-slate-100 font-sans flex flex-col antialiased selection:bg-[#EF4444] selection:text-white border-[8px] border-black">
       
       {/* Responsive outer board wrapper */}
       <div className="flex flex-col min-h-screen w-full font-sans">
@@ -3258,7 +3272,7 @@ export default function App() {
                           <span>👑</span> PODIO DE EXPERIENCIAS Y RECOMPENSAS
                         </h4>
                         <p className="text-[10px] text-gray-600 leading-normal mb-3">
-                          <strong>¡Desafío 100% Gratuito y de Habilidad!</strong> Participa gratis en los pronósticos y alineaciones. Acumula puntos y compite por grandes premios físicos oficiales el <strong>30 de julio</strong>:
+                          <strong>¡Desafío Global de Habilidad!</strong> Participa gratis en las alineaciones y pronósticos. El desafío, juego y puntos son totalmente acumulativos en todos los desafíos o juegos de la página. Acumula puntos y compite por grandes premios físicos y en efectivo el <strong>31 de diciembre del 2026</strong>, premiando al mejor rankeado de la página:
                         </p>
                         <ul className="space-y-1.5 text-xs text-gray-700 font-comic font-bold mb-3">
                           <li className="flex flex-col bg-amber-100/40 border border-amber-300/40 rounded-lg p-2 gap-1">
@@ -3269,7 +3283,7 @@ export default function App() {
                               <span className="font-mono font-black text-amber-700 text-[10px] uppercase bg-amber-200/50 px-1.5 py-0.5 rounded">Premio Mayor</span>
                             </div>
                             <p className="text-[10px] text-gray-600 font-medium pl-6 leading-tight">
-                              Álbum Físico Impreso de Lujo con tus cromos + Camiseta oficial firmada de tu selección + Certificado "DT Campeón" + Pase VIP de por vida.
+                              Premio en efectivo de $1.000 USD + Álbum Físico Impreso de Lujo con tus cromos + Camiseta oficial firmada de tu selección + Certificado "DT Campeón" + Pase VIP de por vida.
                             </p>
                           </li>
                           <li className="flex flex-col bg-slate-100/60 border border-slate-300/40 rounded-lg p-2 gap-1">
@@ -3280,7 +3294,7 @@ export default function App() {
                               <span className="font-mono font-black text-slate-700 text-[9px] uppercase bg-slate-200 px-1 py-0.5 rounded">Silver</span>
                             </div>
                             <p className="text-[10px] text-gray-600 font-medium pl-6 leading-tight">
-                              6 Meses VIP Elite + Balón oficial del Mundial + Gorra y bufanda conmemorativa + Pack de cromos legendarios digitales.
+                              Premio en efectivo de $500 USD + 6 Meses VIP Elite + Balón oficial del Mundial + Gorra y bufanda conmemorativa + Pack de cromos legendarios digitales.
                             </p>
                           </li>
                           <li className="flex flex-col bg-amber-600/10 border border-amber-700/20 rounded-lg p-2 gap-1">
@@ -3291,7 +3305,7 @@ export default function App() {
                               <span className="font-mono font-black text-amber-800 text-[9px] uppercase bg-amber-200 px-1 py-0.5 rounded">Bronze</span>
                             </div>
                             <p className="text-[10px] text-gray-600 font-medium pl-6 leading-tight">
-                              3 Meses VIP Elite + Bufanda conmemorativa de Héroes del Deporte + Pack de cromos legendarios digitales.
+                              Premio en efectivo de $250 USD + 3 Meses VIP Elite + Bufanda conmemorativa de Héroes del Deporte + Pack de cromos legendarios digitales.
                             </p>
                           </li>
                         </ul>
@@ -3304,7 +3318,7 @@ export default function App() {
                             ⚖️ <strong>Cláusula Legal:</strong> NO SE REQUIERE NINGUNA COMPRA PARA PARTICIPAR NI PARA GANAR. El Desafío se resuelve estrictamente por el conocimiento técnico del usuario al predecir resultados.
                           </p>
                           <p>
-                            📺 <strong>Transmisión y Fe Pública:</strong> Premiación en vivo el <strong>30 de julio de 2026</strong> en Facebook Live y YouTube, auditada bajo acta notarial para máxima fe pública.
+                            📺 <strong>Transmisión y Fe Pública:</strong> Premiación en vivo el <strong>31 de diciembre de 2026</strong> en Facebook Live y YouTube, auditada bajo acta notarial para máxima fe pública.
                           </p>
                         </div>
                       </div>
@@ -4522,7 +4536,7 @@ export default function App() {
                       <div>
                         <h4 className="font-bold text-xs text-white uppercase tracking-wider font-mono">📢 ¡Inicia tu Registro de Elite!</h4>
                         <p className="text-[11px] text-gray-300 mt-0.5 leading-relaxed">
-                          Estás usando una credencial de invitado temporal. Regístrate hoy de forma 100% gratuita para recibir tu propio <strong>Código de Juego Único</strong> y participar activamente por los premios en efectivo ($1.000 USD al 1º, $500 USD al 2º y $250 USD al 3º) el 30 de julio en vivo, con total transparencia auditada por un notario público.
+                          Estás usando una credencial de invitado temporal. Regístrate hoy de forma 100% gratuita para recibir tu propio <strong>Código de Juego Único</strong> y participar activamente por los premios en efectivo ($1.000 USD al 1º, $500 USD al 2º y $250 USD al 3º) el 31 de diciembre del 2026 en vivo, con total transparencia auditada por un notario público.
                         </p>
                       </div>
                     </div>
@@ -5012,7 +5026,7 @@ export default function App() {
               {/* Corner badge indicating live event */}
               <div className="absolute top-3.5 left-3.5 z-20">
                 <span className="bg-[#11b782] text-black font-mono font-black text-[8px] sm:text-[9.5px] px-2.5 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1 shadow-[3px_3px_0px_rgba(0,0,0,1)] border-2 border-black animate-pulse">
-                  🏆 NUEVA ETAPA OFICIAL • OCTAVOS DE FINAL
+                  🏆 NUEVA ETAPA OFICIAL • DESAFÍO MUNDIAL
                 </span>
               </div>
             </div>
@@ -5067,7 +5081,7 @@ export default function App() {
                 }}
                 className="flex-[2] bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black font-sans font-black text-xs py-3.5 px-4 rounded-xl shadow-[4px_4px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 active:translate-y-1 transition duration-150 cursor-pointer uppercase tracking-wider text-center flex items-center justify-center gap-1.5 order-1 sm:order-2 min-h-[44px]"
               >
-                ¡JUEGA GRATIS EL DESAFÍO DE OCTAVOS DE FINAL AHORA! 😉
+                ¡JUEGA GRATIS EL DESAFÍO MUNDIAL AHORA! 😉
               </button>
             </div>
 
@@ -5111,15 +5125,15 @@ export default function App() {
             <div className="flex-1 overflow-y-auto custom-scrollbar p-5 sm:p-6 space-y-5">
               <div className="text-center pb-2.5 border-b border-slate-850">
                 <h4 className="text-base sm:text-lg font-black text-[#11b782] tracking-tight uppercase">
-                  INFORME DE LA COPA MUNDIAL DE LA FIFA 2026™
+                  INFORME DEL MUNDIAL 2026
                 </h4>
                 <p className="text-[9.5px] sm:text-[10.5px] text-slate-300 font-bold uppercase tracking-wider mt-0.5">
-                  Álbum Digital Interactivo • Licencia de Competición Oficial
+                  Álbum Digital Interactivo • Licencia de Competición del Desafío Mundial
                 </p>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Columna 1: Desafío de Octavos */}
+                {/* Columna 1: Desafío Mundial */}
                 <div className="bg-[#11221b]/80 border-2 border-[#11b782]/40 rounded-2xl p-4 text-left relative overflow-hidden flex flex-col justify-between">
                   <div>
                     <div className="bg-yellow-500 text-black text-[8px] uppercase tracking-widest font-black px-2.5 py-0.5 border-b-2 border-l-2 border-black rounded-bl-lg absolute top-0 right-0">
@@ -5129,12 +5143,12 @@ export default function App() {
                       ⭐ Fase Eliminatoria Directa
                     </h4>
                     <p className="text-[9.5px] sm:text-[10.5px] text-slate-200 font-sans mb-3 leading-relaxed">
-                      ¡La Copa del Mundo se pone seria! Con nuestras <strong>nuevas políticas de acceso abierto</strong>, lanzamos el Desafío de Octavos de Final:
+                      ¡La Copa del Mundo se pone seria! Con nuestras <strong>nuevas políticas de acceso abierto</strong>, lanzamos el Desafío Mundial:
                     </p>
                     <ul className="space-y-2.5 text-[9.5px] sm:text-[10px] text-slate-300 font-sans">
                       <li className="flex items-start gap-2">
                         <span className="text-yellow-400 shrink-0 font-bold">⚽</span>
-                        <span><strong>10 Sobres GRATIS:</strong> Reclama tus sobres de Octavos al ingresar para obtener jugadores estrella.</span>
+                        <span><strong>10 Sobres GRATIS:</strong> Reclama tus sobres del Desafío Mundial al ingresar para obtener jugadores estrella.</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <span className="text-[#11b782] shrink-0 font-bold">🧠</span>
@@ -6141,7 +6155,7 @@ export default function App() {
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-amber-400 font-black shrink-0">✓</span>
-                      <span>Corte final de puntuaciones realizado el día <strong>30 de julio de 2026</strong>.</span>
+                      <span>Corte final de puntuaciones realizado el día <strong>31 de diciembre de 2026</strong>.</span>
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-amber-400 font-black shrink-0">✓</span>
