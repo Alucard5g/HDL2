@@ -60,17 +60,17 @@ const ACCESSORY_OPTIONS = [
 // Complete menu-by-menu dialogue database for SophIA the Tactical Assistant
 const TAB_EXPLANATIONS: { [key: string]: { text: string; state: 'explaining' | 'happy' | 'excited' | 'thinking'; badge: string } } = {
   menu_hub: {
-    text: "¡Bienvenido a tu Centro de Control Táctico, DT! Desde aquí puedes acceder al álbum de cromos, pronosticar el fixture, armar tu alineación en la pizarra táctica, competir en las Ligas de Honor y adquirir paquetes de selección.",
+    text: "¡Bienvenido a tu Centro de Control Táctico, DT! Desde aquí puedes acceder al álbum de tarjetas, pronosticar el fixture, armar tu alineación en la pizarra táctica, competir en las Ligas de Honor y adquirir paquetes de selección.",
     state: "happy",
     badge: "CENTRO DE CONTROL"
   },
   album: {
-    text: "¡Este es tu Álbum Oficial de Cromos! Aquí coleccionas las plantillas de 26 jugadores por país. Responde las trivias para ganar puntos, desbloquea cromos y sube el nivel de tus plantillas para ser un estratega legendario.",
+    text: "¡Este es tu Álbum Oficial de Tarjetas! Aquí coleccionas las plantillas de 26 jugadores por país. Responde las trivias para ganar puntos, desbloquea tarjetas y sube el nivel de tus plantillas para ser un estratega legendario.",
     state: "explaining",
-    badge: "ÁLBUM DE CROMOS"
+    badge: "ÁLBUM DE TARJETAS"
   },
   board: {
-    text: "¡La Pizarra Táctica interactiva, DT! Arma tu 11 titular arrastrando tus cromos desbloqueados. ¿Te faltan tus cracks favoritos? ¡Te recomiendo comprar cromos digitales en la Tienda! Cada compra no solo completa tu equipo de inmediato, sino que te otorga fabulosos puntos de bonificación que te harán subir rápido en el Ranking de DT y asegurar los espectaculares premios de $1.000 USD, $500 USD o $250 USD.",
+    text: "¡La Pizarra Táctica interactiva, DT! Arma tu 11 titular arrastrando tus tarjetas desbloqueadas. ¿Te faltan tus cracks favoritos? ¡Te recomiendo comprar tarjetas digitales en la Tienda! Cada compra no solo completa tu equipo de inmediato, sino que te otorga fabulosos puntos de bonificación que te harán subir rápido en el Ranking de DT y asegurar los espectaculares premios de $1.000 USD, $500 USD o $250 USD.",
     state: "excited",
     badge: "PIZARRA TÁCTICA"
   },
@@ -85,7 +85,7 @@ const TAB_EXPLANATIONS: { [key: string]: { text: string; state: 'explaining' | '
     badge: "FIXTURE & PRONÓSTICOS"
   },
   subscription: {
-    text: "¡Tienda de Cromos y Paquetes de Selección! Desbloquea países con el Sobre Nacional ($5) o continentes enteros con el Pase Regional ($15) en Pago Único sin suscripciones recurrentes. ¡El 5% de cada compra va destinado a nuestra fundación aliada!",
+    text: "¡Tienda de Tarjetas y Paquetes de Selección! Desbloquea países con el Sobre Nacional ($5) o continentes enteros con el Pase Regional ($15) en Pago Único sin suscripciones recurrentes. ¡El 5% de cada compra va destinado a nuestra fundación aliada!",
     state: "excited",
     badge: "TIENDA SOLIDARIA"
   },
@@ -103,12 +103,12 @@ const TAB_EXPLANATIONS: { [key: string]: { text: string; state: 'explaining' | '
 
 const GENERAL_GUIDE_STEPS = [
   {
-    text: "¡Hola, DT! Soy SophIA, tu Asistente de Campo. ¡Bienvenido al cuartel general táctico! Tu misión es coleccionar cromos, superar trivias de fútbol y armar alineaciones perfectas para liderar el ranking mundial.",
+    text: "¡Hola, DT! Soy SophIA, tu Asistente de Campo. ¡Bienvenido al cuartel general táctico! Tu misión es coleccionar tarjetas, superar trivias de fútbol y armar alineaciones perfectas para liderar el ranking mundial.",
     state: "happy",
     badge: "INICIO"
   },
   {
-    text: "En el menú 'Álbum', cada país tiene 26 cromos que desbloqueas respondiendo trivias y acumulando puntos para abrir tus sobres.",
+    text: "En el menú 'Álbum', cada país tiene 26 tarjetas que desbloqueas respondiendo trivias y acumulando puntos para abrir tus sobres.",
     state: "explaining",
     badge: "ÁLBUM"
   },
@@ -123,7 +123,7 @@ const GENERAL_GUIDE_STEPS = [
     badge: "PREMIOS"
   },
   {
-    text: "En la 'Tienda', puedes adquirir cromos de Pago Único (sin suscripciones recurrentes) para completar tu álbum más rápido. Además, el 5% de cada compra apoya directamente a fundaciones locales.",
+    text: "En la 'Tienda', puedes adquirir tarjetas de Pago Único (sin suscripciones recurrentes) para completar tu álbum más rápido. Además, el 5% de cada compra apoya directamente a fundaciones locales.",
     state: "excited",
     badge: "IMPACTO SOCIAL"
   }
@@ -623,7 +623,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                           💎 ¡Estrategia de SophIA para Ganar!
                         </p>
                         <p className="text-[10px] text-slate-350">
-                          Al adquirir <strong>cromos digitales oficiales</strong> completas tu plantilla de inmediato, lo que te otorga <strong>puntos masivos de bonificación de patrocinio</strong> para escalar en el Ranking General de DT y asegurar los premios en efectivo.
+                          Al adquirir <strong>tarjetas digitales oficiales</strong> completas tu plantilla de inmediato, lo que te otorga <strong>puntos masivos de bonificación de patrocinio</strong> para escalar en el Ranking General de DT y asegurar los premios en efectivo.
                         </p>
                         {onChangeTab && (
                           <button
@@ -633,7 +633,7 @@ export const DTAvatarAndAssistant: React.FC<DTAvatarAndAssistantProps> = ({
                             }}
                             className="w-full py-2 bg-[#FDDF2B] hover:bg-yellow-400 text-black font-sans font-black text-[9px] uppercase rounded-lg border border-black transition-all cursor-pointer shadow-[1.5px_1.5px_0px_rgba(0,0,0,1)] text-center block"
                           >
-                            🛒 IR A COMPRAR CROMOS DIGITALES 🚀
+                            🛒 IR A COMPRAR TARJETAS DIGITALES 🚀
                           </button>
                         )}
                       </div>

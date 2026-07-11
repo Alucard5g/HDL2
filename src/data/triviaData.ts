@@ -2014,12 +2014,12 @@ export function getPregeneratedTrivia(country: string, level: number): { pais: s
         id: 3,
         pregunta: `Respecto a los rigurosos estatutos del Álbum Oficial Torneo 2026: ¿qué requisito necesita ${country} para activar su Pizarra Táctica de D.T.?`,
         opciones: [
-          "Superar los 3 Niveles de Trivia (Cultura, Historia y Táctica Avanzada) para reclutar sus 26 cromos.",
+          "Superar los 3 Niveles de Trivia (Cultura, Historia y Táctica Avanzada) para reclutar sus 26 tarjetas.",
           "Tener una membresía premium de alto costo pagada por la pasarela de suscripción.",
           "Ganar 10 partidos consecutivos en línea contra otros usuarios de la comunidad.",
           "Clasificar en primer lugar de su grupo en las simulaciones torneos de selecciones."
         ],
-        correcta: "Superar los 3 Niveles de Trivia (Cultura, Historia y Táctica Avanzada) para reclutar sus 26 cromos."
+        correcta: "Superar los 3 Niveles de Trivia (Cultura, Historia y Táctica Avanzada) para reclutar sus 26 tarjetas."
       }
     ]
   };

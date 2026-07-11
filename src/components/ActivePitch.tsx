@@ -118,6 +118,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
   }, [formationKey, savedBoard]);
 
   // Scouting and selection fields
+  const [is3D, setIs3D] = useState<boolean>(true);
   const [predictionLocal, setPredictionLocal] = useState<number>(savedBoard?.prediction?.golesLocal ?? 0);
   const [predictionVisitante, setPredictionVisitante] = useState<number>(savedBoard?.prediction?.golesVisitante ?? 0);
   const [activeSlotSelection, setActiveSlotSelection] = useState<string | null>(null); // slot position label currently being configured
@@ -208,7 +209,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
         </div>
 
         <p className="text-xs text-slate-450 mb-3 block leading-normal">
-          Selecciona uno de tus cromos tácticos desbloqueados para cubrir esta vacante:
+          Selecciona una de tus tarjetas tácticas desbloqueadas para cubrir esta vacante:
         </p>
 
         <div className="max-h-60 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
@@ -216,7 +217,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
             <div className="text-center py-6 bg-slate-950 rounded-xl border border-dashed border-slate-800/80">
               <p className="text-xs text-gray-500 mb-1">Sin jugadores disponibles.</p>
               <p className="text-[10px] text-yellow-300 max-w-[200px] mx-auto leading-normal">
-                Supera trivias de este país para desbloquear más cromos en esta demarcación.
+                Supera trivias de este país para desbloquear más tarjetas en esta demarcación.
               </p>
             </div>
           ) : (
@@ -310,6 +311,19 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
           {/* Grouped Action Buttons with premium layout */}
           <div className="flex flex-wrap items-center gap-2 justify-start xl:justify-end border-t border-slate-800/60 xl:border-t-0 pt-3 xl:pt-0">
             <button
+              onClick={() => setIs3D(!is3D)}
+              className={`text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 font-bold transition-all cursor-pointer select-none active:scale-95 ${
+                is3D 
+                  ? 'bg-gradient-to-r from-indigo-600/20 to-blue-600/20 text-indigo-300 border-indigo-500/50 shadow-[0_0_12px_rgba(99,102,241,0.25)]' 
+                  : 'bg-slate-950 text-slate-400 border-slate-850 hover:text-white hover:border-slate-700'
+              }`}
+              title="Alternar perspectiva táctica 3D"
+            >
+              <Eye className={`w-3.5 h-3.5 ${is3D ? 'text-indigo-400 animate-pulse' : 'text-slate-400'}`} />
+              <span>{is3D ? 'Pizarra 3D' : 'Pizarra 2D'}</span>
+            </button>
+
+            <button
               onClick={() => setShowHeatmap(!showHeatmap)}
               className={`text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 font-bold transition-all cursor-pointer select-none active:scale-95 ${
                 showHeatmap 
@@ -325,7 +339,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
             <button
               onClick={handleQuickAutoFill}
               className="text-xs flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 border-2 border-emerald-500/30 hover:border-emerald-500/50 font-bold transition-all cursor-pointer active:scale-95"
-              title="Completar automáticamente el once inicial titular con tus mejores cromos desbloqueados"
+              title="Completar automáticamente el once inicial titular con tus mejores tarjetas desbloqueadas"
             >
               <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
               <span>Autocompletar XI</span>
@@ -343,7 +357,15 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
         </div>
 
         {/* The green tactical pitch */}
-        <div className="relative w-full aspect-[4/5] bg-gradient-to-b from-emerald-950 to-green-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl p-1" style={{ minHeight: '440px' }}>
+        <div 
+          className="relative w-full aspect-[4/5] bg-gradient-to-b from-emerald-950 to-green-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl p-1 transition-all duration-700 ease-out" 
+          style={{ 
+            minHeight: '440px',
+            transform: is3D ? 'perspective(1200px) rotateX(25deg) scale(0.93) translateY(-10px)' : 'none',
+            transformStyle: 'preserve-3d',
+            boxShadow: is3D ? '0 30px 60px rgba(0,0,0,0.85), inset 0 0 50px rgba(0,0,0,0.6)' : 'none'
+          }}
+        >
           {/* Soccer grass design pattern stripes */}
           <div className="absolute inset-0 flex flex-col opacity-10 pointer-events-none">
             {Array.from({ length: 10 }).map((_, index) => (
@@ -414,8 +436,15 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
               <button
                 key={label}
                 onClick={() => handleSpotClick(label)}
-                className="absolute -translate-x-1/2 -translate-y-1/2 group z-10 transition-all cursor-pointer hover:scale-105 active:scale-95"
-                style={{ left: `${coord.x}%`, top: `${coord.y}%` }}
+                className="absolute group z-10 transition-all duration-500 cursor-pointer hover:scale-110 active:scale-95"
+                style={{ 
+                  left: `${coord.x}%`, 
+                  top: `${coord.y}%`,
+                  transform: is3D 
+                    ? 'translate(-50%, -50%) rotateX(-25deg) translateZ(15px)' 
+                    : 'translate(-50%, -50%)',
+                  transformStyle: 'preserve-3d'
+                }}
               >
                 <div className="flex flex-col items-center">
                   {pObj ? (
@@ -482,7 +511,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
               <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" /> Sugerencia de SophIA
             </h5>
             <p className="text-[11px] text-slate-200 leading-relaxed">
-              ¿Sabías que puedes asegurar el liderato? Al adquirir tus <strong className="text-amber-300">Cromos Digitales Premium</strong> en la sección de compras, sumas instantáneamente <strong className="text-emerald-400">+5 puntos de score</strong> por país y <strong className="text-emerald-400">+15 puntos</strong> por región. 
+              ¿Sabías que puedes asegurar el liderato? Al adquirir tus <strong className="text-amber-300">Tarjetas Digitales Premium</strong> en la sección de compras, sumas instantáneamente <strong className="text-emerald-400">+5 puntos de score</strong> por país y <strong className="text-emerald-400">+15 puntos</strong> por región. 
             </p>
             <p className="text-[10px] text-slate-400 font-medium">
               ¡Mejora tu alineación, sube vertiginosamente en el <strong className="text-amber-300">Ranking Oficial de DT</strong> y participa activamente por los fabulosos premios del Desafío Mundial! 🏆✨
@@ -518,7 +547,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
         {(!activeSlotSelection || activeSlotSelection) && (
           <div className={activeSlotSelection ? "hidden lg:block" : "block"}>
             <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5">
-              <h4 className="font-bold text-white text-xs uppercase tracking-wider text-emerald-400 mb-3">Inspección de Cromo Táctico</h4>
+              <h4 className="font-bold text-white text-xs uppercase tracking-wider text-emerald-400 mb-3">Inspección de Tarjeta Táctica</h4>
               
               <div className="bg-slate-950 rounded-2xl p-4 border border-slate-900 flex flex-col items-center text-center">
                 <select
@@ -529,7 +558,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
                   }}
                   className="w-full bg-slate-900 text-xs border border-slate-800 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 mb-4 text-white"
                 >
-                  <option className="bg-[#0f172a] text-white" value="">Selecciona un cromo para inspeccionar...</option>
+                  <option className="bg-[#0f172a] text-white" value="">Selecciona una tarjeta para inspeccionar...</option>
                   {players.map(p => (
                     <option className="bg-[#0f172a] text-white" key={p.id} value={p.id}>{p.realName} ({p.position} - {p.rating})</option>
                   ))}
@@ -572,7 +601,7 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
                 ) : (
                   <div className="text-center py-8">
                     <Info className="w-8 h-8 text-slate-700 mx-auto mb-2" />
-                    <p className="text-xs text-gray-500 max-w-[200px]">Selecciona uno de los 26 cromos del país anterior para desplegar su ficha de scouting técnico.</p>
+                    <p className="text-xs text-gray-500 max-w-[200px]">Selecciona una de las 26 tarjetas del país anterior para desplegar su ficha de scouting técnico.</p>
                   </div>
                 )}
               </div>

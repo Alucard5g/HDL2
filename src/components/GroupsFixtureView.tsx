@@ -47,6 +47,19 @@ export default function GroupsFixtureView({
   // Helper to pre-populate winners from played real matches
   const getOfficialKnockoutWinners = () => {
     const officialWinners: { [id: string]: string } = {};
+    
+    const getWinnerOfMatch = (matchId: string): string => {
+      const m = KNOCKOUT_FIXTURES.find(x => x.id === matchId);
+      if (!m || !m.jugado || !m.marcadorReal) return '';
+      if (m.marcadorReal.golesLocal > m.marcadorReal.golesVisitante) return m.local;
+      if (m.marcadorReal.golesVisitante > m.marcadorReal.golesLocal) return m.visitante;
+      if (m.penalesReal) {
+        if (m.penalesReal.penalesLocal > m.penalesReal.penalesVisitante) return m.local;
+        return m.visitante;
+      }
+      return '';
+    };
+
     KNOCKOUT_FIXTURES.forEach(m => {
       if (m.jugado && m.marcadorReal) {
         if (m.marcadorReal.golesLocal > m.marcadorReal.golesVisitante) {
@@ -68,18 +81,48 @@ export default function GroupsFixtureView({
         }
       }
     });
+
+    // Match bracket intermediate nodes to official played results
+    const octL1Winner = getWinnerOfMatch('ko-18');
+    if (octL1Winner) officialWinners['oct-L1'] = octL1Winner;
+    const octL2Winner = getWinnerOfMatch('ko-17');
+    if (octL2Winner) officialWinners['oct-L2'] = octL2Winner;
+    const octL3Winner = getWinnerOfMatch('ko-21');
+    if (octL3Winner) officialWinners['oct-L3'] = octL3Winner;
+    const octL4Winner = getWinnerOfMatch('ko-22');
+    if (octL4Winner) officialWinners['oct-L4'] = octL4Winner;
+
+    const octR1Winner = getWinnerOfMatch('ko-19');
+    if (octR1Winner) officialWinners['oct-R1'] = octR1Winner;
+    const octR2Winner = getWinnerOfMatch('ko-20');
+    if (octR2Winner) officialWinners['oct-R2'] = octR2Winner;
+    const octR3Winner = getWinnerOfMatch('ko-23');
+    if (octR3Winner) officialWinners['oct-R3'] = octR3Winner;
+    const octR4Winner = getWinnerOfMatch('ko-24');
+    if (octR4Winner) officialWinners['oct-R4'] = octR4Winner;
+
+    // Cuartos
+    const qfL1Winner = getWinnerOfMatch('ko-25');
+    if (qfL1Winner) officialWinners['qf-L1'] = qfL1Winner;
+    const qfL2Winner = getWinnerOfMatch('ko-26');
+    if (qfL2Winner) officialWinners['qf-L2'] = qfL2Winner;
+    const qfR1Winner = getWinnerOfMatch('ko-27');
+    if (qfR1Winner) officialWinners['qf-R1'] = qfR1Winner;
+    const qfR2Winner = getWinnerOfMatch('ko-28');
+    if (qfR2Winner) officialWinners['qf-R2'] = qfR2Winner;
+
     return officialWinners;
   };
 
   // Local bracket simulator selections loaded from userBoards if exists
   const [bracketWinners, setBracketWinners] = useState<{ [id: string]: string }>(() => {
-    const saved = userBoards['__playoffPredictions'];
+    const saved = userBoards ? userBoards['__playoffPredictions'] : undefined;
     const officialWinners = getOfficialKnockoutWinners();
     return { ...((saved as any)?.winners || {}), ...officialWinners };
   });
 
   const [playoffScores, setPlayoffScores] = useState<{ [matchId: string]: { golesLocal: number; golesVisitante: number } }>(() => {
-    const saved = userBoards['__playoffPredictions'];
+    const saved = userBoards ? userBoards['__playoffPredictions'] : undefined;
     return (saved as any)?.scores || {};
   });
 
@@ -88,7 +131,7 @@ export default function GroupsFixtureView({
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   useEffect(() => {
-    const saved = userBoards['__playoffPredictions'];
+    const saved = userBoards ? userBoards['__playoffPredictions'] : undefined;
     const officialWinners = getOfficialKnockoutWinners();
     setBracketWinners(prev => ({
       ...prev,
@@ -268,7 +311,7 @@ export default function GroupsFixtureView({
                   FASE DE ELIMINACIÓN DIRECTA
                 </span>
                 <h2 className="text-2xl font-black text-white mt-2 uppercase tracking-tight font-sans">
-                  OCTAVOS DE FINAL - HÉROES DEL DEPORTE
+                  HÉROES DEL DEPORTE
                 </h2>
                 <p className="text-xs text-gray-400 font-mono mt-1">
                   Hora de Ecuador (ECT) • Sorteo y Emparejamientos Oficiales Confirmados
@@ -1325,7 +1368,7 @@ export default function GroupsFixtureView({
                                 )}
                               </div>
                               <p className="text-[10px] text-gray-500 font-mono">
-                                {unlockedCount}/26 Cromos Desbloqueados
+                                {unlockedCount}/26 Tarjetas Desbloqueadas
                               </p>
                             </div>
                           </div>
@@ -1469,7 +1512,7 @@ export default function GroupsFixtureView({
                         <span className="text-3xl select-none filter drop-shadow">{localCountry?.flag || '🎌'}</span>
                         <span className="text-xs font-bold text-white group-hover/local:text-indigo-400 transition-colors uppercase tracking-tight">{m.local}</span>
                         <span className={`text-[9px] font-mono ${isLocalComplete ? 'text-emerald-400' : 'text-gray-550'}`}>
-                          {localUnlocked}/26 Cromos
+                          {localUnlocked}/26 Tarjetas
                         </span>
                       </div>
 
@@ -1497,7 +1540,7 @@ export default function GroupsFixtureView({
                         <span className="text-3xl select-none filter drop-shadow">{visiteCountry?.flag || '🎌'}</span>
                         <span className="text-xs font-bold text-white group-hover/visit:text-indigo-400 transition-colors uppercase tracking-tight">{m.visitante}</span>
                         <span className={`text-[9px] font-mono ${isVisiteComplete ? 'text-emerald-400' : 'text-gray-550'}`}>
-                          {visiteUnlocked}/26 Cromos
+                          {visiteUnlocked}/26 Tarjetas
                         </span>
                       </div>
                     </div>
@@ -1539,7 +1582,7 @@ export default function GroupsFixtureView({
                       ) : (
                         <div className="text-[10px] text-gray-550 flex items-center justify-center gap-1 font-mono">
                           <Lock className="w-3 h-3 text-slate-700" />
-                          <span>Completa 26 cromos para desbloquear Pizarra de D.T.</span>
+                          <span>Completa 26 tarjetas para desbloquear Pizarra de D.T.</span>
                         </div>
                       )}
 

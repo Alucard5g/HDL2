@@ -16,7 +16,7 @@ export interface Player {
   imageUrl?: string; // Optional player card photo image (Sticker!)
   nickname?: string; // Apodo del jugador, ej. "La Pulga"
   shirtNumber?: number; // Número en camiseta
-  actionAnimation?: string; // Descripción detallada de la acción animada (cromo digital)
+  actionAnimation?: string; // Descripción detallada de la acción animada (tarjeta digital)
   descriptiveTitle?: string; // Título descriptivo, ej. "El Astro argentino"
 }
 
@@ -48,6 +48,7 @@ export interface Match {
   equipo_local?: string;
   equipo_visitante?: string;
   penalesReal?: { penalesLocal: number; penalesVisitante: number };
+  mvpReal?: string; // Player ID of the official real-world MVP
   detallesExtra?: string;
 }
 
@@ -55,6 +56,10 @@ export interface UserPrediction {
   matchId: string;
   golesLocal: number;
   golesVisitante: number;
+  ganador?: 'local' | 'visitante' | 'empate';
+  penalesLocal?: number;
+  penalesVisitante?: number;
+  mvp?: string; // Player ID of the predicted MVP
 }
 
 export interface UserTacticalBoard {
@@ -78,10 +83,10 @@ export interface LeaderboardEntry {
 export interface User {
   id: string;               // ID único autogenerado o de auth
   gameCode: string;         // Código de juego único de 6 caracteres (ej: DT-2026)
-  unlockedStickers: string[]; // Lista de IDs de los cromos individuales desbloqueados (ej. ["ar-1", "br-10"])
-  completedCountries: string[]; // Lista de nombres de países completados (que desbloquearon sus 26 cromos)
-  unlockedStickersCount: number; // Cantidad total de cromos desbloqueados (coincide con unlockedStickers.length)
-  totalScore: number;       // Puntaje acumulado dinámico: (cantidad cromos * 1) + (países completos * 5)
+  unlockedStickers: string[]; // Lista de IDs de las tarjetas individuales desbloqueadas (ej. ["ar-1", "br-10"])
+  completedCountries: string[]; // Lista de nombres de países completados (que desbloquearon sus 26 tarjetas)
+  unlockedStickersCount: number; // Cantidad total de tarjetas desbloqueadas (coincide con unlockedStickers.length)
+  totalScore: number;       // Puntaje acumulado dinámico: (cantidad tarjetas * 1) + (países completos * 5)
   raffleEligibility?: '$1.000 USD (1er Lugar)' | '$500 USD (2do Lugar)' | '$250 USD (3er Lugar)' | 'Ninguno';
   avatarConfig?: any;
 }
@@ -177,6 +182,54 @@ export interface Suggestion {
   createdAt: string;
   status: 'pending' | 'reviewed';
 }
+
+// === PVP & SIMULATION SYSTEMS (TACTICAL STYLE) ===
+
+export type RunDirection = 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SO' | 'O' | 'NO';
+
+export interface PlayerTactic {
+  playerId: string;
+  runDirection: RunDirection;
+  markingTargetId: string | 'zonal'; // Player ID to mark or 'zonal'
+}
+
+export interface TeamTactics {
+  formationWithBall: string;    // '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2'
+  formationWithoutBall: string; // '4-3-3' | '4-4-2' | '3-5-2' | '5-3-2'
+  pressureLine: number;         // 1 to 10
+  playerTactics: { [playerId: string]: PlayerTactic };
+}
+
+export interface PVPSimulationResult {
+  goalsLocal: number;
+  goalsVisitante: number;
+  possessionLocal: number;
+  possessionVisitante: number;
+  shotsLocal: number;
+  shotsVisitante: number;
+  victoryChanceLocal: number;
+  victoryChanceVisitante: number;
+  report: string;              // Gemini or fallback tactical explanation report
+  heatMapLocal: number[][];    // 8x8 predictive grid representing hot-spots
+  heatMapVisitante: number[][]; // 8x8 predictive grid representing hot-spots
+  scorersLocal: string[];      // Player names who scored
+  scorersVisitante: string[];  // Player names who scored
+}
+
+export interface PVPChallenge {
+  id: string;
+  opponentName: string;
+  opponentLogo: string;
+  opponentRating: number;
+  opponentPlayers: string[];   // Roster of player IDs
+  played: boolean;
+  scoreLocal?: number;
+  scoreVisitante?: number;
+  xpAwarded?: number;
+  coinsAwarded?: number;
+  simulationResult?: PVPSimulationResult;
+}
+
 
 
 

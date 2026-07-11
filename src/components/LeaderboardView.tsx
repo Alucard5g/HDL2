@@ -91,6 +91,11 @@ export default function LeaderboardView({
   userLicense = '',
   onNavigateToSubscription
 }: LeaderboardViewProps) {
+  const [rankingTab, setRankingTab] = useState<'liga_mundial' | 'arena_vip'>('liga_mundial');
+  const [userArenaXp, setUserArenaXp] = useState<number>(() => {
+    return Number(localStorage.getItem('pvp_arena_xp') || '0');
+  });
+
   const [simulationLogs, setSimulationLogs] = useState<string[]>([]);
   const [isSimulated, setIsSimulated] = useState<boolean>(false);
   const [predictionScore, setPredictionScore] = useState<number>(0);
@@ -485,9 +490,9 @@ export default function LeaderboardView({
 
   // Define prize targets based on ranking as of December 31, 2026
   const prizes = [
-    { rank: 1, title: 'Gran Premio de Clasificación', name: 'Premio en Efectivo: $1.000 USD', desc: 'Otorgado al primer lugar absoluto en puntaje de D.T. al corte final del 31 de diciembre de 2026, auditado por un notario público.', icon: <Trophy className="w-5.5 h-5.5 text-yellow-450" />, badge: 'bg-yellow-500/15 border-yellow-500 text-yellow-405' },
-    { rank: 2, title: 'Segundo Premio de Clasificación', name: 'Premio en Efectivo: $500 USD', desc: 'Otorgado al segundo lugar absoluto en puntaje de D.T. al corte final del 31 de diciembre de 2026, auditado por un notario público.', icon: <Award className="w-5.5 h-5.5 text-slate-300" />, badge: 'bg-slate-300/15 border-slate-300 text-slate-300' },
-    { rank: 3, title: 'Tercer Premio de Clasificación', name: 'Premio en Efectivo: $250 USD', desc: 'Otorgado al tercer lugar absoluto en puntaje de D.T. al corte final del 31 de diciembre de 2026, auditado por un notario público.', icon: <Coins className="w-5.5 h-5.5 text-amber-500" />, badge: 'bg-amber-600/15 border-amber-600 text-amber-600' }
+    { rank: 1, title: 'Gran Premio de Clasificación', name: 'Álbum de Lujo Físico + Camiseta Oficial Firmada', desc: 'Primer lugar absoluto recibe un Álbum Físico Impreso de Lujo con todas sus tarjetas coleccionadas, Camiseta Oficial autografiada de su Selección, Certificado de "DT Campeón" y un Pase VIP físico de por vida.', icon: <Trophy className="w-5.5 h-5.5 text-yellow-450" />, badge: 'bg-yellow-500/15 border-yellow-500 text-yellow-405' },
+    { rank: 2, title: 'Segundo Premio de Clasificación', name: 'Balón Oficial Mundialista + 6 Meses VIP Elite', desc: 'Segundo lugar absoluto recibe 6 meses de Pase VIP Elite, Balón Oficial del Mundial, Gorra y Bufanda conmemorativas de Héroes del Deporte y un pack de tarjetas legendarias de colección.', icon: <Award className="w-5.5 h-5.5 text-slate-300" />, badge: 'bg-slate-300/15 border-slate-300 text-slate-300' },
+    { rank: 3, title: 'Tercer Premio de Clasificación', name: 'Bufanda Conmemorativa Oficial + 3 Meses VIP Elite', desc: 'Tercer lugar absoluto recibe 3 meses de Pase VIP Elite, Bufanda conmemorativa de Héroes del Deporte y un pack de tarjetas legendarias de colección.', icon: <Coins className="w-5.5 h-5.5 text-amber-500" />, badge: 'bg-amber-600/15 border-amber-600 text-amber-600' }
   ];
 
   const isPaidPlan = currentUserSubscription === 'Plan Scout Básico' || currentUserSubscription === 'Pase VIP Elite';
@@ -504,14 +509,14 @@ export default function LeaderboardView({
             <span className="text-[9.5px] font-mono font-bold text-indigo-400 uppercase tracking-widest block mb-1">AUDITORÍA DE RENDIMIENTO D.T.</span>
             <h2 className="text-xl font-extrabold text-white">Desglose de tus Puntos Oficiales</h2>
             <p className="text-xs text-gray-400 mt-1 max-w-xl">
-              Tus puntuaciones se calculan dinámicamente: cada cromo individual reclutado añade exactly <strong className="text-indigo-300">1 punto</strong>, completar un país otorga <strong className="text-emerald-405">5 puntos extra</strong>, y resolver trivias de selecciones (y próximamente clubes) acumula <strong className="text-yellow-450">10 puntos</strong> por cada nivel completado con éxito. Todo es acumulativo.
+              Tus puntuaciones se calculan dinámicamente: cada tarjeta individual reclutada añade exactly <strong className="text-indigo-300">1 punto</strong>, completar un país otorga <strong className="text-emerald-405">5 puntos extra</strong>, y resolver trivias de selecciones (y próximamente clubes) acumula <strong className="text-yellow-450">10 puntos</strong> por cada nivel completado con éxito. Todo es acumulativo.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-3.5 w-full lg:w-auto">
             {/* Cards unlocked points */}
             <div className="bg-slate-950 border border-slate-850 p-3.5 rounded-2xl flex-1 lg:flex-none min-w-[110px]">
-              <span className="text-[8.5px] font-mono text-gray-500 uppercase block">Cromos Reunidos</span>
+              <span className="text-[8.5px] font-mono text-gray-500 uppercase block">Tarjetas Reunidas</span>
               <span className="text-2xl font-black font-mono text-white block mt-0.5">{unlockedCromosCount}</span>
               <span className="text-[10px] text-indigo-400 font-mono mt-0.5">+{albumStickerScore} Pts</span>
             </div>
@@ -624,14 +629,14 @@ export default function LeaderboardView({
           )}
         </div>
 
-        {/* COL 3: Mi Billetera, Plan de Pago & Licencia */}
+        {/* COL 3: Licencia Oficial de D.T. */}
         <div className="bg-slate-900 border border-slate-850 rounded-3xl p-5 space-y-4 shadow-xl flex flex-col justify-between">
           <div className="space-y-4">
             <div className="border-b border-slate-800 pb-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Coins className="w-5 h-5 text-yellow-450" />
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
                 <h3 className="font-bold text-white text-xs uppercase tracking-wider font-mono">
-                  💼 Mi Billetera de D.T. y Licencia
+                  📋 Licencia Oficial de D.T.
                 </h3>
               </div>
               <span className="text-[9px] font-mono bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/15 font-bold">SINCRO OK</span>
@@ -689,7 +694,7 @@ export default function LeaderboardView({
               <div>
                 <h4 className="font-extrabold text-sm text-amber-400 uppercase font-mono tracking-wider">Inscripción a Premios Deshabilitada (Plan de Pago Requerido)</h4>
                 <p className="text-[11.5px] text-gray-300 leading-relaxed mt-0.5 max-w-2xl">
-                  Estás registrado con un <strong>Plan Gratuito Amateur</strong>. Tus puntos oficiales se registran en el ranking pero <strong>no eres elegible para recibir los premios en efectivo</strong> ($1.000, $500 o $250 USD). El desafío, juego y puntos son totalmente acumulativos en todos los desafíos o juegos de la página. Los premios y donaciones se auditan con notario público y se entregarán el 31 de diciembre del 2026 en vivo por Facebook Live y YouTube. ¡Adquiere el Pase VIP o el Plan Scout Básico para habilitar tu elegibilidad auditable!
+                  Estás registrado con un <strong>Plan Gratuito Amateur</strong>. Tus puntos oficiales se registran en el ranking pero <strong>no eres elegible para recibir los premios físicos oficiales</strong> (Álbum Físico Premium de Lujo, camisetas oficiales autografiadas y balones mundialistas). El desafío, juego y puntos son totalmente acumulativos en todos los desafíos o juegos de la página. Los premios y donaciones se auditan con notario público y se entregarán el 31 de diciembre del 2026 en vivo por Facebook Live y YouTube. ¡Adquiere el Pase VIP o el Plan Scout Básico para habilitar tu elegibilidad auditable!
                 </p>
               </div>
             </div>
@@ -768,70 +773,225 @@ export default function LeaderboardView({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         
         {/* LEFT: Live Leaderboard ranking list */}
-        <div className="lg:col-span-6 bg-slate-900 border border-slate-805 rounded-3xl p-6 shadow-xl">
-          <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-5">
-            <Trophy className="w-6 h-6 text-yellow-400 shrink-0" />
-            <div>
-              <h3 className="font-bold text-white text-base">Tabla de Clasificación Global</h3>
-              <p className="text-gray-400 text-xs mt-0.5">Ranking global en tiempo real integrado por base de datos</p>
+        <div className="lg:col-span-7 bg-slate-900 border border-slate-805 rounded-3xl p-6 shadow-xl flex flex-col justify-between">
+          <div>
+            {/* Tab Switcher */}
+            <div className="flex bg-slate-950 p-1.5 rounded-2xl border-2 border-black shadow-[3px_3px_0px_rgba(0,0,0,1)] mb-6">
+              <button
+                type="button"
+                onClick={() => setRankingTab('liga_mundial')}
+                className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  rankingTab === 'liga_mundial'
+                    ? 'bg-[#FF7F00] text-black border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)]'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                🌍 Liga Mundial (Gratis)
+              </button>
+              <button
+                type="button"
+                onClick={() => setRankingTab('arena_vip')}
+                className={`flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                  rankingTab === 'arena_vip'
+                    ? 'bg-indigo-600 text-white border-2 border-black shadow-[2px_2px_0px_rgba(0,0,0,1)]'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                👑 Arena TactikAI (VIP)
+              </button>
             </div>
-          </div>
 
-          <div className="space-y-3">
-            {displayedRanking.map((item, index) => {
-              const isUser = item.username.includes('Tú') || item.username.includes('Director');
-              const pos = item.rank || (index + 1);
-              const medalStyles = pos === 1 ? 'bg-yellow-500/10 border-yellow-500 text-yellow-400' 
-                               : pos === 2 ? 'bg-slate-300/10 border-slate-300 text-slate-300' 
-                               : pos === 3 ? 'bg-amber-600/10 border-amber-600 text-amber-600' 
-                               : 'bg-slate-950 border-slate-850 text-gray-400';
-
-              let eligibilityLabel = '';
-              if (pos === 1) eligibilityLabel = '🥇 $1.000 USD';
-              else if (pos === 2) eligibilityLabel = '🥈 $500 USD';
-              else if (pos === 3) eligibilityLabel = '🥉 $250 USD';
-
-              return (
-                <div
-                  key={index}
-                  className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
-                    isUser 
-                      ? 'bg-indigo-500/10 border-indigo-500 ring-1 ring-indigo-500/25 shadow-lg scale-[1.01]' 
-                      : 'bg-slate-950 border-slate-950 hover:border-slate-800'
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center border font-mono font-bold text-xs ${medalStyles}`}>
-                      {pos}
-                    </div>
-                    <div>
-                      <h4 className={`text-sm font-bold flex items-center gap-1.5 ${isUser ? 'text-indigo-400 font-extrabold' : 'text-white'}`}>
-                        <span>{item.avatar || '⚽'}</span>
-                        <span>{item.username}</span>
-                      </h4>
-                      <p className="text-[9.5px] text-gray-500 font-mono mt-0.5">
-                        Cod: {item.code} {item.aciertosOnce !== undefined && item.aciertosOnce > 0 ? `• Táctica XI: ${item.aciertosOnce}/11` : ''} {eligibilityLabel && <span className="text-indigo-400 font-semibold ml-1">• {eligibilityLabel}</span>}
-                      </p>
-                      {/* Detailed segment breakdown on leaderboard list */}
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1 font-mono text-[8.5px] tracking-tight">
-                        <span className="bg-blue-500/10 text-blue-400 px-1.5 py-0.2 rounded" title="Puntos por Cromos">🖼️ Cromos: {item.unlockedStickersCount || 0}</span>
-                        <span className="bg-emerald-500/10 text-emerald-400 px-1.5 py-0.2 rounded" title="Bonos por Países Completados">🌍 Bonos: {(item.completedCountries?.length || 0) * 5}</span>
-                        <span className="bg-orange-500/10 text-orange-400 px-1.5 py-0.2 rounded" title="Puntos por XI Ideal">🏃 XI: {(item.aciertosOnce || 0) * 10}</span>
-                        <span className="bg-yellow-500/10 text-yellow-300 px-1.5 py-0.2 rounded" title="Puntos por Marcador Exacto">🎯 Score: {(item.aciertosMarcador || 0) * 20}</span>
-                        <span className="bg-purple-500/10 text-purple-400 px-1.5 py-0.2 rounded" title="Puntos por Invitaciones">👥 Amigos: {item.referralPoints || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <span className={`text-base font-black font-mono ${isUser ? 'text-indigo-400' : 'text-white'}`}>
-                      {item.score}
-                    </span>
-                    <span className="block text-[8px] text-gray-500 font-mono uppercase">PTS</span>
+            {/* HEADER TEXTS BASED ON ACTIVE TAB */}
+            {rankingTab === 'liga_mundial' ? (
+              <div className="mb-5 border-b border-slate-850 pb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Trophy className="w-5.5 h-5.5 text-yellow-450" />
+                  <h3 className="font-extrabold text-white text-base uppercase tracking-wider">Clasificación Liga Mundial</h3>
+                </div>
+                <p className="text-gray-400 text-xs leading-relaxed">
+                  Basado <strong className="text-emerald-400">únicamente en aciertos de pronósticos reales</strong> (marcador exacto, once inicial titular y MVP). Las compras no influyen.
+                </p>
+                
+                {/* LEGAL BARRIER DISCLAIMER */}
+                <div className="mt-3 p-3 bg-emerald-500/10 border-2 border-emerald-500/30 rounded-xl flex items-start gap-2 text-left">
+                  <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[9.5px] font-mono font-black text-emerald-400 uppercase tracking-widest block">🛡️ MURO DE CONTENCIÓN LEGAL</span>
+                    <p className="text-[10px] text-slate-350 leading-relaxed mt-0.5">
+                      Esta clasificación es estrictamente gratuita y meritocrática. Ninguna microtransacción, compra de sobres o canje influye en la puntuación o el orden de este ranking. Los premios son físicos e independientes de compras.
+                    </p>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ) : (
+              <div className="mb-5 border-b border-slate-850 pb-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className="w-5.5 h-5.5 text-indigo-400" />
+                  <h3 className="font-extrabold text-white text-base uppercase tracking-wider">Arena TactikAI / Desafío VIP</h3>
+                </div>
+                <p className="text-gray-400 text-xs leading-relaxed">
+                  Clasificación de simulación PvP para usuarios Scout/VIP. Compite alineando tus tarjetas poseídas contra otros entrenadores.
+                </p>
+              </div>
+            )}
+
+            {/* LIST RENDERING */}
+            {rankingTab === 'liga_mundial' ? (
+              <div className="space-y-3">
+                {/* Sort displayed ranking exclusively by prediction points */}
+                {[...displayedRanking].map(item => {
+                  const isUser = item.username.includes('Tú') || item.username.includes('Director');
+                  const predScore = isUser ? predictionScore : ((item.aciertosOnce || 0) * 10 + (item.aciertosMarcador || 0) * 20);
+                  return {
+                    ...item,
+                    predictionOnlyScore: predScore
+                  };
+                })
+                .sort((a, b) => b.predictionOnlyScore - a.predictionOnlyScore)
+                .map((item, index) => {
+                  const isUser = item.username.includes('Tú') || item.username.includes('Director');
+                  const pos = index + 1;
+                  const medalStyles = pos === 1 ? 'bg-yellow-500/10 border-yellow-500 text-yellow-400' 
+                                   : pos === 2 ? 'bg-slate-300/10 border-slate-300 text-slate-300' 
+                                   : pos === 3 ? 'bg-amber-600/10 border-amber-600 text-amber-600' 
+                                   : 'bg-slate-950 border-slate-850 text-gray-400';
+
+                  let eligibilityLabel = '';
+                  if (pos === 1) eligibilityLabel = '🥇 $1.000 USD';
+                  else if (pos === 2) eligibilityLabel = '🥈 $500 USD';
+                  else if (pos === 3) eligibilityLabel = '🥉 $250 USD';
+
+                  return (
+                    <div
+                      key={index}
+                      className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                        isUser 
+                          ? 'bg-indigo-500/10 border-indigo-550 ring-1 ring-indigo-500/25 shadow-lg scale-[1.01]' 
+                          : 'bg-slate-950 border-slate-950 hover:border-slate-800'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3.5">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center border font-mono font-bold text-xs ${medalStyles}`}>
+                          {pos}
+                        </div>
+                        <div>
+                          <h4 className={`text-sm font-bold flex items-center gap-1.5 ${isUser ? 'text-indigo-400 font-extrabold' : 'text-white'}`}>
+                            <span>{item.avatar || '⚽'}</span>
+                            <span>{item.username}</span>
+                          </h4>
+                          <p className="text-[9.5px] text-gray-500 font-mono mt-0.5">
+                            Cod: {item.code} {item.aciertosOnce !== undefined && item.aciertosOnce > 0 ? `• XI Aciertos: ${item.aciertosOnce}/11` : ''} {eligibilityLabel && <span className="text-indigo-400 font-semibold ml-1">• {eligibilityLabel}</span>}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1 font-mono text-[8.5px] tracking-tight text-slate-400">
+                            <span className="bg-orange-500/10 text-orange-400 px-1.5 py-0.2 rounded">🏃 Acierto XI: {(item.aciertosOnce || 0) * 10} PTS</span>
+                            <span className="bg-yellow-500/10 text-yellow-300 px-1.5 py-0.2 rounded">🎯 Goles: {(item.aciertosMarcador || 0) * 20} PTS</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className={`text-base font-black font-mono ${isUser ? 'text-indigo-400' : 'text-white'}`}>
+                          {item.predictionOnlyScore}
+                        </span>
+                        <span className="block text-[8px] text-gray-500 font-mono uppercase">PTS</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* ARENA TACTIKAI VIP TAB CONTENT */
+              <div>
+                {!isPaidPlan ? (
+                  /* LOCK SCREEN FOR GRATUITO USER */
+                  <div className="bg-slate-950/90 border-2 border-indigo-500/30 rounded-3xl p-8 text-center space-y-5 relative overflow-hidden my-4 min-h-[350px] flex flex-col justify-center items-center">
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+                    
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-550/15 border-2 border-indigo-500/30 flex items-center justify-center shadow-lg shadow-indigo-500/10">
+                      <Lock className="w-7 h-7 text-indigo-400 animate-pulse" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="font-bangers text-2xl text-white uppercase tracking-wider">Desafío VIP Arena Bloqueado</h4>
+                      <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
+                        La Arena TactikAI PvP es una clasificación independiente y competitiva reservada para usuarios con <strong className="text-[#FF7F00]">Pase Scout o Pase VIP Elite</strong>. Aquí se ponen a prueba tus alineaciones tácticas formadas únicamente con tarjetas que posees.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-slate-900 border border-slate-800 rounded-2xl text-left text-[10.5px] font-sans text-slate-400 leading-normal max-w-md">
+                      ⚠️ <strong>Muro de Contención Legal:</strong> Al ser un torneo de simulación donde influye la posesión de tarjetas, este ranking se mantiene 100% independiente de la Liga Mundial para cumplir estrictamente con las leyes de sorteos y evitar pay-to-win en la liga gratuita.
+                    </div>
+
+                    {onNavigateToSubscription && (
+                      <button
+                        onClick={onNavigateToSubscription}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white border-2 border-black px-6 py-2.5 rounded-xl font-sans font-black text-xs uppercase shadow-[4px_4px_0px_rgba(0,0,0,1)] cursor-pointer transition active:translate-y-0.5 active:shadow-[1.5px_1.5px_0px_rgba(0,0,0,1)]"
+                      >
+                        Mejorar Plan & Desbloquear Arena
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  /* FULL INDEPENDENT ARENA LEADERBOARD */
+                  <div className="space-y-3">
+                    {[
+                      { username: "Tú - DT Manager", score: userArenaXp, avatar: "👑", code: currentUserCode, club: "Mi Club TactikAI", isUser: true },
+                      { username: "Bielsa Disciple", score: 850, avatar: "🧠", code: "DT-BIEL", club: "Newell's Tactics", isUser: false },
+                      { username: "Guardiola Jr", score: 720, avatar: "🛸", code: "DT-PEPJ", club: "Tiki Taka Athletic", isUser: false },
+                      { username: "Simeone Fanatic", score: 680, avatar: "🧱", code: "DT-CHOL", club: "Muro de Berlín FC", isUser: false },
+                      { username: "Ancelotti King", score: 610, avatar: "🤨", code: "DT-CARL", club: "Real Class FC", isUser: false },
+                      { username: "Jogo Bonito SC", score: 540, avatar: "🇧🇷", code: "DT-SAMB", club: "Samba Stars", isUser: false }
+                    ]
+                    .sort((a, b) => b.score - a.score)
+                    .map((item, index) => {
+                      const pos = index + 1;
+                      const medalStyles = pos === 1 ? 'bg-indigo-550/20 border-indigo-500 text-indigo-400' 
+                                       : pos === 2 ? 'bg-purple-500/10 border-purple-400 text-purple-300' 
+                                       : pos === 3 ? 'bg-blue-600/10 border-blue-600 text-blue-400' 
+                                       : 'bg-slate-950 border-slate-850 text-gray-500';
+
+                      return (
+                        <div
+                          key={index}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                            item.isUser 
+                              ? 'bg-indigo-500/10 border-indigo-550 ring-1 ring-indigo-500/25 shadow-lg scale-[1.01]' 
+                              : 'bg-slate-950 border-slate-950 hover:border-slate-800'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3.5">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center border font-mono font-bold text-xs ${medalStyles}`}>
+                              {pos}
+                            </div>
+                            <div>
+                              <h4 className={`text-sm font-bold flex items-center gap-1.5 ${item.isUser ? 'text-indigo-400 font-extrabold' : 'text-white'}`}>
+                                <span>{item.avatar || '⚽'}</span>
+                                <span>{item.username}</span>
+                              </h4>
+                              <p className="text-[9.5px] text-gray-500 font-mono mt-0.5">
+                                Club: <strong className="text-slate-300">{item.club}</strong> • Cod: {item.code}
+                              </p>
+                              <div className="flex items-center gap-1.5 mt-1">
+                                <span className="text-[8.5px] bg-indigo-500/15 text-indigo-400 font-mono px-2 py-0.2 rounded">
+                                  🎮 ARENA MATCH COMPETITOR
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <span className={`text-base font-black font-mono ${item.isUser ? 'text-indigo-400' : 'text-white'}`}>
+                              {item.score}
+                            </span>
+                            <span className="block text-[8px] text-gray-500 font-mono uppercase">XP ARENA</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -914,7 +1074,7 @@ export default function LeaderboardView({
                       type="button"
                       onClick={() => {
                         const shareLink = `${window.location.origin}/?ref=${encodeURIComponent(currentUserEmail || '')}`;
-                        const customMsg = `🏆 ¡Únete al Álbum de Trivia Pro de Selecciones 25-26!\n\nRegístrate ingresando a este enlace de invitación:\n👉 ${shareLink}\n\n¡Pon a prueba tus conocimientos tácticos, colecciona cromos de los astros y clasifica a sorteos reales! (Usa mi correo registrado: *${currentUserEmail}* al registrarte)`;
+                        const customMsg = `🏆 ¡Únete al Álbum de Trivia Pro de Selecciones 25-26!\n\nRegístrate ingresando a este enlace de invitación:\n👉 ${shareLink}\n\n¡Pon a prueba tus conocimientos tácticos, colecciona tarjetas de los astros y clasifica a sorteos reales! (Usa mi correo registrado: *${currentUserEmail}* al registrarte)`;
                         const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(customMsg)}`;
                         window.open(whatsappUrl, '_blank');
                       }}
@@ -1011,7 +1171,7 @@ export default function LeaderboardView({
               </div>
 
               <p className="text-[11.5px] text-gray-400 leading-normal">
-                Cumpliendo las normas de transparencia y equidad de sorteos, las tiradas de cromos se resuelven con una semilla única. Si ingresas el mismo código, el resultado será 100% idéntico y verificable, previniendo manipulaciones.
+                Cumpliendo las normas de transparencia y equidad de sorteos, las tiradas de tarjetas se resuelven con una semilla única. Si ingresas el mismo código, el resultado será 100% idéntico y verificable, previniendo manipulaciones.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1061,10 +1221,10 @@ export default function LeaderboardView({
                       return (
                         <div key={idx} className="bg-brand-card/90 border border-slate-800 p-2 rounded-xl flex-1 text-center font-sans">
                           <span className="text-[8px] font-mono bg-indigo-500/10 text-indigo-400 border border-indigo-500/15 py-0.5 px-1.5 rounded uppercase">
-                            Cromo #{idx + 1}
+                            Tarjeta #{idx + 1}
                           </span>
                           <h5 className="font-extrabold text-[11px] text-white mt-1.5 truncate">
-                            {playerFound ? playerFound.realName : `Cromo ${idx + 1}`}
+                            {playerFound ? playerFound.realName : `Tarjeta ${idx + 1}`}
                           </h5>
                           <span className="text-[9px] text-slate-500 block truncate font-mono">
                             {playerFound ? `${playerFound.rating} Rating` : 'N/A'}

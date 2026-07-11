@@ -950,7 +950,7 @@ No violes derechos de autor. Utiliza descripciones artísticas, tácticas y futb
     const currentDateObj = new Date(currentTimeISO);
     const diffMs = matchDateObj.getTime() - currentDateObj.getTime();
     const diffHours = diffMs / (1000 * 60 * 60);
-    const fallbackEligible = diffHours >= 2.0;
+    const fallbackEligible = diffHours >= 1.0;
 
     let eligible = fallbackEligible;
     let hoursRemaining = Number(diffHours.toFixed(2));
@@ -959,7 +959,7 @@ No violes derechos de autor. Utiliza descripciones artísticas, tácticas y futb
     if (ai && !isGeminiQuotaDepleted) {
       try {
         const prompt = `Valida si el pronóstico de marcador y táctica califica para ganar puntos según la regla del D.T. de la Copa Mundial 2026.
-Regla: Toda predicción debe guardarse obligatoriamente al menos 2 horas antes de la hora oficial de inicio del encuentro deportivo. Si se realiza después de ese tiempo límite, se guardará como datos informativos e históricos del DT, pero NO otorgará puntos para la tabla de posiciones (elegibilidad = false).
+Regla: Toda predicción debe guardarse obligatoriamente al menos 1 hora antes de la hora oficial de inicio del encuentro deportivo. Si se realiza después de ese tiempo límite, se guardará como datos informativos e históricos del DT, pero NO otorgará puntos para la tabla de posiciones (elegibilidad = false).
 
 Datos del Próximo Encuentro:
 - Local: ${local}
@@ -975,7 +975,7 @@ Datos Geográficos y Temporales del Director Técnico (Usuario):
 Analiza con calma:
 1. Compara críticamente la hora programada (${matchFecha} UTC-5) con la hora del usuario (${currentTimeISO}).
 2. Determina cuántas horas faltan para el inicio del partido.
-3. Evalúa si quedan por lo menos 2.0 horas (TRUE), o si faltan menos de 2 horas (por ejemplo, si faltan 1.5 horas, o si ya inició/concluyó) (FALSE).
+3. Evalúa si quedan por lo menos 1.0 hora (TRUE), o si faltan menos de 1 hora (por ejemplo, si faltan 0.5 horas, o si ya inició/concluyó) (FALSE).
 
 Devuelve obligatoriamente un formato JSON que cumpla al pie de la letra con este esquema:
 {
@@ -1961,6 +1961,205 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
   // API 1.48: Get custom match results across users and devices for global synchronization
   app.get("/api/matches/custom", (req, res) => {
     res.json({ status: "success", matches: CUSTOM_MATCHES_DB });
+  });
+
+  // API 1.485: Tactical Simulation & PVP Challenge Engine
+  app.post("/api/pvp/simulate", async (req, res) => {
+    const { challengeId, clubName, escudoSeed, userRoster, tactics, opponentPlayers } = req.body;
+
+    if (!userRoster || !Array.isArray(userRoster) || userRoster.length < 11) {
+      return res.status(400).json({ error: "Se requiere un once inicial completo (11 jugadores) para simular." });
+    }
+    if (!tactics || !tactics.playerTactics) {
+      return res.status(400).json({ error: "Falta el esquema táctico y directrices de posicionamiento." });
+    }
+
+    // Identify Opponent metadata
+    let opponentName = "Oponente de Arena";
+    let opponentRating = 85;
+    if (challengeId === "chal_berlin") {
+      opponentName = "Muro de Berlín FC";
+      opponentRating = 84;
+    } else if (challengeId === "chal_sambas") {
+      opponentName = "Jogo Bonito SC";
+      opponentRating = 88;
+    } else if (challengeId === "chal_tikitaka") {
+      opponentName = "Tiki Taka Athletic";
+      opponentRating = 86;
+    } else if (challengeId === "chal_counters") {
+      opponentName = "Contraataque United";
+      opponentRating = 85;
+    }
+
+    // 1. Calculate Average user team rating
+    const totalUserRating = userRoster.reduce((sum, p) => sum + (Number(p.rating) || 75), 0);
+    const avgUserRating = totalUserRating / 11;
+
+    // 2. Compute tactical bonuses based on strategic parameters
+    let userTacticBonus = 0;
+    
+    // Fluid formation bonus
+    if (tactics.formationWithBall !== tactics.formationWithoutBall) {
+      userTacticBonus += 3.5; 
+    }
+
+    // Pressure line modifiers (risk vs reward)
+    const press = Number(tactics.pressureLine) || 5;
+    if (press >= 8) {
+      userTacticBonus += 1.5; // highly aggressive, increases attack
+    } else if (press <= 3) {
+      userTacticBonus += 0.5; // low pressure, hard to beat but limits attack
+    }
+
+    // Directional Arrow check (e.g. FW with N/NE/NW direction gets bonus)
+    let perfectArrows = 0;
+    userRoster.forEach(p => {
+      const pTactic = tactics.playerTactics[p.id];
+      if (pTactic) {
+        const dir = pTactic.runDirection;
+        if (p.position === "FW" && (dir === "N" || dir === "NE" || dir === "NO")) {
+          perfectArrows++;
+        } else if (p.position === "DF" && (dir === "S" || dir === "SE" || dir === "SO")) {
+          perfectArrows++;
+        }
+      }
+    });
+    userTacticBonus += (perfectArrows * 0.4);
+
+    // 3. Compute Probabilistic Outcomes
+    const userStrength = avgUserRating + userTacticBonus;
+    const opponentStrength = opponentRating;
+    const totalStrength = userStrength + opponentStrength;
+
+    // Base win probability of user
+    const winProb = Math.round((userStrength / totalStrength) * 100);
+    const drawProb = 20;
+
+    // Determine Result
+    const randomSeed = Math.random() * 100;
+    let goalsLocal = 0;
+    let goalsVisitante = 0;
+
+    if (randomSeed < winProb - 8) {
+      // Victory for User
+      goalsLocal = Math.floor(Math.random() * 3) + 1;
+      goalsVisitante = Math.floor(Math.random() * goalsLocal);
+    } else if (randomSeed < winProb + drawProb) {
+      // Draw match
+      goalsLocal = Math.floor(Math.random() * 3);
+      goalsVisitante = goalsLocal;
+    } else {
+      // Defeat for User
+      goalsVisitante = Math.floor(Math.random() * 3) + 1;
+      goalsLocal = Math.floor(Math.random() * goalsVisitante);
+    }
+
+    // Stats calculations
+    const possessionLocal = Math.min(68, Math.max(32, Math.round(50 + userTacticBonus + (Math.random() * 8 - 4))));
+    const possessionVisitante = 100 - possessionLocal;
+
+    const shotsLocal = Math.max(goalsLocal, Math.floor(possessionLocal / 4.5) + Math.floor(Math.random() * 3));
+    const shotsVisitante = Math.max(goalsVisitante, Math.floor(possessionVisitante / 4.5) + Math.floor(Math.random() * 3));
+
+    // Scorer extraction from aligned players
+    const userFWs = userRoster.filter(p => p.position === "FW");
+    const userMFs = userRoster.filter(p => p.position === "MF");
+    const strikerPool = userFWs.length > 0 ? userFWs : (userMFs.length > 0 ? userMFs : userRoster);
+
+    const scorersLocal: string[] = [];
+    for (let i = 0; i < goalsLocal; i++) {
+      const scorer = strikerPool[Math.floor(Math.random() * strikerPool.length)];
+      scorersLocal.push(scorer.name || scorer.realName);
+    }
+
+    const scorersVisitante: string[] = [];
+    for (let i = 0; i < goalsVisitante; i++) {
+      scorersVisitante.push(`Estrella Rival ${i + 1}`);
+    }
+
+    // Generate predictive 8x8 heatmaps (as grids for UI visual blocks)
+    const heatMapLocal = Array.from({ length: 8 }, () => 
+      Array.from({ length: 8 }, () => Math.round(10 + Math.random() * 45 + (possessionLocal > 50 ? 10 : 0)))
+    );
+    const heatMapVisitante = Array.from({ length: 8 }, () => 
+      Array.from({ length: 8 }, () => Math.round(10 + Math.random() * 45 + (possessionVisitante > 50 ? 10 : 0)))
+    );
+
+    let report = "";
+
+    // 4. Generate report with Gemini (if active) or Fallback
+    if (ai && !isGeminiQuotaDepleted) {
+      try {
+        const prompt = `Actúa como SophIA, una Analista de Fútbol y Táctica Deportiva experta en simuladores managers clásicos.
+Analiza con rigor técnico el siguiente partido simulado en la PVP Arena:
+
+- Club Local (Usuario): ${clubName} (Escudo: ${escudoSeed})
+- Alineación Local: ${JSON.stringify(userRoster.map(p => ({ name: p.name, pos: p.position, rating: p.rating, country: p.country })), null, 2)}
+- Tácticas de Estrategia Elegidas:
+  * Formación con Balón: ${tactics.formationWithBall}
+  * Formación sin Balón (Defensiva): ${tactics.formationWithoutBall}
+  * Línea de Presión: ${tactics.pressureLine}/10
+  * Directrices de carrera (Flechas 8-direccionales) y marcaje individual asignadas.
+- Oponente (Rival): ${opponentName} (Rating promedio: ${opponentRating})
+- Marcador Final: ${clubName} ${goalsLocal} - ${goalsVisitante} ${opponentName}
+- Estadísticas: Posesión: ${possessionLocal}% vs ${possessionVisitante}%. Remates: ${shotsLocal} vs ${shotsVisitante}.
+- Goleadores de tu club: ${JSON.stringify(scorersLocal)}
+
+Genera un reporte de análisis táctico en español (aproximadamente de 150 a 200 palabras) en un tono directo, humilde y sumamente analítico.
+Explica detalladamente por qué la combinación táctica de la formación fluida (${tactics.formationWithBall} -> ${tactics.formationWithoutBall}) y la presión de nivel ${tactics.pressureLine} funcionó o falló contra ${opponentName}.
+Menciona el impacto de las flechas de dirección de carrera configuradas para tus delanteros o defensores. No agregues formatos markdown de código, sólamente entrega el texto en párrafos fluidos listos para renderizar.`;
+
+        const response = await generateContentWithRetry(ai, {
+          model: "gemini-2.5-flash",
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          config: { temperature: 0.7 }
+        });
+
+        const textResponse = response?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (textResponse) {
+          report = textResponse.trim();
+        }
+      } catch (err) {
+        console.warn("[Gemini API Warning] Error in tactical report generation with Gemini, using local fallback:", err);
+      }
+    }
+
+    // Local Fallback if Gemini failed or quota depleted
+    if (!report) {
+      const isVictory = goalsLocal > goalsVisitante;
+      const isDraw = goalsLocal === goalsVisitante;
+      
+      let resultAnalysis = "";
+      if (isVictory) {
+        resultAnalysis = `¡Soberbio triunfo para ${clubName}! La formación dinámica de ${tactics.formationWithBall} desestabilizó por completo la cobertura defensiva de ${opponentName}. Las flechas ofensivas norte permitieron desmarques profundos hacia el último tercio.`;
+      } else if (isDraw) {
+        resultAnalysis = `Duelo de pizarras nulo. Tanto ${clubName} como ${opponentName} resguardaron sus sectores de forma soberbia. La transición defensiva replegándose a ${tactics.formationWithoutBall} evitó sorpresas de contraataque.`;
+      } else {
+        resultAnalysis = `Tropiezo táctico en la arena. La presión en bloque alto (nivel ${tactics.pressureLine}/10) dejó desprotegida la retaguardia de tu club, permitiendo que ${opponentName} liquidara en velocidad con trazos largos.`;
+      }
+
+      report = `Análisis Táctico SophIA (Generación Local): ${resultAnalysis}
+      
+Tu club de directores técnicos alineó un esquema fluido sumamente inteligente. La posesión se mantuvo en un sólido ${possessionLocal}%, registrando un volumen de juego ofensivo de ${shotsLocal} remates totales.
+${scorersLocal.length > 0 ? `Los remates de ${scorersLocal.join(", ")} capitalizaron las opciones creadas por las flechas de desborde.` : "Se adoleció de contundencia frente a los tres palos del portero rival."}
+La asignación de marcajes específicos ayudó a neutralizar la ofensiva de ${opponentName}, aunque se identifican áreas de mejora en la línea de contención media. ¡Sigue editando tus variantes estratégicas para ascender en la clasificación global de DTs!`;
+    }
+
+    res.json({
+      goalsLocal,
+      goalsVisitante,
+      possessionLocal,
+      possessionVisitante,
+      shotsLocal,
+      shotsVisitante,
+      victoryChanceLocal: winProb,
+      victoryChanceVisitante: 100 - winProb - drawProb,
+      report,
+      heatMapLocal,
+      heatMapVisitante,
+      scorersLocal,
+      scorersVisitante
+    });
   });
 
   // API 1.49: Update custom match results from the administrators and trigger permanent JSON serialization

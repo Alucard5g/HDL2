@@ -11,6 +11,8 @@ import FlutterDocsView from './components/FlutterDocsView';
 import GroupsFixtureView from './components/GroupsFixtureView';
 import SubscriptionView from './components/SubscriptionView';
 import AdminPanelView from './components/AdminPanelView';
+import PVPArenaView from './components/PVPArenaView';
+import SocialImpactStadium from './components/SocialImpactStadium';
 import { TactikAiLogo } from './components/TactikAiLogo';
 import { DTAvatarAndAssistant } from './components/DTAvatarAndAssistant';
 import { DTAvatarRenderer } from './components/DTAvatarRenderer';
@@ -34,7 +36,10 @@ import {
   LogOut,
   Rss,
   MessageSquare,
-  Globe
+  Globe,
+  Heart,
+  Coins,
+  Shield
 } from 'lucide-react';
 
 function getSafeImageUrl(url: string | undefined): string | undefined {
@@ -112,7 +117,7 @@ function safeSaveCustomStickers(generations: { [key: string]: string }) {
 
 export default function App() {
   // Navigation tabs
-  const [activeTab, setActiveTab] = useState<'menu_hub' | 'album' | 'board' | 'leaderboard' | 'groups_fixture' | 'flutter' | 'subscription' | 'admin'>('menu_hub');
+  const [activeTab, setActiveTab] = useState<'menu_hub' | 'album' | 'board' | 'leaderboard' | 'groups_fixture' | 'flutter' | 'subscription' | 'admin' | 'pvp_arena' | 'reglas' | 'nuestra_causa'>('menu_hub');
 
   // CAPTURA Y PERSISTENCIA DE VISITA POR QR / INVITACIÓN DE USUARIOS / STRIPE SUCCESS
   useEffect(() => {
@@ -243,6 +248,68 @@ export default function App() {
     const storedEmail = localStorage.getItem('dt_user_email');
     if (!storedEmail || storedEmail.trim() === '') {
       setShowGuestWelcome(true);
+    }
+  }, []);
+
+  // Auto-login / session recovery from server on page refresh (remembers users)
+  useEffect(() => {
+    const storedEmail = localStorage.getItem('dt_user_email');
+    const storedPassword = localStorage.getItem('dt_user_password');
+    if (storedEmail && storedPassword && storedEmail.trim() !== '') {
+      fetch('/api/user/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: storedEmail, password: storedPassword })
+      })
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('No se pudo autenticar automáticamente');
+      })
+      .then(data => {
+        if (data && data.status === 'success' && data.user) {
+          const matchedUser = data.user;
+          setUserId(matchedUser.id || 'usr_me');
+          setUsername(matchedUser.username || 'Tú (Director Técnico)');
+          setUserCode(matchedUser.gameCode || matchedUser.code || '');
+          setUserAvatar(matchedUser.avatar || '👑');
+          setUserEmail(matchedUser.email);
+          setUserPassword(matchedUser.password);
+          setUserLicense(matchedUser.licenseCode || matchedUser.license || '');
+          setUserSubscription(matchedUser.subscription || 'Ninguna');
+          
+          if (matchedUser.adminSyncCounter !== undefined) {
+            setAdminSyncCounter(matchedUser.adminSyncCounter);
+            localStorage.setItem('dt_admin_sync_counter', String(matchedUser.adminSyncCounter));
+          }
+          if (matchedUser.vipChosenContinent) {
+            setVipChosenContinent(matchedUser.vipChosenContinent);
+            localStorage.setItem('dt_vip_chosen_continent', matchedUser.vipChosenContinent);
+          }
+          if (matchedUser.unlockedLevels) {
+            setUnlockedLevels(matchedUser.unlockedLevels);
+            localStorage.setItem('scouting_unlocked_levels', JSON.stringify(matchedUser.unlockedLevels));
+          }
+          if (matchedUser.tacticalBoards) {
+            setTacticalBoards(matchedUser.tacticalBoards);
+            localStorage.setItem('scouting_tactical_boards', JSON.stringify(matchedUser.tacticalBoards));
+          }
+          if (matchedUser.coins !== undefined) {
+            setUserCoins(matchedUser.coins);
+            localStorage.setItem('dt_user_coins', String(matchedUser.coins));
+          }
+          if (matchedUser.cashBalance !== undefined) {
+            setUserCashBalance(matchedUser.cashBalance);
+            localStorage.setItem('dt_user_cash_balance', String(matchedUser.cashBalance));
+          }
+          if (matchedUser.avatarConfig) {
+            setUserAvatarConfig(matchedUser.avatarConfig);
+            localStorage.setItem('dt_avatar_custom_config', JSON.stringify(matchedUser.avatarConfig));
+          }
+        }
+      })
+      .catch(err => {
+        console.warn('[Auto-Login Error]:', err);
+      });
     }
   }, []);
 
@@ -453,6 +520,56 @@ export default function App() {
     return saved ? parseInt(saved, 10) : 350; // Start with 350 coins default saldo
   });
 
+  // Track unlocked countries from all paths (trivia, scout, daily, vip, season_pass)
+  const [unlockedCountries, setUnlockedCountries] = useState<{ [countryName: string]: 'trivia' | 'scout' | 'daily' | 'vip' | 'season_pass' }>(() => {
+    try {
+      const val = localStorage.getItem('dt_unlocked_countries');
+      return val ? JSON.parse(val) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Track daily pack cumulative spend per country (Duplicate Protection)
+  const [dailyPacksSpend, setDailyPacksSpend] = useState<{ [countryName: string]: number }>(() => {
+    try {
+      const val = localStorage.getItem('dt_daily_packs_spend');
+      return val ? JSON.parse(val) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Social impact donations pools
+  const [communityBasePool, setCommunityBasePool] = useState<number>(() => {
+    return Number(localStorage.getItem('album_community_donations_base') || '258.45');
+  });
+
+  const [personalDonationTotal, setPersonalDonationTotal] = useState<number>(() => {
+    return Number(localStorage.getItem('album_user_donations_total') || '0.00');
+  });
+
+  useEffect(() => {
+    localStorage.setItem('dt_unlocked_countries', JSON.stringify(unlockedCountries));
+  }, [unlockedCountries]);
+
+  useEffect(() => {
+    localStorage.setItem('dt_daily_packs_spend', JSON.stringify(dailyPacksSpend));
+  }, [dailyPacksSpend]);
+
+  useEffect(() => {
+    localStorage.setItem('album_community_donations_base', String(communityBasePool));
+  }, [communityBasePool]);
+
+  useEffect(() => {
+    localStorage.setItem('album_user_donations_total', String(personalDonationTotal));
+  }, [personalDonationTotal]);
+
+  const [pvpArenaXp, setPvpArenaXp] = useState<number>(() => {
+    const saved = localStorage.getItem('pvp_arena_xp');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+
   const [paymentHistory, setPaymentHistory] = useState<any[]>(() => {
     const saved = localStorage.getItem('dt_user_payment_history');
     if (saved) {
@@ -490,6 +607,10 @@ export default function App() {
   }, [userCoins]);
 
   useEffect(() => {
+    localStorage.setItem('pvp_arena_xp', pvpArenaXp.toString());
+  }, [pvpArenaXp]);
+
+  useEffect(() => {
     localStorage.setItem('dt_user_payment_history', JSON.stringify(paymentHistory));
   }, [paymentHistory]);
 
@@ -525,37 +646,6 @@ export default function App() {
       localStorage.removeItem('dt_user_password');
     }
     setUserPassword(newPassword);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('dt_user_id');
-    localStorage.removeItem('dt_username');
-    localStorage.removeItem('dt_user_avatar');
-    localStorage.removeItem('dt_user_email');
-    localStorage.removeItem('dt_user_license');
-    localStorage.removeItem('user_subscription');
-    localStorage.removeItem('scout_chosen_country');
-    localStorage.removeItem('dt_vip_chosen_continent');
-    localStorage.removeItem('dt_user_password');
-    localStorage.removeItem('dt_purchased_points');
-
-    setUserId('user_me');
-    setUsername('Tú (Director Técnico)');
-    setUserAvatar('👑');
-    setUserEmail('');
-    setUserLicense('');
-    setUserSubscription('Ninguna');
-    setScoutChosenCountry('');
-    setVipChosenContinent('América');
-    setUserPassword('');
-    setPurchasedPoints(0);
-    setIsLocked(false);
-
-    const standardCode = 'DT-' + Math.floor(1000 + Math.random() * 9000);
-    localStorage.setItem('dt_user_code', standardCode);
-    setUserCode(standardCode);
-
-    setIsRegistrationOpen(true);
   };
 
   const [userId, setUserId] = useState<string>(() => {
@@ -682,9 +772,14 @@ export default function App() {
     localStorage.setItem('dt_admin_sync_counter', adminSyncCounter.toString());
   }, [adminSyncCounter]);
 
-  const isAdmin = userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail' || userEmail.trim().toLowerCase() === 'conscientizarte13@gmail.com' || userEmail.trim().toLowerCase() === 'conscientizarte13@gmail';
+  const isAdmin = typeof userEmail === 'string' && (
+    userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail.com' || 
+    userEmail.trim().toLowerCase() === 'geovannygrk3d@gmail' || 
+    userEmail.trim().toLowerCase() === 'conscientizarte13@gmail.com' || 
+    userEmail.trim().toLowerCase() === 'conscientizarte13@gmail'
+  );
 
-  const isRegistered = userId !== 'user_me' && !!userEmail && userEmail.trim().length > 0;
+  const isRegistered = userId !== 'user_me' && typeof userEmail === 'string' && userEmail.trim().length > 0;
 
   // State
   const [selectedCountryName, setSelectedCountryName] = useState<string>('Ecuador');
@@ -781,6 +876,38 @@ export default function App() {
   const [inputRecoveryCode, setInputRecoveryCode] = useState<string>('');
   const [showGuestWelcome, setShowGuestWelcome] = useState<boolean>(false);
   const [showEventDetails, setShowEventDetails] = useState<boolean>(false);
+
+  const handleLogout = () => {
+    localStorage.removeItem('dt_user_id');
+    localStorage.removeItem('dt_username');
+    localStorage.removeItem('dt_user_avatar');
+    localStorage.removeItem('dt_user_email');
+    localStorage.removeItem('dt_user_license');
+    localStorage.removeItem('user_subscription');
+    localStorage.removeItem('scout_chosen_country');
+    localStorage.removeItem('dt_vip_chosen_continent');
+    localStorage.removeItem('dt_user_password');
+    localStorage.removeItem('dt_purchased_points');
+
+    setUserId('user_me');
+    setUsername('Tú (Director Técnico)');
+    setUserAvatar('👑');
+    setUserEmail('');
+    setUserLicense('');
+    setUserSubscription('Ninguna');
+    setScoutChosenCountry('');
+    setVipChosenContinent('América');
+    setUserPassword('');
+    setPurchasedPoints(0);
+    setIsLocked(false);
+
+    const standardCode = 'DT-' + Math.floor(1000 + Math.random() * 9000);
+    localStorage.setItem('dt_user_code', standardCode);
+    setUserCode(standardCode);
+
+    setIsLoginMode(true); // Prompts login immediately when signing out
+    setIsRegistrationOpen(true);
+  };
 
   // Estados para diálogos alternativos a window.confirm / alert bloqueados por IFrames
   const [appCustomConfirm, setAppCustomConfirm] = useState<{
@@ -1097,8 +1224,8 @@ export default function App() {
         }
 
         setAppCustomAlert({
-          title: '⚡ ¡CROMO GENERADO Y COMPRIMIDO!',
-          message: `La GPU de fal.ai completó el renderizado. El cromo se ha convertido a formato WebP optimizado y se guardó en el servidor permanentemente.`
+          title: '⚡ ¡TARJETA GENERADA Y COMPRIMIDA!',
+          message: `La GPU de fal.ai completó el renderizado. La tarjeta se ha convertido a formato WebP optimizado y se guardó en el servidor permanentemente.`
         });
       } else {
         throw new Error('La respuesta de fal.ai no contiene una URL de imagen válida.');
@@ -1209,7 +1336,7 @@ export default function App() {
 
     setAppCustomAlert({
       title: '🔗 ¡ILUSTRACIÓN VINCULADA EN WEBP!',
-      message: `El cromo de ${player.realName} se ha sincronizado correctamente. Se adaptó la imagen a formato WebP ultraligero y se guardó en el servidor permanentemente.`
+      message: `La tarjeta de ${player.realName} se ha sincronizado correctamente. Se adaptó la imagen a formato WebP ultraligero y se guardó en el servidor permanentemente.`
     });
   };
 
@@ -1220,8 +1347,8 @@ export default function App() {
       const keyCount = Object.keys(parsed).length;
       if (keyCount === 0) {
         setAppCustomAlert({
-          title: '⚠️ SIN CROMOS SINCRONIZADOS',
-          message: 'Aún no has sincronizado ningún cromo personalizado utilizando la opción de Fal.ai o copiando enlaces.'
+          title: '⚠️ SIN TARJETAS SINCRONIZADAS',
+          message: 'Aún no has sincronizado ninguna tarjeta personalizada utilizando la opción de Fal.ai o copiando enlaces.'
         });
         return;
       }
@@ -1242,12 +1369,12 @@ export default function App() {
       if (clipboardSuccess) {
         setAppCustomAlert({
           title: '💾 ¡COPIA DE SEGURIDAD EXPORTADA!',
-          message: `¡Excelente! Se copiaron tus ${keyCount} cromos al portapapeles. Además, abrimos el panel de abajo mostrando tu código por si deseas guardarlo manualmente.`
+          message: `¡Excelente! Se copiaron tus ${keyCount} tarjetas al portapapeles. Además, abrimos el panel de abajo mostrando tu código por si deseas guardarlo manualmente.`
         });
       } else {
         setAppCustomAlert({
           title: '💾 PANEL DE RESPALDO GENERADO',
-          message: `Se ha abierto el panel de abajo conteniendo el código codificado de tus ${keyCount} cromos para que lo copies manualmente (ya que el navegador restringió acceso automático al portapapeles).`
+          message: `Se ha abierto el panel de abajo conteniendo el código codificado de tus ${keyCount} tarjetas para que lo copies manualmente (ya que el navegador restringió acceso automático al portapapeles).`
         });
       }
     } catch (e: any) {
@@ -1262,7 +1389,7 @@ export default function App() {
     if (!inputText.trim()) {
       setAppCustomAlert({
         title: '⚠️ ENTRADA VACÍA',
-        message: 'Por favor ingresa o pega el texto de respaldo de cromos válido.'
+        message: 'Por favor ingresa o pega el texto de respaldo de tarjetas válido.'
       });
       return;
     }
@@ -1320,7 +1447,7 @@ export default function App() {
 
       setAppCustomAlert({
         title: '⚡ ¡RESPALDO RESTAURADO CON ÉXITO!',
-        message: `¡Increíble! Hemos procesado y restaurado ${mergedCount} cromos personalizados. Se han registrado e inyectado con éxito tanto en tu almacenamiento local como en el servidor.`
+        message: `¡Increíble! Hemos procesado y restaurado ${mergedCount} tarjetas personalizadas. Se han registrado e inyectado con éxito tanto en tu almacenamiento local como en el servidor.`
       });
 
     } catch (e: any) {
@@ -1646,8 +1773,8 @@ export default function App() {
       const countryPlayers = playersDB[country] || [];
       const matchData = getPopulatedMatch(country, countryPlayers);
       
-      const assignedIds = Object.values(board.selectedPlayers).filter(Boolean) as string[];
-      const officialXI = matchData.onceInicialReal;
+      const assignedIds = board && board.selectedPlayers ? (Object.values(board.selectedPlayers).filter(Boolean) as string[]) : [];
+      const officialXI = matchData ? (matchData.onceInicialReal || []) : [];
       assignedIds.forEach(pId => {
         if (officialXI.includes(pId)) {
           totalOnceHits += 1;
@@ -1799,17 +1926,52 @@ export default function App() {
       return countryName !== 'Ecuador';
     }
     
-    // VIP Elite and Scout Básico can access games for all countries, but won't get stickers unless in their selection
-    if (userSubscription === 'Pase VIP Elite' || userSubscription === 'Plan Scout Básico') {
+    // Season Pass unlocks absolutely everything
+    if (userSubscription === 'Pase de Temporada') {
       return false;
     }
-    
+
+    // VIP Elite unlocks the chosen continent/confederation
+    if (userSubscription === 'Pase VIP Elite') {
+      const continent = getCountryContinent(countryName);
+      const isContinentChosen = (cont: string) => vipChosenContinent && vipChosenContinent.split(',').map(s => s.trim().toUpperCase()).includes(cont.toUpperCase());
+      if (isContinentChosen(continent)) {
+        return false;
+      }
+    }
+
+    // Plan Scout Básico unlocks the chosen country/selection
+    if (userSubscription === 'Plan Scout Básico') {
+      const isCountryChosen = (c: string) => scoutChosenCountry && scoutChosenCountry.split(',').map(s => s.trim().toUpperCase()).includes(c.toUpperCase());
+      if (isCountryChosen(countryName)) {
+        return false;
+      }
+    }
+
+    // Check if unlocked via Scout package directly (stored separately)
+    const scoutUnlocked = JSON.parse(localStorage.getItem('scout_unlocked_countries') || '[]');
+    if (scoutUnlocked.includes(countryName)) {
+      return false;
+    }
+
+    // Check if unlocked via Daily Pack cumulative spend reaching $10
+    const dailySpends = JSON.parse(localStorage.getItem('daily_pack_spends') || '{}');
+    if ((dailySpends[countryName] || 0) >= 10) {
+      return false;
+    }
+
+    // Check if unlocked via Trivia Gratis (max 3 countries)
+    const triviaUnlocked = JSON.parse(localStorage.getItem('trivia_unlocked_countries') || '[]');
+    if (triviaUnlocked.includes(countryName)) {
+      return false;
+    }
+
     // Check if the country is fully completed/purchased in unlockedLevels
     const levels = unlockedLevels[countryName];
     const isCompleted = levels && levels[1] && levels[2] && levels[3];
     if (isCompleted) return false;
 
-    if (userSubscription === 'Ninguna') {
+    if (userSubscription === 'Ninguna' || !userSubscription) {
       if (freeChosenCountry !== '' && freeChosenCountry !== countryName) {
         return true;
       }
@@ -1942,6 +2104,30 @@ export default function App() {
       }
       next[country][level] = true;
       localStorage.setItem('scouting_unlocked_levels', JSON.stringify(next));
+
+      // Check if all 3 levels are now complete
+      if (next[country][1] && next[country][2] && next[country][3]) {
+        const triviaUnlocked = JSON.parse(localStorage.getItem('trivia_unlocked_countries') || '[]');
+        if (!triviaUnlocked.includes(country)) {
+          if (triviaUnlocked.length >= 3) {
+            setTimeout(() => {
+              setAppCustomAlert({
+                title: "⚠️ LÍMITE DE TRIVIA GRATIS",
+                message: `Has completado las 3 trivias para ${country}, pero ya has alcanzado el límite de 3 selecciones desbloqueadas de forma gratuita a través del camino de Trivia. Para pronosticar partidos de esta selección, puedes adquirir su Paquete Scout o el Pase de Temporada.`
+              });
+            }, 500);
+          } else {
+            const nextTriviaUnlocked = [...triviaUnlocked, country];
+            localStorage.setItem('trivia_unlocked_countries', JSON.stringify(nextTriviaUnlocked));
+            setTimeout(() => {
+              setAppCustomAlert({
+                title: "🎉 ¡SELECCIÓN DESBLOQUEADA POR TRIVIA!",
+                message: `¡Espectacular! Al responder correctamente las trivias de ${country}, has desbloqueado esta selección de forma 100% gratuita para realizar tus pronósticos oficiales (${nextTriviaUnlocked.length}/3 de límite por este camino).`
+              });
+            }, 500);
+          }
+        }
+      }
       return next;
     });
 
@@ -1982,7 +2168,7 @@ export default function App() {
     // Show a warm, interactive loading popup to indicate validation is processing in the server
     setAppCustomAlert({
       title: '🕵️‍♂️ CONTROL DE HORARIOS EN PROCESO...',
-      message: `El oráculo de Gemini 3.5 Flash está analizando tus coordenadas de geolocalización y huso horario para contrastar el plazo reglamentario límite de 2 horas antes del inicio oficial del encuentro...`
+      message: `El oráculo de Gemini 3.5 Flash está analizando tus coordenadas de geolocalización y huso horario para contrastar el plazo reglamentario límite de 1 hora antes del inicio oficial del encuentro...`
     });
 
     let userLocation: { lat: number, lng: number } | null = null;
@@ -2303,9 +2489,9 @@ export default function App() {
 
     const isAdmin = cleanEmail === 'geovannygrk3d@gmail.com' || cleanEmail === 'geovannygrk3d@gmail' || cleanEmail === 'conscientizarte13@gmail.com' || cleanEmail === 'conscientizarte13@gmail';
     if (isAdmin) {
-      alert(`🎉 ¡Google Sign-in Exitoso, Bienvenido Administrador Central!\n\nEmail: "${cleanEmail}"\nContraseña registrada correctamente.\nTu Clave Única es: "${uniqueId}"\nTu Código de Juego es: "${code}"\n\nTu juego se ha iniciado DESDE CERO con un álbum limpio de 0 cromos.\nTienes acceso privilegiado completo al Panel de Administración de Sorteos.\nRedirigiendo al panel de suscripción...`);
+      alert(`🎉 ¡Google Sign-in Exitoso, Bienvenido Administrador Central!\n\nEmail: "${cleanEmail}"\nContraseña registrada correctamente.\nTu Clave Única es: "${uniqueId}"\nTu Código de Juego es: "${code}"\n\nTu juego se ha iniciado DESDE CERO con un álbum limpio de 0 tarjetas.\nTienes acceso privilegiado completo al Panel de Administración de Sorteos.\nRedirigiendo al panel de suscripción...`);
     } else {
-      alert(`🎉 ¡Google Sign-in Exitoso!\n\nUsuario: ${cleanUsername}\nEmail: "${cleanEmail}"\nContraseña registrada correctamente.\nTu Código de Director Técnico es: "${code}"\n\nTu juego se ha iniciado DESDE CERO con un álbum limpio de 0 cromos.\nElige un plan de suscripción para recibir tu código de participación.`);
+      alert(`🎉 ¡Google Sign-in Exitoso!\n\nUsuario: ${cleanUsername}\nEmail: "${cleanEmail}"\nContraseña registrada correctamente.\nTu Código de Director Técnico es: "${code}"\n\nTu juego se ha iniciado DESDE CERO con un álbum limpio de 0 tarjetas.\nElige un plan de suscripción para recibir tu código de participación.`);
     }
   };
 
@@ -3098,7 +3284,7 @@ export default function App() {
                         {currentUserInfo.unlockedStickersCount} / {COUNTRIES.length * 26}
                       </span>
                       <span className="text-[9px] font-mono font-black text-gray-500 uppercase tracking-widest mt-0.5">
-                        Cromos Convocados
+                        Tarjetas Convocadas
                       </span>
                     </div>
 
@@ -3202,7 +3388,7 @@ export default function App() {
                         <ul className="space-y-2.5 text-xs text-gray-700 font-comic font-bold">
                           <li className="flex items-start gap-2">
                             <span className="text-[#EF4444] text-base shrink-0">✔</span>
-                            <span><strong>Responde Trivias:</strong> Supera las trivias de 3 niveles por país para abrir sobres y coleccionar cromos.</span>
+                            <span><strong>Responde Trivias:</strong> Supera las trivias de 3 niveles por país para abrir sobres y coleccionar tarjetas.</span>
                           </li>
                           <li className="flex items-start gap-2">
                             <span className="text-[#EF4444] text-base shrink-0">✔</span>
@@ -3231,7 +3417,7 @@ export default function App() {
                         </h4>
                         <div className="space-y-1.5 text-xs text-cool-gray-800">
                           <div className="flex items-center justify-between border-b border-gray-100 pb-1">
-                            <span className="text-gray-600 font-comic font-bold">Cada cromo desbloqueado</span>
+                            <span className="text-gray-600 font-comic font-bold">Cada tarjeta desbloqueada</span>
                             <span className="font-mono font-black text-black bg-slate-100 px-1.5 py-0.5 rounded border border-black text-[10px] shrink-0">+1 PT</span>
                           </div>
                           <div className="flex items-center justify-between border-b border-gray-100 pb-1">
@@ -3272,7 +3458,7 @@ export default function App() {
                           <span>👑</span> PODIO DE EXPERIENCIAS Y RECOMPENSAS
                         </h4>
                         <p className="text-[10px] text-gray-600 leading-normal mb-3">
-                          <strong>¡Desafío Global de Habilidad!</strong> Participa gratis en las alineaciones y pronósticos. El desafío, juego y puntos son totalmente acumulativos en todos los desafíos o juegos de la página. Acumula puntos y compite por grandes premios físicos y en efectivo el <strong>31 de diciembre del 2026</strong>, premiando al mejor rankeado de la página:
+                          <strong>¡Desafío Global de Habilidad!</strong> Participa gratis en las alineaciones y pronósticos. El desafío, juego y puntos son totalmente acumulativos en todos los desafíos o juegos de la página. Acumula puntos y compite por grandes premios físicos de alta gama el <strong>31 de diciembre del 2026</strong>, premiando al mejor rankeado de la página:
                         </p>
                         <ul className="space-y-1.5 text-xs text-gray-700 font-comic font-bold mb-3">
                           <li className="flex flex-col bg-amber-100/40 border border-amber-300/40 rounded-lg p-2 gap-1">
@@ -3283,7 +3469,7 @@ export default function App() {
                               <span className="font-mono font-black text-amber-700 text-[10px] uppercase bg-amber-200/50 px-1.5 py-0.5 rounded">Premio Mayor</span>
                             </div>
                             <p className="text-[10px] text-gray-600 font-medium pl-6 leading-tight">
-                              Premio en efectivo de $1.000 USD + Álbum Físico Impreso de Lujo con tus cromos + Camiseta oficial firmada de tu selección + Certificado "DT Campeón" + Pase VIP de por vida.
+                              Álbum Físico Impreso de Lujo con tus tarjetas + Camiseta oficial firmada de tu selección + Certificado "DT Campeón" + Pase VIP físico de por vida.
                             </p>
                           </li>
                           <li className="flex flex-col bg-slate-100/60 border border-slate-300/40 rounded-lg p-2 gap-1">
@@ -3294,7 +3480,7 @@ export default function App() {
                               <span className="font-mono font-black text-slate-700 text-[9px] uppercase bg-slate-200 px-1 py-0.5 rounded">Silver</span>
                             </div>
                             <p className="text-[10px] text-gray-600 font-medium pl-6 leading-tight">
-                              Premio en efectivo de $500 USD + 6 Meses VIP Elite + Balón oficial del Mundial + Gorra y bufanda conmemorativa + Pack de cromos legendarios digitales.
+                              Balón Oficial del Mundial + 6 Meses VIP Elite + Gorra y bufanda conmemorativa + Pack de tarjetas de colección digitales.
                             </p>
                           </li>
                           <li className="flex flex-col bg-amber-600/10 border border-amber-700/20 rounded-lg p-2 gap-1">
@@ -3305,14 +3491,14 @@ export default function App() {
                               <span className="font-mono font-black text-amber-800 text-[9px] uppercase bg-amber-200 px-1 py-0.5 rounded">Bronze</span>
                             </div>
                             <p className="text-[10px] text-gray-600 font-medium pl-6 leading-tight">
-                              Premio en efectivo de $250 USD + 3 Meses VIP Elite + Bufanda conmemorativa de Héroes del Deporte + Pack de cromos legendarios digitales.
+                              Bufanda Conmemorativa de Héroes del Deporte + 3 Meses VIP Elite + Pack de tarjetas de colección digitales.
                             </p>
                           </li>
                         </ul>
                         
                         <div className="bg-slate-900 text-white p-3 rounded-xl border-2 border-black text-[10px] space-y-2 leading-normal">
                           <p>
-                            ⚽ <strong>Separación de Juego y Compra:</strong> El Desafío Táctico y de Pronósticos es gratuito. La compra de paquetes de cromos es opcional y sirve para completar la colección estética, sin alterar la equidad deportiva del ranking.
+                            ⚽ <strong>Separación de Juego y Compra:</strong> El Desafío Táctico y de Pronósticos es gratuito. La compra de paquetes de tarjetas es opcional y sirve para completar la colección estética, sin alterar la equidad deportiva del ranking.
                           </p>
                           <p className="text-[#10b981] font-bold">
                             ⚖️ <strong>Cláusula Legal:</strong> NO SE REQUIERE NINGUNA COMPRA PARA PARTICIPAR NI PARA GANAR. El Desafío se resuelve estrictamente por el conocimiento técnico del usuario al predecir resultados.
@@ -3357,7 +3543,7 @@ export default function App() {
                            📚 ÁLBUM & COLECCIÓN
                         </h3>
                         <p className={`text-[11px] font-comic font-bold leading-tight max-w-sm ${!isRegistered ? 'text-slate-400/80' : 'text-black/85'}`}>
-                          Explora las plantillas y los cromos oficiales de las mejores selecciones de América y el mundo. ¡Completa los 3 niveles de trivias por país!
+                          Explora las plantillas y las tarjetas oficiales de las mejores selecciones de América y el mundo. ¡Completa los 3 niveles de trivias por país!
                         </p>
                       </div>
                       <div className={`w-12 h-12 border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl transition-transform group-hover:rotate-6 ${!isRegistered ? 'bg-slate-900 text-slate-500 shadow-[2.5px_2.5px_0px_rgba(0,0,0,0.5)]' : 'bg-black text-[#11b782] shadow-[2.5px_2.5px_0px_#005535]'}`}>
@@ -3367,7 +3553,7 @@ export default function App() {
                     
                     <div className={`relative z-10 mt-5 pt-3.5 border-t flex items-center justify-between font-mono text-[9px] font-black ${!isRegistered ? 'border-slate-800 text-slate-500' : 'border-black/10 text-black'}`}>
                       <div className="flex items-center gap-1">
-                        <span>⚡ {currentUserInfo.unlockedStickersCount} CROMOS COL.</span>
+                        <span>⚡ {currentUserInfo.unlockedStickersCount} TARJETAS COL.</span>
                         <span className={!isRegistered ? 'text-slate-700' : 'text-black/50'}>|</span>
                         <span>🏆 {currentUserInfo.completedCountriesList.length} COMPLETADOS</span>
                       </div>
@@ -3525,7 +3711,7 @@ export default function App() {
                            💳 PASE VIP ELITE
                         </h3>
                         <p className={`text-[11px] font-comic font-bold leading-tight max-w-sm ${!isRegistered ? 'text-slate-400/80' : 'text-slate-300'}`}>
-                          Desbloquea los análisis tácticos detallados de scout, un escudo exclusivo de Director Técnico y sobres de cromos premium sin límites.
+                          Desbloquea los análisis tácticos detallados de scout, un escudo exclusivo de Director Técnico y sobres de tarjetas premium sin límites.
                         </p>
                       </div>
                       <div className={`w-12 h-12 border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform ${!isRegistered ? 'bg-slate-900 text-slate-500 shadow-[2.5px_2.5px_0px_rgba(0,0,0,0.5)]' : 'bg-white text-black'}`}>
@@ -3538,13 +3724,96 @@ export default function App() {
                         <span className={`px-1.5 py-0.5 border rounded text-[8.5px] uppercase font-bold tracking-wider ${!isRegistered ? 'bg-slate-900 border-slate-800 text-slate-400' : 'text-white bg-emerald-800 border-[#11b782]'}`}>
                           {userSubscription === 'Ninguna' ? 'ESTÁNDAR GRATIS' : 'PROVEEDOR ACTIVO'}
                         </span>
-                        <span className={!isRegistered ? 'text-slate-500' : 'text-emerald-400'}>${userCashBalance.toFixed(2)} USD</span>
                       </div>
                       <span className={`flex items-center gap-0.5 px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform ${!isRegistered ? 'bg-slate-900 text-slate-500' : 'bg-[#11b782] text-black'}`}>
-                        BILLETERA <ChevronRight className={`w-3 h-3 inline stroke-[3] ${!isRegistered ? 'text-slate-500' : 'text-black'}`} />
+                        COMPRAR PLANES <ChevronRight className={`w-3 h-3 inline stroke-[3] ${!isRegistered ? 'text-slate-500' : 'text-black'}`} />
                       </span>
                     </div>
                   </motion.div>
+
+                  {/* Panel 8: DESAFÍO DE DTs (PVP) / DESAFÍO GLOBAL */}
+                  {isAdmin ? (
+                    <motion.div 
+                      whileHover={{ scale: 1.025, y: -4 }}
+                      onClick={() => { setActiveTab('pvp_arena'); }}
+                      className={`cursor-pointer group relative overflow-hidden border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px] ${
+                        !isRegistered 
+                          ? 'bg-[#291a0c] text-slate-400 border-slate-800 opacity-85 hover:opacity-100' 
+                          : 'bg-[#FF7F00] text-black'
+                      }`}
+                    >
+                      {!isRegistered && (
+                        <div className="absolute top-2.5 right-2.5 bg-[#EF4444] text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-black rotate-[2deg] shadow-[2px_2px_0px_#000] z-20">
+                          🔒 REGISTRO REQUERIDO
+                        </div>
+                      )}
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+                      <div className="relative z-10 flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className={`font-mono text-[9px] font-black uppercase tracking-wider mb-1 ${!isRegistered ? 'text-amber-500/60' : 'text-black/70'}`}>CINTURÓN 08 [MODO DESARROLLADOR - ADMIN]</div>
+                          <h3 className={`font-bangers text-2xl lg:text-3xl tracking-wide uppercase leading-none mb-2 ${!isRegistered ? 'text-slate-300' : 'text-black'}`}>
+                             🎮 DESAFÍO DE DTs (PVP)
+                          </h3>
+                          <p className={`text-[11px] font-comic font-bold leading-tight max-w-sm ${!isRegistered ? 'text-slate-400/80' : 'text-black/85'}`}>
+                            Alinea tus stickers reales, define flechas de rendimiento estratégico, y compite en el simulador manager para ganar monedas de canje y puntos.
+                          </p>
+                        </div>
+                        <div className={`w-12 h-12 border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform ${!isRegistered ? 'bg-slate-900 text-slate-500 shadow-[2.5px_2.5px_0px_rgba(0,0,0,0.5)]' : 'bg-black text-[#FF7F00]'}`}>
+                          🎮
+                        </div>
+                      </div>
+                      
+                      <div className={`relative z-10 mt-5 pt-3.5 border-t flex items-center justify-between font-mono text-[9px] font-black ${!isRegistered ? 'border-slate-800 text-slate-500' : 'border-black/10 text-black'}`}>
+                        <div className="flex items-center gap-1.5">
+                          <span className="bg-black text-white px-1.5 py-0.5 border border-black text-[8px] uppercase font-bold">PVP ARENA</span>
+                          <span>🏆 {pvpArenaXp || 0} XP ACUMULADO</span>
+                        </div>
+                        <span className="flex items-center gap-0.5 bg-black text-white px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
+                          PROBAR ARENA <ChevronRight className="w-3 h-3 text-white inline stroke-[3]" />
+                        </span>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      whileHover={{ scale: 1.025, y: -4 }}
+                      onClick={() => {
+                        setAppCustomAlert({
+                          title: "🚀 DESAFÍO GLOBAL TÁCTICO",
+                          message: "¡Próximamente en la siguiente actualización! Conecta tu alineación de ensueño con directores técnicos de todo el mundo y compite por premios de primer nivel de la Copa Mundial."
+                        });
+                      }}
+                      className="cursor-pointer group relative overflow-hidden bg-gradient-to-br from-indigo-900 to-slate-950 border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#22c55e] transition-all flex flex-col justify-between min-h-[170px]"
+                    >
+                      <div className="absolute top-2.5 right-2.5 bg-[#22c55e] text-black text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-black rotate-[-2deg] shadow-[2px_2px_0px_#000] z-20">
+                        ⚡ PRÓXIMAMENTE
+                      </div>
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+                      <div className="relative z-10 flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="font-mono text-[9px] font-black text-emerald-400 uppercase tracking-wider mb-1">MARKETING DE LANZAMIENTO</div>
+                          <h3 className="font-bangers text-2xl lg:text-3xl tracking-wide text-white uppercase leading-none mb-2">
+                             🏆 DESAFÍO GLOBAL TÁCTICO
+                          </h3>
+                          <p className="text-[11px] font-comic font-bold text-slate-300 leading-tight max-w-sm">
+                            ¡El simulador manager definitivo de nivel internacional! Compite contra D.T.s de todo el mundo con tus alineaciones y directrices personalizadas para coronarte en el ranking VIP.
+                          </p>
+                        </div>
+                        <div className="w-12 h-12 bg-black text-[#22c55e] border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform">
+                          🏆
+                        </div>
+                      </div>
+                      
+                      <div className="relative z-10 mt-5 pt-3.5 border-t border-slate-800 flex items-center justify-between font-mono text-[9px] font-black text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <span className="bg-[#22c55e] text-black px-1.5 py-0.5 border border-black text-[8px] uppercase font-bold">DESAFÍO GLOBAL</span>
+                          <span>REGISTROS EN BREVE</span>
+                        </div>
+                        <span className="flex items-center gap-0.5 bg-[#22c55e] text-black px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
+                          SABER MÁS <ChevronRight className="w-3 h-3 text-black inline stroke-[3]" />
+                        </span>
+                      </div>
+                    </motion.div>
+                  )}
 
                   {/* Panel 6: AUDITORÍA SORTEOS (Rose pink audit theme) */}
                   {isAdmin && (
@@ -3620,7 +3889,78 @@ export default function App() {
                     </motion.div>
                   )}
 
+                  {/* Panel Public: REGLAS DEL JUEGO */}
+                  <motion.div 
+                    whileHover={{ scale: 1.025, y: -4 }}
+                    onClick={() => { setActiveTab('reglas'); }}
+                    className="cursor-pointer group relative overflow-hidden bg-white border-[3.5px] border-black p-6 rounded-2xl shadow-[6px_6px_0px_#FDDF2B] transition-all flex flex-col justify-between min-h-[170px]"
+                  >
+                    <div className="absolute top-2.5 right-2.5 bg-[#22c55e] text-black text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-black rotate-[-2deg] shadow-[2px_2px_0px_#000] z-20">
+                      🌍 GRATUITO Y PÚBLICO
+                    </div>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-yellow-400/5 rounded-full blur-2xl pointer-events-none" />
+                    <div className="relative z-10 flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-mono text-[9px] font-black text-gray-500 uppercase tracking-wider mb-1">REGLAS OFICIALES</div>
+                        <h3 className="font-bangers text-2xl lg:text-3xl tracking-wide text-black uppercase leading-none mb-2">
+                           📜 REGLAS DEL DESAFÍO
+                        </h3>
+                        <p className="text-[11px] font-comic font-bold text-gray-700 leading-tight max-w-sm">
+                          Conoce la dinámica gratuita del juego, el sistema de puntajes por pronósticos de marcador y alineación, y los coleccionables exclusivos.
+                        </p>
+                      </div>
+                      <div className="w-12 h-12 bg-[#FDDF2B] text-black border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform">
+                        📜
+                      </div>
+                    </div>
+                    
+                    <div className="relative z-10 mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between font-mono text-[9px] font-black text-slate-500">
+                      <div className="flex items-center gap-1.5">
+                        <span className="bg-black text-white px-1.5 py-0.5 border border-black text-[8px] uppercase font-bold">100% SIN COSTO</span>
+                        <span>⚽ RECOMPENSAS EXCLUSIVAS</span>
+                      </div>
+                      <span className="flex items-center gap-0.5 bg-black text-white px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
+                        LEER REGLAS <ChevronRight className="w-3 h-3 text-white inline stroke-[3]" />
+                      </span>
+                    </div>
+                  </motion.div>
 
+                  {/* Panel Public: NUESTRA CAUSA (SOCIAL IMPACT) */}
+                  <motion.div 
+                    whileHover={{ scale: 1.025, y: -4 }}
+                    onClick={() => { setActiveTab('nuestra_causa'); }}
+                    className="cursor-pointer group relative overflow-hidden bg-[#0a0f0d] border-[3.5px] border-[#EF4444] p-6 rounded-2xl shadow-[6px_6px_0px_#000] transition-all flex flex-col justify-between min-h-[170px]"
+                  >
+                    <div className="absolute top-2.5 right-2.5 bg-[#EF4444] text-white text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border-2 border-black rotate-[2deg] shadow-[2px_2px_0px_#000] z-20">
+                      ❤️ ACCIÓN SOCIAL
+                    </div>
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#EF4444]/10 rounded-full blur-2xl pointer-events-none" />
+                    <div className="relative z-10 flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="font-mono text-[9px] font-black text-red-500 uppercase tracking-wider mb-1">PROGRAMA DE IMPACTO</div>
+                        <h3 className="font-bangers text-2xl lg:text-3xl tracking-wide text-white uppercase leading-none mb-2">
+                           🌱 NUESTRA CAUSA
+                        </h3>
+                        <p className="text-[11px] font-comic font-bold text-slate-300 leading-tight max-w-sm">
+                          Apoyamos el desarrollo infantil de fútbol base con la Fundación Guerreros de luz. El 5% de cada paquete adquirido se destina directamente.
+                        </p>
+                      </div>
+                      <div className="w-12 h-12 bg-[#EF4444] text-white border-2 border-black rounded-lg flex items-center justify-center font-bold text-2xl shadow-[2.5px_2.5px_0px_#000] group-hover:rotate-6 transition-transform">
+                        🌱
+                      </div>
+                    </div>
+                    
+                    <div className="relative z-10 mt-5 pt-3.5 border-t border-slate-900 flex items-center justify-between font-mono text-[9px] font-black text-slate-400">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[#EF4444] font-bold">FONDOS: ${communityBasePool.toFixed(2)} USD</span>
+                        <span className="text-slate-600">|</span>
+                        <span>🏆 +250 NIÑOS APORTADOS</span>
+                      </div>
+                      <span className="flex items-center gap-0.5 bg-[#EF4444] text-white px-2 py-1 rounded border-2 border-black font-bangers text-[10px] tracking-wider uppercase group-hover:translate-x-1 transition-transform">
+                        VER IMPACTO <ChevronRight className="w-3 h-3 text-white inline stroke-[3]" />
+                      </span>
+                    </div>
+                  </motion.div>
 
                 </div>
               </div>
@@ -3636,7 +3976,7 @@ export default function App() {
                       📚 TOMOS DISPONIBLES
                     </h3>
                     <p className="text-[10px] font-comic font-bold text-slate-100">
-                      Selecciona una Selección y completa sus cromos oficiales
+                      Selecciona una Selección y completa sus tarjetas oficiales
                     </p>
                   </div>
                   
@@ -3707,7 +4047,7 @@ export default function App() {
                                 <span className={`text-[10px] font-mono font-bold border rounded-md px-2 py-0.5 ${
                                   isSelected ? 'bg-black text-white border-black' : 'bg-slate-950 text-slate-300 border-slate-800'
                                 }`}>
-                                  {unlockedCromos}/{maxCromos} Cromos
+                                  {unlockedCromos}/{maxCromos} Tarjetas
                                 </span>
                               </>
                             )}
@@ -3726,12 +4066,12 @@ export default function App() {
                         <div className="flex items-center gap-1.5 mb-2.5">
                           <span className="text-[#FDDF2B] animate-pulse">👑</span>
                           <h4 className="font-bangers text-[12px] text-[#FDDF2B] tracking-wider uppercase">
-                            RESPALDO ANTI-REINICIO DE CROMOS SINCORNIZADOS
+                            RESPALDO ANTI-REINICIO DE TARJETAS SINCRONIZADAS
                           </h4>
                         </div>
-                        <p className="text-[10px] font-comic font-normal text-slate-350 leading-relaxed mb-3">
+                        <p className="text-[10px] font-comic font-normal text-slate-355 leading-relaxed mb-3">
                           En entornos de desarrollo y pruebas, los reinicios del servidor pueden restablecer la base de datos temporal si la instancia del contenedor se reconstruye. 
-                          <strong> ¡Protege tu progreso del álbum!</strong> Exporta y restaura todos los cromos que hayas sincronizado de forma ilimitada.
+                          <strong> ¡Protege tu progreso del álbum!</strong> Exporta y restaura todas las tarjetas que hayas sincronizado de forma ilimitada.
                         </p>
                         
                         <div className="grid grid-cols-2 gap-2">
@@ -3793,7 +4133,7 @@ export default function App() {
                           : 'bg-slate-800 text-slate-300'
                       }`}>
                         <span className="text-[9px] font-mono font-black uppercase block tracking-wider text-slate-100">
-                          {hasCromoAccess ? 'CROMOS REUNIDOS' : 'ACCESO SIN CROMOS'}
+                          {hasCromoAccess ? 'TARJETAS REUNIDAS' : 'SÓLO TRIVIA'}
                         </span>
                         <span className="text-4xl font-bangers block tracking-widest leading-none mt-1 text-white">
                           {hasCromoAccess ? `${unlockedCount} / 26` : '🎮 TRIVIA'}
@@ -3947,7 +4287,7 @@ export default function App() {
                                 </h5>
                                 <p className="text-[11px] font-comic font-semibold text-slate-700 mt-2 leading-relaxed">
                                   {hasCromoAccess 
-                                    ? (lvl === 1 ? 'Recluta banca suplente (+9 cromos)' : lvl === 2 ? 'Recluta jugadores titulares (+9 cromos)' : 'Franquicia y Leyendas (+8 cromos)')
+                                    ? (lvl === 1 ? 'Recluta banca suplente (+9 tarjetas)' : lvl === 2 ? 'Recluta jugadores titulares (+9 tarjetas)' : 'Franquicia y Leyendas (+8 tarjetas)')
                                     : (lvl === 1 ? 'Prueba de cultura general (+5 pts de D.T.)' : lvl === 2 ? 'Prueba de historia antigua (+5 pts de D.T.)' : 'Prueba de táctica avanzada (+5 pts de D.T.)')
                                   }
                                 </p>
@@ -4046,7 +4386,7 @@ export default function App() {
                               <div className="text-left">
                                 <span className="text-[8.5px] font-mono text-rose-600 font-extrabold block uppercase leading-none">Nivel {lvl}</span>
                                 <h5 className="font-bangers text-sm text-black tracking-wide leading-normal uppercase mt-1">
-                                  {lvl === 1 ? '🎨 Cromos de Banca' : lvl === 2 ? '⏳ Jugadores Clave' : '📐 Estrellas de Competición'}
+                                  {lvl === 1 ? '🎨 Tarjetas de Banca' : lvl === 2 ? '⏳ Jugadores Clave' : '📐 Estrellas de Competición'}
                                 </h5>
                                 <span className="text-[9.5px] font-comic font-black text-slate-500 block mt-0.5">
                                   {lvl === 1 ? '9 futbolistas (+9 GL)' : lvl === 2 ? '9 futbolistas (+9 GL)' : '8 astros estrella (+8 GL)'}
@@ -4074,7 +4414,7 @@ export default function App() {
                           SISTEMA DE ENTREGA DE SOBRES DE TRIVIA
                         </h4>
                         <p className="max-w-md text-xs font-comic font-semibold text-slate-300 leading-relaxed">
-                          Por instrucción oficial del Director Técnico, no hay sobres generados al azar. Para desbloquear y revelar los cromos oficiales de <span className="text-[#10B981] font-bold">{selectedCountryName}</span>, debes realizar y aprobar las trivias del tomo superior. ¡Cada nivel completado otorga su respectivo set de cromos!
+                          Por instrucción oficial del Director Técnico, no hay sobres generados al azar. Para desbloquear y revelar las tarjetas oficiales de <span className="text-[#10B981] font-bold">{selectedCountryName}</span>, debes realizar y aprobar las trivias del tomo superior. ¡Cada nivel completado otorga su respectivo set de tarjetas!
                         </p>
                         <button
                           onClick={() => {
@@ -4131,7 +4471,7 @@ export default function App() {
                             ¡LIBERANDO ENERGÍA TRICOLOR!
                           </h4>
                           <p className="text-[10px] font-mono text-slate-450 uppercase tracking-widest mt-1">
-                            Sorteo Auditado • Generando Cromos Legendarios...
+                            Sorteo Auditado • Generando Tarjetas Legendarias...
                           </p>
                         </motion.div>
                       )}
@@ -4149,7 +4489,7 @@ export default function App() {
                         >
                           <div className="bg-[#EF4444] bg-halftone-red text-white border-[3px] border-black p-2 bg-rose-600 rotate-[-1deg] shadow-[4px_4px_0px_#000] mb-5 text-center">
                             <h4 className="font-bangers text-lg tracking-widest uppercase">
-                              🎉 ¡SOBRE ABIERTO CON ÉXITO! DETALLES DE CROMOS REVELADOS
+                              🎉 ¡SOBRE ABIERTO CON ÉXITO! DETALLES DE TARJETAS REVELADAS
                             </h4>
                           </div>
 
@@ -4231,7 +4571,7 @@ export default function App() {
                               onClick={() => setHasOpenedPack(false)}
                               className="px-8 py-3.5 bg-[#FDDF2B] hover:bg-yellow-400 text-black font-bangers tracking-widest text-sm uppercase border-[3.5px] border-black shadow-[5px_5px_0px_#000] hover:translate-y-0.5 hover:shadow-[2px_2px_0px_#000] transition-all cursor-pointer rounded-2xl inline-flex items-center gap-2 font-black rotate-[-0.5deg]"
                             >
-                              <span>¡EXCELENTE! RECOLECTAR CROMOS EN COFRE</span>
+                              <span>¡EXCELENTE! RECOLECTAR TARJETAS EN COFRE</span>
                               <span className="text-base select-none">🏆</span>
                             </button>
                           </div>
@@ -4275,7 +4615,7 @@ export default function App() {
                             </div>
                           </div>
                           <p className="font-sans text-[10px] leading-relaxed text-slate-400">
-                            Por reglamento del comité oficial, toda recompensa se pre-calcula de forma matemática. Esto garantiza que la entrega de cromos es determinista y no depende de peticiones de red volátiles o fraude en cliente.
+                            Por reglamento del comité oficial, toda recompensa se pre-calcula de forma matemática. Esto garantiza que la entrega de tarjetas es determinista y no depende de peticiones de red volátiles o fraude en cliente.
                           </p>
                         </div>
                       </details>
@@ -4321,7 +4661,7 @@ export default function App() {
                           <span className="text-[9px] bg-indigo-600 px-2 py-0.5 rounded-full text-white font-mono font-black uppercase tracking-wider inline-block mb-1.5 border border-black">
                             ⚡ PANEL DE ACCESO ADMIN
                           </span>
-                          <h4 className="text-sm font-bangers tracking-wider uppercase text-yellow-400">Control Instantáneo de Cromos ({activeCountry.name})</h4>
+                          <h4 className="text-sm font-bangers tracking-wider uppercase text-yellow-400">Control Instantáneo de Tarjetas ({activeCountry.name})</h4>
                           <p className="text-[10.5px] text-slate-350 font-comic font-semibold mt-1">Como administrador del sistema, puedes forzar la convalidación, adición o vaciado instantáneo de stickers para pruebas de visualización.</p>
                         </div>
                         <div className="flex flex-row gap-2 w-full sm:w-auto shrink-0">
@@ -4398,7 +4738,7 @@ export default function App() {
                             </h4>
                             <p className="text-[11px] font-comic font-bold text-slate-800 leading-relaxed">
                               Tu plan actual <strong>{userSubscription}</strong> tiene asignada la cobertura de <strong>{userSubscription === 'Pase VIP Elite' ? `Continente: ${vipChosenContinent}` : `Selección: ${scoutChosenCountry}`}</strong>. 
-                              Puedes acceder y jugar las trivias de <strong>{activeCountry.name}</strong> por diversión y puntos, pero <strong>no se desbloquearán cromos</strong> para tu álbum en esta selección.
+                              Puedes acceder y jugar las trivias de <strong>{activeCountry.name}</strong> por diversión y puntos, pero <strong>no se desbloquearán tarjetas</strong> para tu álbum en esta selección.
                             </p>
                           </div>
                         </div>
@@ -4464,11 +4804,11 @@ export default function App() {
                               <div className="w-full relative z-10">
                                 {!hasCromoAccess ? (
                                   <div className="text-[9.5px] font-comic font-black text-[#EF4444] mb-2 leading-tight uppercase animate-pulse">
-                                    🚫 Sin Cromo en tu Plan
+                                    🚫 Sin Tarjeta en tu Plan
                                   </div>
                                 ) : (
                                   <div className="text-[9.5px] font-comic font-black text-amber-500 mb-2 leading-tight uppercase">
-                                    🔒 Cromo Bloqueado
+                                    🔒 Tarjeta Bloqueada
                                   </div>
                                 )}
                                 <button
@@ -4482,13 +4822,13 @@ export default function App() {
                                     onClick={() => {
                                       setManuallyUnlockedPlayerIds(prev => ({ ...prev, [p.id]: true }));
                                       setAppCustomAlert({
-                                        title: '🔓 CROMO AÑADIDO',
-                                        message: `Has desbloqueado el cromo de ${p.realName} (${p.name}) para el álbum.`
+                                        title: '🔓 TARJETA AÑADIDA',
+                                        message: `Has desbloqueado la tarjeta de ${p.realName} (${p.name}) para el álbum.`
                                       });
                                     }}
                                     className="w-full mt-2 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black border-2 border-black font-bangers text-[10.5px] uppercase tracking-wider rounded-lg shadow-[2px_2px_0px_#000] cursor-pointer"
                                   >
-                                    ➕ AÑADIR CROMO
+                                    ➕ AÑADIR TARJETA
                                   </button>
                                 )}
                               </div>
@@ -4536,7 +4876,7 @@ export default function App() {
                       <div>
                         <h4 className="font-bold text-xs text-white uppercase tracking-wider font-mono">📢 ¡Inicia tu Registro de Elite!</h4>
                         <p className="text-[11px] text-gray-300 mt-0.5 leading-relaxed">
-                          Estás usando una credencial de invitado temporal. Regístrate hoy de forma 100% gratuita para recibir tu propio <strong>Código de Juego Único</strong> y participar activamente por los premios en efectivo ($1.000 USD al 1º, $500 USD al 2º y $250 USD al 3º) el 31 de diciembre del 2026 en vivo, con total transparencia auditada por un notario público.
+                          Estás usando una credencial de invitado temporal. Regístrate hoy de forma 100% gratuita para recibir tu propio <strong>Código de Juego Único</strong> y participar activamente por los premios físicos oficiales (Álbum Físico Premium de Lujo, camisetas oficiales autografiadas y balones mundialistas) el 31 de diciembre del 2026 en vivo, con total transparencia auditada por un notario público.
                         </p>
                       </div>
                     </div>
@@ -4605,6 +4945,27 @@ export default function App() {
               />
             )}
  
+            {/* TAB: PVP Arena - Desafío de DTs */}
+            {activeTab === 'pvp_arena' && (
+              <PVPArenaView
+                currentSubscription={userSubscription}
+                unlockedLevels={unlockedLevels}
+                manuallyUnlockedPlayerIds={manuallyUnlockedPlayerIds}
+                userCoins={userCoins}
+                onUpdateCoins={setUserCoins}
+                userScore={currentUserInfo.totalScore}
+                onUpdateScore={(newScore: number) => {
+                  const diff = newScore - currentUserInfo.totalScore;
+                  if (diff > 0) {
+                    setPurchasedPoints(prev => prev + diff);
+                  }
+                }}
+                username={username}
+                userCode={userCode}
+                onNavigateToVIP={() => setActiveTab('subscription')}
+              />
+            )}
+
             {/* TAB: Subscription Panel */}
             {activeTab === 'subscription' && (
               <SubscriptionView
@@ -4631,7 +4992,301 @@ export default function App() {
                 onAddPurchasedPoints={(pts: number) => setPurchasedPoints(prev => prev + pts)}
                 vipChosenContinent={vipChosenContinent}
                 onUpdateVipContinent={handleUpdateVipContinent}
+                manuallyUnlockedPlayerIds={manuallyUnlockedPlayerIds}
+                onUpdateManuallyUnlockedPlayerIds={setManuallyUnlockedPlayerIds}
+                communityBasePool={communityBasePool}
+                onUpdateCommunityBasePool={setCommunityBasePool}
+                personalDonationTotal={personalDonationTotal}
+                onUpdatePersonalDonationTotal={setPersonalDonationTotal}
               />
+            )}
+
+            {/* TAB: Reglas del Juego (Public, accessible to all) */}
+            {activeTab === 'reglas' && (
+              <div className="space-y-8 select-none animate-fadeIn" id="reglas-tab-content">
+                
+                {/* Header Section */}
+                <div className="relative overflow-hidden bg-white border-[3.5px] border-black p-6 sm:p-8 rounded-3xl shadow-[6px_6px_0px_#FDDF2B] flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-[#FDDF2B]/15 rounded-full blur-3xl pointer-events-none" />
+                  <div className="z-10 flex-1">
+                    <div className="inline-flex items-center gap-2 bg-[#22c55e] text-black border-2 border-black font-mono text-[9px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-widest mb-3 rotate-[-1deg] shadow-[2px_2px_0px_#000]">
+                      ⚽ REGLAMENTO OFICIAL DE DIRECTORES TÉCNICOS
+                    </div>
+                    <h2 className="font-bangers text-4xl sm:text-5xl tracking-wide uppercase leading-none text-black mb-2">
+                      📜 REGLAS DEL DESAFÍO
+                    </h2>
+                    <p className="text-xs sm:text-sm font-comic font-bold text-gray-700 max-w-xl">
+                      El Desafío es una competencia de habilidad táctica y conocimientos deportivos de fútbol base 100% gratuita. Demuestra tu jerarquía en la pizarra de DT y compite con total transparencia.
+                    </p>
+                  </div>
+                  
+                  {/* Dynamic clock from rules */}
+                  <div className="z-10 bg-[#080c09] border-[3px] border-black text-[#22c55e] p-4 rounded-2xl shadow-[4px_4px_0px_#000] flex flex-col items-center justify-center shrink-0 min-w-[150px] font-mono">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">HORARIO OFICIAL ECT</span>
+                    <span className="text-2xl font-black mt-1">UTC-5</span>
+                    <span className="text-[9px] text-[#22c55e]/80 mt-1 uppercase text-center font-bold">1 hora límite antes de cada partido</span>
+                  </div>
+                </div>
+
+                {/* 4 Cards Bento Grid Layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  
+                  {/* Card 1: Carácter Gratuito */}
+                  <div className="bg-[#f0fdf4] border-[3px] border-black p-6 rounded-2xl shadow-[5px_5px_0px_#22c55e] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-10 h-10 bg-emerald-100 border-2 border-black rounded-xl flex items-center justify-center text-xl shadow-[2px_2px_0px_#000]">
+                          🎁
+                        </div>
+                        <h3 className="font-bangers text-xl tracking-wide uppercase text-emerald-950">
+                          100% Gratuito y Libre
+                        </h3>
+                      </div>
+                      <p className="text-xs font-comic font-bold text-emerald-900 leading-relaxed">
+                        El Desafío es gratuito. <strong>No se requiere realizar ninguna compra</strong> para participar activamente en la plataforma, completar el álbum, pronosticar partidos o ganar los premios oficiales de clasificación.
+                      </p>
+                      <p className="text-xs font-comic font-bold text-emerald-800 mt-2 leading-relaxed">
+                        Cualquier usuario registrado de forma gratuita puede desbloquear selecciones respondiendo trivias y sumando puntos oficiales para la tabla. Las compras o paquetes opcionales solo otorgan comodidades y el derecho inmediato de pronóstico para coleccionistas.
+                      </p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-emerald-200/50 text-[9px] font-mono font-black text-emerald-700 uppercase">
+                      ⚠️ SIN DINERO DE POR MEDIO • DINÁMICA DE HABILIDAD
+                    </div>
+                  </div>
+
+                  {/* Card 2: Sistema de Cómputo de Puntos */}
+                  <div className="bg-[#fffbeb] border-[3px] border-black p-6 rounded-2xl shadow-[5px_5px_0px_#FDDF2B] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-10 h-10 bg-amber-100 border-2 border-black rounded-xl flex items-center justify-center text-xl shadow-[2px_2px_0px_#000]">
+                          📊
+                        </div>
+                        <h3 className="font-bangers text-xl tracking-wide uppercase text-amber-950">
+                          Sistema de Cómputo del DT
+                        </h3>
+                      </div>
+                      <ul className="space-y-1.5 text-xs font-comic font-bold text-amber-900">
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-[#22c55e]">✔</span>
+                          <span><strong>Ganador Correcto:</strong> Recibe <strong>+10 puntos</strong> por pronosticar la victoria o empate.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-[#22c55e]">✔</span>
+                          <span><strong>Marcador Exacto:</strong> Recibe <strong>+25 puntos</strong> si aciertas los goles exactos.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-[#22c55e]">✔</span>
+                          <span><strong>Alineación Campeona:</strong> Recibe <strong>+15 puntos</strong> por ubicar 8 o más titulares correctos en tu pizarra activa.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-[#22c55e]">✔</span>
+                          <span><strong>Jugador MVP:</strong> Recibe <strong>+10 puntos</strong> si aciertas al mejor jugador del partido oficial.</span>
+                        </li>
+                        <li className="flex items-start gap-1.5">
+                          <span className="text-[#22c55e]">✔</span>
+                          <span><strong>Racha DT de Oro:</strong> Recibe <strong>+15 puntos</strong> de bonificación por encadenar 3 partidos correctos consecutivos.</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-amber-200 text-[9px] font-mono font-black text-amber-700 uppercase">
+                      🕒 Plazo Límite: 1 hora antes del pitazo oficial
+                    </div>
+                  </div>
+
+                  {/* Card 3: Recompensas y Coleccionables */}
+                  <div className="bg-[#fff1f2] border-[3px] border-black p-6 rounded-2xl shadow-[5px_5px_0px_#EF4444] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-10 h-10 bg-rose-100 border-2 border-black rounded-xl flex items-center justify-center text-xl shadow-[2px_2px_0px_#000]">
+                          🏆
+                        </div>
+                        <h3 className="font-bangers text-xl tracking-wide uppercase text-rose-950">
+                          Coleccionables de Alta Calidad
+                        </h3>
+                      </div>
+                      <p className="text-xs font-comic font-bold text-rose-900 leading-relaxed">
+                        Los premios a entregar en este desafío <strong>NO consisten en dinero en efectivo</strong> ni créditos financieros, adaptándose estrictamente a las normas de cumplimiento regulatorio y transparencia.
+                      </p>
+                      <p className="text-xs font-comic font-bold text-rose-800 mt-2 leading-relaxed">
+                        Los ganadores absolutos serán premiados con:
+                      </p>
+                      <ul className="list-disc pl-4 mt-1 text-xs font-comic font-bold text-rose-800 space-y-1">
+                        <li>Álbumes físicos de lujo empastados con tu colección.</li>
+                        <li>Camisetas oficiales de fútbol de alta gama autografiadas.</li>
+                        <li>Balones oficiales del certamen de la marca oficial.</li>
+                        <li>Experiencias de hospitalidad de fútbol infantil base.</li>
+                        <li>Pases VIP físicos de por vida para futuros certámenes.</li>
+                      </ul>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-rose-200 text-[9px] font-mono font-black text-rose-700 uppercase">
+                      🎁 PREMIACIÓN FÍSICA AUTÉNTICA • CALIDAD PREMIUM
+                    </div>
+                  </div>
+
+                  {/* Card 4: Determinación de Ganadores sin Azar */}
+                  <div className="bg-[#f0f9ff] border-[3px] border-black p-6 rounded-2xl shadow-[5px_5px_0px_#3b82f6] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-10 h-10 bg-blue-100 border-2 border-black rounded-xl flex items-center justify-center text-xl shadow-[2px_2px_0px_#000]">
+                          📊
+                        </div>
+                        <h3 className="font-bangers text-xl tracking-wide uppercase text-blue-950">
+                          Determinación Directa por Puntos
+                        </h3>
+                      </div>
+                      <p className="text-xs font-comic font-bold text-blue-900 leading-relaxed">
+                        Para certificar el carácter de destreza del desafío, <strong>no se realizarán sorteos al azar o rifas aleatorias</strong> para la adjudicación de los premios principales.
+                      </p>
+                      <p className="text-xs font-comic font-bold text-blue-800 mt-2 leading-relaxed">
+                        Las posiciones finales en la Tabla de Ligas de Honor de Directores Técnicos determinarán de forma puramente matemática a los galardonados. Cada acierto, marcador exacto y racha táctica se audita directamente en tiempo real mediante el libro de registros inmutable de la plataforma.
+                      </p>
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-blue-200 text-[9px] font-mono font-black text-blue-700 uppercase">
+                      📊 MÉRITO Y DESTREZA TÁCTICA PURA • CERO AZAR
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB: Nuestra Causa (Social Impact) */}
+            {activeTab === 'nuestra_causa' && (
+              <div className="space-y-8 select-none animate-fadeIn" id="nuestra-causa-tab-content">
+                
+                {/* Header Section */}
+                <div className="relative overflow-hidden bg-emerald-950 border-[3.5px] border-black p-6 sm:p-8 rounded-3xl shadow-[6px_6px_0px_#000] flex flex-col md:flex-row items-center justify-between gap-6 text-white">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="z-10 flex-1">
+                    <div className="inline-flex items-center gap-2 bg-[#EF4444] text-white border-2 border-black font-mono text-[9px] px-2.5 py-0.5 rounded-full font-black uppercase tracking-widest mb-3 rotate-[-1deg] shadow-[2px_2px_0px_#000]">
+                      ❤️ COMPROMISO SOCIAL ACTIVO
+                    </div>
+                    <h2 className="font-bangers text-4xl sm:text-5xl tracking-wide uppercase leading-none mb-2">
+                      🌱 FUNDACIÓN GUERREROS DE LUZ
+                    </h2>
+                    <p className="text-xs sm:text-sm font-comic font-bold text-emerald-200 max-w-xl">
+                      Creemos firmemente en el poder transformador del deporte infantil. Por eso, nos aliamos con la Fundación Guerreros de luz para dotar de canchas, uniformes y nutrición integral a niños en condiciones de vulnerabilidad.
+                    </p>
+                  </div>
+                  
+                  {/* Total Pool Badge */}
+                  <div className="z-10 bg-white border-[3px] border-black text-black p-4 rounded-2xl shadow-[4px_4px_0px_#EF4444] flex flex-col items-center justify-center shrink-0 min-w-[150px]">
+                    <span className="text-[9px] font-mono font-black uppercase tracking-wider text-gray-500">FONDO REUNIDO</span>
+                    <span className="text-3xl font-bangers text-[#EF4444] tracking-tight leading-none mt-1">
+                      ${communityBasePool.toFixed(2)} USD
+                    </span>
+                    <span className="text-[9px] font-mono font-black text-emerald-800 mt-1 uppercase text-center font-bold">5% de cada paquete aportado</span>
+                  </div>
+                </div>
+
+                {/* Our cause stadium visualization */}
+                <SocialImpactStadium
+                  socialFundTotal={communityBasePool}
+                  personalDonationTotal={personalDonationTotal}
+                  userCashBalance={userCashBalance}
+                  onDonateDirectly={(amount) => {
+                    if (userCashBalance >= amount) {
+                      setUserCashBalance(prev => {
+                        const next = prev - amount;
+                        localStorage.setItem('dt_user_cash_balance', String(next));
+                        return next;
+                      });
+                      setPersonalDonationTotal(prev => {
+                        const next = prev + amount;
+                        localStorage.setItem('album_user_donations_total', String(next));
+                        return next;
+                      });
+                      setCommunityBasePool(prev => {
+                        const next = prev + amount;
+                        localStorage.setItem('album_community_donations_base', String(next));
+                        return next;
+                      });
+                      setAppCustomAlert({
+                        title: "❤️ ¡DONACIÓN DIRECTA COMPLETADA!",
+                        message: `¡Muchas gracias por tu inmensa generosidad! Tu donación virtual de $${amount.toFixed(2)} USD ha sido debitada de tu saldo y asignada con éxito al fondo global de la Fundación Guerreros de luz. Esto no otorga puntos de ranking, pero alimenta el alma deportiva infantil de la fundación.`
+                      });
+                    } else {
+                      setAppCustomAlert({
+                        title: "❌ SALDO INSUFICIENTE",
+                        message: "No cuentas con saldo suficiente en tu billetera de simulación para realizar esta donación directa. Por favor, realiza una recarga en la sección de VIP Billetera."
+                      });
+                    }
+                  }}
+                />
+
+                {/* Milestones and Updates block */}
+                <div className="bg-white border-[3.5px] border-black p-6 rounded-3xl shadow-[6px_6px_0px_#000]">
+                  <h3 className="font-bangers text-2xl tracking-wide uppercase text-black mb-4 flex items-center gap-2">
+                    <span>🏆</span> ENTREGAS Y METAS COMPLETADAS 2026
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Meta 1 */}
+                    <div className="border-[2.5px] border-black p-4 rounded-xl shadow-[3px_3px_0px_#22c55e] bg-[#f0fdf4]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xl">👕</span>
+                        <h4 className="font-bangers text-md tracking-wider uppercase text-emerald-950">Sets de Indumentaria</h4>
+                      </div>
+                      <p className="text-[11px] font-comic font-bold text-emerald-800 leading-relaxed">
+                        Meta: 150 kits deportivos completos para la escuela infantil base de Esmeraldas.
+                      </p>
+                      <div className="mt-3 bg-white border border-black h-3 rounded-full overflow-hidden flex">
+                        <div className="bg-[#22c55e] h-full" style={{ width: `${Math.min(100, (communityBasePool / 400) * 100)}%` }} />
+                      </div>
+                      <span className="text-[9px] font-mono font-bold text-emerald-700 block mt-1.5 uppercase">
+                        Progreso: {Math.min(100, Math.round((communityBasePool / 400) * 100))}% financiado
+                      </span>
+                    </div>
+
+                    {/* Meta 2 */}
+                    <div className="border-[2.5px] border-black p-4 rounded-xl shadow-[3px_3px_0px_#FDDF2B] bg-[#fffbeb]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xl">🍎</span>
+                        <h4 className="font-bangers text-md tracking-wider uppercase text-amber-950">Nutrición y Suplementos</h4>
+                      </div>
+                      <p className="text-[11px] font-comic font-bold text-amber-800 leading-relaxed">
+                        Meta: Packs de micronutrientes y colaciones saludables para entrenamiento diario.
+                      </p>
+                      <div className="mt-3 bg-white border border-black h-3 rounded-full overflow-hidden flex">
+                        <div className="bg-[#FDDF2B] h-full" style={{ width: `${Math.min(100, (communityBasePool / 600) * 100)}%` }} />
+                      </div>
+                      <span className="text-[9px] font-mono font-bold text-amber-700 block mt-1.5 uppercase">
+                        Progreso: {Math.min(100, Math.round((communityBasePool / 600) * 100))}% financiado
+                      </span>
+                    </div>
+
+                    {/* Meta 3 */}
+                    <div className="border-[2.5px] border-black p-4 rounded-xl shadow-[3px_3px_0px_#EF4444] bg-[#fff1f2]">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xl">🪥</span>
+                        <h4 className="font-bangers text-md tracking-wider uppercase text-rose-950">Kits de Higiene Dental</h4>
+                      </div>
+                      <p className="text-[11px] font-comic font-bold text-rose-800 leading-relaxed">
+                        Meta: Cepillos, pastas y charlas de prevención bucodental post-entreno infantil.
+                      </p>
+                      <div className="mt-3 bg-white border border-black h-3 rounded-full overflow-hidden flex">
+                        <div className="bg-[#EF4444] h-full" style={{ width: `${Math.min(100, (communityBasePool / 300) * 100)}%` }} />
+                      </div>
+                      <span className="text-[9px] font-mono font-bold text-rose-700 block mt-1.5 uppercase">
+                        Progreso: {Math.min(100, Math.round((communityBasePool / 300) * 100))}% financiado
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Foundation details stamp */}
+                  <div className="mt-6 p-4 border-[2px] border-dashed border-black bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-4 rounded-xl">
+                    <div className="text-xs font-comic font-bold text-slate-700 leading-relaxed">
+                      🤝 <strong>Transparencia Directa:</strong> Cada aporte virtual simulado en el oráculo del DT de Héroes del Deporte sirve como incentivo formativo y de concientización social. El 5% de las compras virtuales que se procesan son destinadas al desarrollo físico de estas escuelas aliadas.
+                    </div>
+                    <span className="text-[9px] bg-black text-white px-3 py-1 font-mono font-black uppercase rounded shrink-0 border border-black rotate-[-1deg]">
+                      RESOLUCIÓN SOCIAL MUNDIAL 2026
+                    </span>
+                  </div>
+
+                </div>
+
+              </div>
             )}
 
             {/* TAB: Admin Database Panel */}
@@ -4829,7 +5484,7 @@ export default function App() {
                     <textarea
                       required
                       rows={2}
-                      placeholder="Escribe sugerencia de trivia, cromo o soporte..."
+                      placeholder="Escribe sugerencia de trivia, tarjeta o soporte..."
                       value={footerSuggestContent}
                       onChange={(e) => setFooterSuggestContent(e.target.value)}
                       className="w-full bg-slate-900 border-2 border-black text-[11px] text-white py-1.5 px-2.5 rounded-lg focus:outline-none placeholder:text-gray-600 font-medium"
@@ -4968,6 +5623,20 @@ export default function App() {
               Ligas
             </span>
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => { setActiveTab('pvp_arena'); setActiveTrivia(null); }}
+              className={`flex flex-col items-center justify-center p-1 rounded-lg transition-all min-h-[44px] min-w-[50px] cursor-pointer ${
+                activeTab === 'pvp_arena' ? 'text-[#FF7F00] scale-105 font-bold' : 'text-slate-400'
+              }`}
+            >
+              <Play className="w-5 h-5 shrink-0" />
+              <span className="text-[9px] font-comic font-black mt-0.5 flex items-center justify-center gap-0.5">
+                {!isRegistered && <span className="text-[8px] filter saturate-150">🔒</span>}
+                Arena
+              </span>
+            </button>
+          )}
           <button
             onClick={() => { setActiveTab('subscription'); setActiveTrivia(null); }}
             className={`flex flex-col items-center justify-center p-1 rounded-lg transition-all min-h-[44px] min-w-[50px] cursor-pointer ${
@@ -5182,18 +5851,18 @@ export default function App() {
                     <h4 className="text-[9.5px] font-black uppercase tracking-widest text-[#11b782] font-mono mb-2 flex items-center gap-1">
                       🥇 PREMIOS Y SEGURIDAD AUDITADA:
                     </h4>
-                    <ul className="space-y-1.5 text-[9.5px] text-slate-300 font-sans">
+                     <ul className="space-y-1.5 text-[9.5px] text-slate-300 font-sans">
                       <li className="flex items-center gap-1.5">
                         <span className="text-yellow-400 font-bold">🥇 1°:</span>
-                        <span><strong>$1.000 USD</strong> en efectivo + Trofeo Físico.</span>
+                        <span><strong>Álbum de Lujo Físico</strong> + Camiseta Oficial Firmada + Trofeo Físico.</span>
                       </li>
                       <li className="flex items-center gap-1.5">
                         <span className="text-slate-300 font-bold">🥈 2°:</span>
-                        <span><strong>$500 USD</strong> + Kit Deportivo Oficial.</span>
+                        <span><strong>Balón Oficial Mundialista</strong> + 6 Meses VIP Elite + Gorra/Bufanda.</span>
                       </li>
                       <li className="flex items-center gap-1.5">
                         <span className="text-amber-600 font-bold">🥉 3°:</span>
-                        <span><strong>$250 USD</strong> + Álbum Físico Completo.</span>
+                        <span><strong>Bufanda Conmemorativa</strong> + 3 Meses VIP Elite + Álbum Impreso.</span>
                       </li>
                       <li className="flex items-center gap-1.5">
                         <span className="text-emerald-400 font-bold">✓ Auditable:</span>
@@ -5334,7 +6003,7 @@ export default function App() {
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
-                      <span>Recibe su pack completo de cromos digitales para empezar a armar tu colección.</span>
+                      <span>Recibe su pack completo de tarjetas digitales para empezar a armar tu colección.</span>
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-[#11b782] shrink-0 font-bold">🎁</span>
@@ -6044,7 +6713,7 @@ export default function App() {
             </p>
 
             <div className="bg-slate-950 border border-slate-800 rounded-2xl p-4 text-xs text-left text-slate-400 space-y-2 mb-6 font-comic leading-relaxed">
-              <p>• Podrás desbloquear sus <strong className="text-white">26 cromos</strong> oficiales.</p>
+              <p>• Podrás desbloquear sus <strong className="text-white">26 tarjetas</strong> oficiales.</p>
               <p>• Podrás superar sus <strong className="text-white">3 niveles de trivias</strong> para ganar puntos.</p>
               <p>• Las demás selecciones quedarán <strong className="text-red-400">bloqueadas</strong> hasta que adquieras un paquete VIP o Scout de Pago Único.</p>
               <p className="text-amber-400 font-bold mt-1">⚠️ Esta decisión es permanente para esta cuenta.</p>
@@ -6106,7 +6775,7 @@ export default function App() {
                   <ul className="text-[11px] sm:text-xs text-slate-300 space-y-2 font-comic leading-relaxed mb-4">
                     <li className="flex items-start gap-1.5">
                       <span className="text-[#11b782] font-black shrink-0">✓</span>
-                      <span>Desbloqueo de <strong>1 país completo</strong> a tu elección (todos sus cromos al instante) 🌟</span>
+                      <span>Desbloqueo de <strong>1 país completo</strong> a tu elección (todas sus tarjetas al instante) 🌟</span>
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-[#11b782] font-black shrink-0">✓</span>
@@ -6143,7 +6812,7 @@ export default function App() {
                   <ul className="text-[11px] sm:text-xs text-slate-300 space-y-2 font-comic leading-relaxed mb-4">
                     <li className="flex items-start gap-1.5">
                       <span className="text-amber-400 font-black shrink-0">✓</span>
-                      <span>Acceso instantáneo a <strong>todos los países</strong> y todos sus cromos desbloqueados automáticamente 🌎</span>
+                      <span>Acceso instantáneo a <strong>todos los países</strong> y todas sus tarjetas desbloqueadas automáticamente 🌎</span>
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-amber-400 font-black shrink-0">✓</span>
@@ -6159,7 +6828,7 @@ export default function App() {
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-amber-400 font-black shrink-0">✓</span>
-                      <span>Elegibilidad directa: 1er Lugar: $1.000, 2do Lugar: $500, 3er Lugar: $250 USD en efectivo, auditado por un notario público.</span>
+                      <span>Elegibilidad directa: Grandes premios físicos oficiales (Álbum de Lujo de tus tarjetas, camisetas autografiadas y balones mundialistas), auditado por un notario público.</span>
                     </li>
                     <li className="flex items-start gap-1.5">
                       <span className="text-amber-400 font-black shrink-0">✓</span>
@@ -6235,7 +6904,7 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE RESTAURACIÓN / IMPORTACIÓN DE CROMOS */}
+      {/* MODAL DE RESTAURACIÓN / IMPORTACIÓN DE TARJETAS */}
       {showBackupModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in font-comic">
           <motion.div
@@ -6246,7 +6915,7 @@ export default function App() {
             <div className="bg-[#EF4444] bg-halftone-red text-white p-4 font-bangers text-lg tracking-wider border-b-[3px] border-black flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span>🛡️</span>
-                <span>PANEL DE RESPALDO DE CROMOS</span>
+                <span>PANEL DE RESPALDO DE TARJETAS</span>
               </div>
               <button
                 onClick={() => setShowBackupModal(false)}
@@ -6258,7 +6927,7 @@ export default function App() {
             
             <div className="p-5 space-y-4">
               <p className="font-comic text-xs font-semibold leading-relaxed text-slate-300">
-                Selecciona y copia tu código JSON de abajo para guardarlo externamente, o pega un código de respaldo anterior y haz clic en <strong>Procesar</strong> para restaurar tus cromos personalizados:
+                Selecciona y copia tu código JSON de abajo para guardarlo externamente, o pega un código de respaldo anterior y haz clic en <strong>Procesar</strong> para restaurar tus tarjetas personalizadas:
               </p>
               
               <textarea
@@ -6271,7 +6940,7 @@ export default function App() {
               <div className="text-[10px] text-slate-400 leading-snug flex items-start gap-1 p-2 bg-slate-950/40 border border-slate-800 rounded-lg">
                 <span className="text-yellow-400 shrink-0">⚠️</span>
                 <span>
-                  <strong>Nota técnica:</strong> Este proceso fusionará los cromos importados con los que tengas activos y regenerará los enlaces en el servidor para persistirlos sobre cualquier reinicio del sistema de desarrollo.
+                  <strong>Nota técnica:</strong> Este proceso fusionará las tarjetas importadas con las que tengas activos y regenerará los enlaces en el servidor para persistirlos sobre cualquier reinicio del sistema de desarrollo.
                 </span>
               </div>
 

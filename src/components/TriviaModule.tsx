@@ -90,9 +90,9 @@ export default function TriviaModule({ country, flag, level, onSuccess, onBack }
   };
 
   const getDifficultyTitle = (lvl: number) => {
-    if (lvl === 1) return 'Nivel 1: Fácil (Cromos del Bloque A - Suplentes)';
-    if (lvl === 2) return 'Nivel 2: Medio (Cromos del Bloque B - Jugadores Clave)';
-    return 'Nivel 3: Difícil (Cromos del Bloque C - Estrellas Franquicia)';
+    if (lvl === 1) return 'Nivel 1: Fácil (Tarjetas del Bloque A - Suplentes)';
+    if (lvl === 2) return 'Nivel 2: Medio (Tarjetas del Bloque B - Jugadores Clave)';
+    return 'Nivel 3: Difícil (Tarjetas del Bloque C - Estrellas Franquicia)';
   };
 
   if (loading) {
@@ -146,8 +146,8 @@ export default function TriviaModule({ country, flag, level, onSuccess, onBack }
         
         <p className="text-slate-700 font-comic font-semibold text-xs mb-6 max-w-sm mx-auto leading-relaxed">
           {isSuccess 
-            ? `Has respondido correctamente ${correctAnswersCount}/3 preguntas del examen táctico oficial para ${country}. ¡Nuevo bloque de cromos listo para ser abierto!`
-            : `Acertaste ${correctAnswersCount}/3 preguntas. Un Director Técnico profesional requiere al menos obtener 2 aciertos para desbloquear los cromos de este nivel.`
+            ? `Has respondido correctamente ${correctAnswersCount}/3 preguntas del examen táctico oficial para ${country}. ¡Nuevo bloque de tarjetas listo para ser abierto!`
+            : `Acertaste ${correctAnswersCount}/3 preguntas. Un Director Técnico profesional requiere al menos obtener 2 aciertos para desbloquear las tarjetas de este nivel.`
           }
         </p>
 
@@ -164,7 +164,7 @@ export default function TriviaModule({ country, flag, level, onSuccess, onBack }
                onClick={onSuccess}
               className="w-full py-3 bg-[#10B981] hover:bg-neutral-800 hover:text-white text-black font-bangers text-sm tracking-wider uppercase border-[3px] border-black rounded-xl cursor-pointer shadow-[3px_3px_0px_#000] active:scale-95 transition-all text-center flex items-center justify-center gap-2 bg-halftone-dots"
             >
-              <Sparkles className="w-5 h-5 shrink-0" /> IR A LA COLECTA / REVELAR CROMOS DESBLOQUEADOS 💥
+              <Sparkles className="w-5 h-5 shrink-0" /> IR A LA COLECTA / REVELAR TARJETAS DESBLOQUEADAS 💥
             </button>
           ) : (
             <div className="flex flex-col sm:flex-row gap-3">

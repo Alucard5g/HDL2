@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Check, 
   ShieldCheck, 
@@ -19,9 +19,12 @@ import {
   Heart,
   BookOpen,
   Users,
-  Gift
+  Gift,
+  Lock,
+  Zap
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import SocialImpactStadium from './SocialImpactStadium';
 import { COUNTRIES } from '../data';
 import { DTAvatarRenderer, AvatarConfig } from './DTAvatarRenderer';
 
@@ -69,6 +72,12 @@ interface SubscriptionViewProps {
   onAddPurchasedPoints?: (points: number) => void;
   vipChosenContinent?: string;
   onUpdateVipContinent?: (continent: string) => void;
+  manuallyUnlockedPlayerIds?: { [playerId: string]: boolean };
+  onUpdateManuallyUnlockedPlayerIds?: (ids: { [playerId: string]: boolean }) => void;
+  communityBasePool?: number;
+  onUpdateCommunityBasePool?: (newVal: number) => void;
+  personalDonationTotal?: number;
+  onUpdatePersonalDonationTotal?: (newVal: number) => void;
 }
 
 export default function SubscriptionView({ 
@@ -94,17 +103,110 @@ export default function SubscriptionView({
   onSetUnlockedLevels = () => {},
   onAddPurchasedPoints = () => {},
   vipChosenContinent = 'América',
-  onUpdateVipContinent = () => {}
+  onUpdateVipContinent = () => {},
+  manuallyUnlockedPlayerIds = {},
+  onUpdateManuallyUnlockedPlayerIds = () => {},
+  communityBasePool,
+  onUpdateCommunityBasePool,
+  personalDonationTotal,
+  onUpdatePersonalDonationTotal
 }: SubscriptionViewProps) {
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [promoCode, setPromoCode] = useState<string>('');
   const [promoError, setPromoError] = useState<string>('');
 
+  // Fichajes Flash States & Calculation
+  const [timeLeft, setTimeLeft] = useState<string>('');
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = Date.now();
+      const twelveHoursMs = 12 * 60 * 60 * 1000;
+      const nextRefresh = Math.ceil(now / twelveHoursMs) * twelveHoursMs;
+      const diff = nextRefresh - now;
+
+      const hrs = Math.floor(diff / (1000 * 60 * 60));
+      const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeLeft(`${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`);
+    };
+
+    updateTimer();
+    const timerId = setInterval(updateTimer, 1000);
+    return () => clearInterval(timerId);
+  }, []);
+
+  const getFichajesFlashPlayers = () => {
+    const period = Math.floor(Date.now() / (12 * 60 * 60 * 1000));
+    const candidates = [
+      { id: 'ar-10', name: 'El 10 de Argentina', realName: 'Lionel Messi', country: 'Argentina', rating: 98, price: 0.99, imageSeed: 'messi_star_wc' },
+      { id: 'br-10', name: 'La Joya de Brasil', realName: 'Neymar Jr', country: 'Brasil', rating: 94, price: 0.79, imageSeed: 'neymar_star_wc' },
+      { id: 'fr-10', name: 'El Rayo de Francia', realName: 'Kylian Mbappé', country: 'Francia', rating: 96, price: 0.99, imageSeed: 'mbappe_star_wc' },
+      { id: 'no-9', name: 'El Cíborg de Noruega', realName: 'Erling Haaland', country: 'Noruega', rating: 95, price: 0.99, imageSeed: 'haaland_star_wc' },
+      { id: 'es-16', name: 'El Motor de España', realName: 'Rodri', country: 'España', rating: 93, price: 0.79, imageSeed: 'rodri_star_wc' },
+      { id: 'de-10', name: 'El Cerebro de Alemania', realName: 'Florian Wirtz', country: 'Alemania', rating: 91, price: 0.49, imageSeed: 'wirtz_star_wc' },
+      { id: 'eg-10', name: 'El Faraón de Egipto', realName: 'Mohamed Salah', country: 'Egipto', rating: 92, price: 0.79, imageSeed: 'salah_star_wc' },
+      { id: 'uy-15', name: 'El Halcón de Uruguay', realName: 'Federico Valverde', country: 'Uruguay', rating: 91, price: 0.49, imageSeed: 'valverde_star_wc' },
+      { id: 'ec-10', name: 'El Diez de Ecuador', realName: 'Kendry Páez', country: 'Ecuador', rating: 88, price: 0.49, imageSeed: 'paez_star_wc' }
+    ];
+
+    const idx1 = period % candidates.length;
+    const idx2 = (period + 3) % candidates.length;
+    const idx3 = (period + 7) % candidates.length;
+    
+    const finalCandidates = [candidates[idx1]];
+    if (candidates[idx2].id !== candidates[idx1].id) {
+      finalCandidates.push(candidates[idx2]);
+    } else {
+      finalCandidates.push(candidates[(idx2 + 1) % candidates.length]);
+    }
+
+    const thirdIdx = candidates[idx3].id !== candidates[idx1].id && candidates[idx3].id !== finalCandidates[1].id
+      ? idx3
+      : (idx3 + 2) % candidates.length;
+    finalCandidates.push(candidates[thirdIdx]);
+
+    return finalCandidates;
+  };
+
+  const handlePurchaseFlashPlayer = (player: any) => {
+    setSuccessMsg(null);
+    if (!manuallyUnlockedPlayerIds) {
+      alert("Error: El sistema de inventario no está listo. Intenta de nuevo.");
+      return;
+    }
+
+    if (manuallyUnlockedPlayerIds[player.id]) {
+      alert("¡Ya posees esta tarjeta en tu colección!");
+      return;
+    }
+
+    // Set payment target states
+    setSelectedFlashPlayer(player);
+    
+    // Reset modal states
+    setPaymentError('');
+    setCardName('');
+    setCardNumber('');
+    setCardExpiry('');
+    setCardCvv('');
+    setPhoneNumber('');
+    setPayphoneOtp('');
+    setOtpSent(false);
+    setDeunaReference('');
+    setBankReference('');
+    setCashCodeVal('');
+    setTransferCodeVal('');
+
+    setShowPaymentModal('flash-player');
+  };
+
   // Payment checkout modal states
   const [showPaymentModal, setShowPaymentModal] = useState<string | null>(null);
-  // payment modes: 'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo' | 'stripe'
-  const [paymentGateway, setPaymentGateway] = useState<'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'saldo' | 'stripe'>('efectivo');
+  // payment modes: 'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'stripe'
+  const [paymentGateway, setPaymentGateway] = useState<'deuna' | 'payphone' | 'transferencia' | 'efectivo' | 'stripe'>('efectivo');
   
   // Selection states for Segmented pricing of purchases
   const [selectedContinentToPurchase, setSelectedContinentToPurchase] = useState<string>('América');
@@ -135,11 +237,14 @@ export default function SubscriptionView({
   const [lastPurchasedDetails, setLastPurchasedDetails] = useState<{ name: string; price: string; contribution: string }>({ name: '', price: '', contribution: '' });
   const [addDonation, setAddDonation] = useState<boolean>(true);
 
+  // Flash Player target selection
+  const [selectedFlashPlayer, setSelectedFlashPlayer] = useState<any | null>(null);
+
   // Charity & Social Impact Module States (Nutrición y Alfabetización Infantil)
-  const [personalDonationTotal, setPersonalDonationTotal] = useState<number>(() => {
+  const [localPersonalDonationTotal, setLocalPersonalDonationTotal] = useState<number>(() => {
     return Number(localStorage.getItem('album_user_donations_total') || '0');
   });
-  const [communityBasePool, setCommunityBasePool] = useState<number>(() => {
+  const [localCommunityBasePool, setLocalCommunityBasePool] = useState<number>(() => {
     const stored = localStorage.getItem('album_community_donations_base');
     if (!stored || stored === '14250') {
       localStorage.setItem('album_community_donations_base', '50');
@@ -147,6 +252,27 @@ export default function SubscriptionView({
     }
     return Number(stored);
   });
+
+  const activePersonalDonationTotal = personalDonationTotal !== undefined ? personalDonationTotal : localPersonalDonationTotal;
+  const activeCommunityBasePool = communityBasePool !== undefined ? communityBasePool : localCommunityBasePool;
+
+  const updatePersonalDonationTotal = (val: number) => {
+    if (onUpdatePersonalDonationTotal) {
+      onUpdatePersonalDonationTotal(val);
+    } else {
+      setLocalPersonalDonationTotal(val);
+      localStorage.setItem('album_user_donations_total', String(val));
+    }
+  };
+
+  const updateCommunityBasePool = (val: number) => {
+    if (onUpdateCommunityBasePool) {
+      onUpdateCommunityBasePool(val);
+    } else {
+      setLocalCommunityBasePool(val);
+      localStorage.setItem('album_community_donations_base', String(val));
+    }
+  };
   const [donationInput, setDonationInput] = useState<string>('10');
   const [chosenCharityCause, setChosenCharityCause] = useState<'nutrition' | 'literacy' | 'all'>('all');
   const [showDonationSuccessAlert, setShowDonationSuccessAlert] = useState<boolean>(false);
@@ -155,6 +281,22 @@ export default function SubscriptionView({
   const [donationPaymentMethod, setDonationPaymentMethod] = useState<'deuna' | 'payphone' | 'transferencia'>('deuna');
   const [donationFormReference, setDonationFormReference] = useState<string>('');
   const [donationErrorStr, setDonationErrorStr] = useState<string>('');
+
+  const handleDonateDirectly = (amount: number) => {
+    // Under the "no hay billetera" rule, we directly process donation updates without wallet checks or deductions
+    onAddTransaction(`Aporte Solidario Directo para causas infantiles`, -amount, 'cash');
+    
+    // Update personal donations total
+    const nextPersonalTotal = activePersonalDonationTotal + amount;
+    updatePersonalDonationTotal(nextPersonalTotal);
+
+    // Also increase the community base pool in real-time
+    const nextCommunityPool = activeCommunityBasePool + amount;
+    updateCommunityBasePool(nextCommunityPool);
+    
+    setLastDonatedAmount(amount);
+    setShowDonationSuccessAlert(true);
+  };
 
   const handleDonationSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -174,13 +316,10 @@ export default function SubscriptionView({
     setIsDonatingProgress(true);
 
     setTimeout(() => {
-      const newPersonalTotal = personalDonationTotal + amount;
-      const newCommunityBase = communityBasePool + amount; 
-      setPersonalDonationTotal(newPersonalTotal);
-      localStorage.setItem('album_user_donations_total', String(newPersonalTotal));
-      
-      setCommunityBasePool(newCommunityBase);
-      localStorage.setItem('album_community_donations_base', String(newCommunityBase));
+      const newPersonalTotal = activePersonalDonationTotal + amount;
+      const newCommunityBase = activeCommunityBasePool + amount; 
+      updatePersonalDonationTotal(newPersonalTotal);
+      updateCommunityBasePool(newCommunityBase);
       
       setLastDonatedAmount(amount);
       setShowDonationSuccessAlert(true);
@@ -228,55 +367,89 @@ export default function SubscriptionView({
     if (!unlockedLevels || !onSetUnlockedLevels) return null;
 
     const nextUnlocked = { ...unlockedLevels };
-    let pointsToAdd = 0;
     let desc = '';
 
-    if (planTier === 'Pase VIP Elite') {
+    if (planTier === 'Pase de Temporada') {
+      COUNTRIES.forEach(country => {
+        nextUnlocked[country.name] = { 1: true, 2: true, 3: true };
+      });
+      desc = `Pase de Temporada: Acceso Total`;
+      onUpdateSubscription('Pase de Temporada');
+    } else if (planTier === 'Pase VIP Elite') {
       const countries = getCountriesForVIPSelection(selectedContinentToPurchase);
       countries.forEach(country => {
         nextUnlocked[country] = { 1: true, 2: true, 3: true };
       });
-      pointsToAdd = 15;
       desc = `Canje VIP: Continente ${selectedContinentToPurchase}`;
       onUpdateVipContinent(selectedContinentToPurchase);
+      onUpdateSubscription('Pase VIP Elite');
     } else if (planTier === 'Plan Scout Básico') {
       nextUnlocked[selectedCountryToPurchase] = { 1: true, 2: true, 3: true };
       onUpdateScoutCountry(selectedCountryToPurchase);
-      pointsToAdd = 5;
       desc = `Canje Scout: Selección ${selectedCountryToPurchase}`;
+      
+      const scoutUnlocked = JSON.parse(localStorage.getItem('scout_unlocked_countries') || '[]');
+      if (!scoutUnlocked.includes(selectedCountryToPurchase)) {
+        scoutUnlocked.push(selectedCountryToPurchase);
+        localStorage.setItem('scout_unlocked_countries', JSON.stringify(scoutUnlocked));
+      }
+    } else if (planTier === 'Paquete Diario de Estampas') {
+      const dailySpends = JSON.parse(localStorage.getItem('daily_pack_spends') || '{}');
+      const currentSpend = dailySpends[selectedCountryToPurchase] || 0;
+      const nextSpend = currentSpend + 2;
+      dailySpends[selectedCountryToPurchase] = nextSpend;
+      localStorage.setItem('daily_pack_spends', JSON.stringify(dailySpends));
+
+      if (nextSpend >= 10) {
+        nextUnlocked[selectedCountryToPurchase] = { 1: true, 2: true, 3: true };
+        desc = `Límite Diario Alcanzado: Selección ${selectedCountryToPurchase} Desbloqueada`;
+        setTimeout(() => {
+          alert(`🎉 ¡PROTECCIÓN CONTRA DUPLICADOS ACTIVADA!\n\n¡Increíble! Has alcanzado un gasto acumulado de $10 en Paquetes Diarios de Estampas para ${selectedCountryToPurchase}. La protección legal contra duplicados se ha activado y esta selección se ha desbloqueado permanentemente y de forma gratuita para tus predicciones.`);
+        }, 500);
+      } else {
+        desc = `Paquete Diario de Estampas: ${selectedCountryToPurchase} ($2) - Gasto Acumulado: $${nextSpend}/$10`;
+      }
+    } else if (planTier === 'flash-player' && selectedFlashPlayer) {
+      const nextUnlockedPlayers = {
+        ...manuallyUnlockedPlayerIds,
+        [selectedFlashPlayer.id]: true
+      };
+      if (onUpdateManuallyUnlockedPlayerIds) {
+        onUpdateManuallyUnlockedPlayerIds(nextUnlockedPlayers);
+      }
+      desc = `Fichaje Flash: Adquisición Directa de ${selectedFlashPlayer.realName} (${selectedFlashPlayer.country})`;
     }
 
     onSetUnlockedLevels(nextUnlocked);
     localStorage.setItem('scouting_unlocked_levels', JSON.stringify(nextUnlocked));
 
-    if (onAddPurchasedPoints) {
-      onAddPurchasedPoints(pointsToAdd);
-    }
-
-    return { pointsToAdd, desc };
+    return { desc };
   };
 
   const getPlanDetails = (planId: string | null) => {
     if (!planId || planId === 'Ninguna') {
       return { price: '$0.00', amount: 0, text: 'Plan Activo por Defecto' };
     }
+    if (planId === 'flash-player' && selectedFlashPlayer) {
+      return {
+        price: `$${selectedFlashPlayer.price.toFixed(2)}`,
+        amount: selectedFlashPlayer.price,
+        text: `Fichaje Flash: ${selectedFlashPlayer.realName} (${selectedFlashPlayer.country})`
+      };
+    }
     if (planId === 'Plan Scout Básico') {
-      if (pricingLocation === 'Ecuador') {
-        return { price: '$5.00', amount: 5.00, text: `Desbloquear ${selectedCountryToPurchase} ($5.00)` };
-      } else if (pricingLocation === 'España') {
-        return { price: '10.00 €', amount: 10.00, text: `Desbloquear ${selectedCountryToPurchase} (10.00 €)` };
-      } else {
-        return { price: '$10.00', amount: 10.00, text: `Desbloquear ${selectedCountryToPurchase} ($10.00)` };
-      }
+      return { price: '$5.00', amount: 5.00, text: `Desbloquear ${selectedCountryToPurchase} ($5.00)` };
     }
-    // Pase VIP Elite
-    if (pricingLocation === 'Ecuador') {
+    if (planId === 'Paquete Diario de Estampas') {
+      return { price: '$2.00', amount: 2.00, text: `Paquete Diario ${selectedCountryToPurchase} ($2.00)` };
+    }
+    if (planId === 'Pase VIP Elite') {
       return { price: '$15.00', amount: 15.00, text: `Canjear Continente ${selectedContinentToPurchase} ($15.00)` };
-    } else if (pricingLocation === 'España') {
-      return { price: '20.00 €', amount: 20.00, text: `Canjear Continente ${selectedContinentToPurchase} (20.00 €)` };
-    } else {
-      return { price: '$20.00', amount: 20.00, text: `Canjear Continente ${selectedContinentToPurchase} ($20.00)` };
     }
+    if (planId === 'Pase de Temporada') {
+      return { price: '$20.00', amount: 20.00, text: `Pase de Temporada ($20.00)` };
+    }
+    return { price: '$0.00', amount: 0, text: 'Plan Activo' };
   };
 
   const plans = [
@@ -287,9 +460,9 @@ export default function SubscriptionView({
       period: 'Gratis por siempre',
       desc: 'Acceso básico para coleccionistas casuales.',
       features: [
-        'Colecciona sobres resolviendo trivias ordinarias',
+        'Colecciona sobres resolviendo trivias gratis',
         'Hasta 3 pizarras tácticas guardadas simultáneamente',
-        'Estadísticas de aciertos globales básicas'
+        'Hasta 3 selecciones desbloqueables gratis por Trivia'
       ],
       buttonText: 'Plan Activo por Defecto',
       popular: false,
@@ -298,36 +471,62 @@ export default function SubscriptionView({
     {
       id: 'Plan Scout Básico',
       name: 'Paquete Scout — Pago Único',
-      price: getPlanDetails('Plan Scout Básico').price,
-      period: 'Pago Único (Sin Recurrencia)',
-      desc: 'Compra cromos de selecciones individuales por $5 cada una (pago único, sin cargos recurrentes). Cada selección acreditada te suma +5 puntos de score de DT y desbloquea el país completo.',
+      price: '$5.00',
+      period: 'Pago Único por Selección',
+      desc: 'Desbloquea una selección nacional al instante por $5.00 (pago único). Permite realizar todos los pronósticos y coleccionar sin límites.',
       features: [
         'Cuesta $5.00 por cada país/selección de tu elección 🎯',
-        'Suma inmediata de +5 puntos de score a tu puntuación de DT 📈',
-        'Desbloqueo al 100% de todos los cromos (26/26) del país elegido inmediatamente 🌟',
-        'Paga de forma flexible y canjea múltiples selecciones individuales',
-        'Inscripción de sorteo garantizada si estás en el top el día de la final'
+        'Desbloqueo al 100% de la selección elegida inmediatamente 🌟',
+        'Inscripción de sorteo garantizada ante notario público'
       ],
       buttonText: 'Adquirir Selección ($5.00)',
       popular: false,
       color: 'border-indigo-500/20 bg-indigo-950/10 text-indigo-300'
     },
     {
-      id: 'Pase VIP Elite',
-      name: 'Pase VIP Elite — Pago Único',
-      price: getPlanDetails('Pase VIP Elite').price,
-      period: 'Pago Único (Sin Recurrencia)',
-      desc: 'Canjea los cromos de un continente a tu elección por $15 (pago único, sin cargos recurrentes). Cada canje de continente te acredita +15 puntos de score de DT y desbloquea todos sus países.',
+      id: 'Paquete Diario de Estampas',
+      name: 'Paquete Diario de Estampas',
+      price: '$2.00',
+      period: 'Adquisición Diaria de Sobres',
+      desc: 'Adquiere un paquete diario por $2.00. Con un tope legal acumulado de $10 por selección, se activa la protección contra duplicados y se desbloquea permanentemente.',
       features: [
-        'Cuesta $15.00 por continente (América, Europa o África/Asia/Oceanía juntas) 🌍',
-        'Suma inmediata de +15 puntos de score a tu puntuación de DT por cada continente canjeado 👑',
-        'Desbloqueo automático al 100% de todos los cromos de todos los países de ese continente 🏆',
-        'Corte final de puntuaciones realizado el día 31 de diciembre de 2026',
+        'Cuesta $2.00 por paquete de tarjetas de un país diario 📂',
+        'Tope estricto de $10 acumulados por selección (5 compras máx) 🛑',
+        'Protección contra duplicados: desbloqueo definitivo al llegar a $10 🛡'
+      ],
+      buttonText: 'Comprar Sobre Diario ($2.00)',
+      popular: false,
+      color: 'border-emerald-500/20 bg-emerald-950/10 text-emerald-300'
+    },
+    {
+      id: 'Pase VIP Elite',
+      name: 'Pase VIP Elite',
+      price: '$15.00',
+      period: 'Pago Único',
+      desc: 'Canjea las tarjetas y predicciones de una confederación o continente entero por $15 (pago único, sin cargos recurrentes).',
+      features: [
+        'Cuesta $15.00 por continente/confederación de tu elección 🌍',
+        'Desbloqueo automático al 100% de todos los países de ese continente 🏆',
         'Insignia dorada VIP de DT verificado en el panel de control'
       ],
       buttonText: 'Adquirir Continente ($15.00)',
       popular: true,
       color: 'border-amber-500 bg-amber-500/5 text-amber-400'
+    },
+    {
+      id: 'Pase de Temporada',
+      name: 'Pase de Temporada Full Access',
+      price: '$20.00',
+      period: 'Pago Único Completo',
+      desc: 'Acceso ilimitado a todas las selecciones de todos los continentes sin restricción por solo $20.00 (pago único).',
+      features: [
+        'Desbloqueo total al 100% de todas las selecciones del juego 🏆',
+        'Acceso de por vida a los sorteos de la Copa Mundial 2026',
+        'Cero límites en predicciones y pizarras tácticas de fútbol'
+      ],
+      buttonText: 'Adquirir Pase de Temporada ($20.00)',
+      popular: false,
+      color: 'border-pink-500 bg-pink-500/5 text-pink-400'
     }
   ];
 
@@ -379,24 +578,21 @@ export default function SubscriptionView({
     setShowPaymentModal(planId);
   };
 
-  const incrementDonationsPools = (planTier: string, addedDonationActive: boolean) => {
-    const isVIP = planTier === 'Pase VIP Elite';
-    const autoAmount = isVIP ? 0.75 : 0.25;
-    const suggestedAmount = isVIP ? 1.50 : 0.50;
+  const incrementDonationsPools = (planTier: string, costAmount: number, addedDonationActive: boolean) => {
+    const autoAmount = costAmount * 0.05;
+    const suggestedAmount = addedDonationActive ? (costAmount * 0.10) : 0;
     
-    const communityAdd = autoAmount;
-    const personalAdd = addedDonationActive ? suggestedAmount : 0;
+    const communityAdd = autoAmount + suggestedAmount;
+    const personalAdd = autoAmount + suggestedAmount;
     
     if (communityAdd > 0) {
-      const newCommunity = communityBasePool + communityAdd;
-      setCommunityBasePool(newCommunity);
-      localStorage.setItem('album_community_donations_base', String(newCommunity));
+      const newCommunity = activeCommunityBasePool + communityAdd;
+      updateCommunityBasePool(newCommunity);
     }
     
     if (personalAdd > 0) {
-      const newPersonal = personalDonationTotal + personalAdd;
-      setPersonalDonationTotal(newPersonal);
-      localStorage.setItem('album_user_donations_total', String(newPersonal));
+      const newPersonal = activePersonalDonationTotal + personalAdd;
+      updatePersonalDonationTotal(newPersonal);
     }
   };
 
@@ -405,11 +601,15 @@ export default function SubscriptionView({
     const costAmount = details.amount || 5.00;
     const contributionValue = (costAmount * 0.05).toFixed(2);
     setLastPurchasedDetails({
-      name: planTier === 'Pase VIP Elite' ? `Continente ${selectedContinentToPurchase}` : `Selección ${selectedCountryToPurchase}`,
+      name: planTier === 'Pase VIP Elite' 
+        ? `Continente ${selectedContinentToPurchase}` 
+        : (planTier === 'flash-player' && selectedFlashPlayer 
+          ? `Fichaje Flash: ${selectedFlashPlayer.realName}` 
+          : `Selección ${selectedCountryToPurchase}`),
       price: details.price,
       contribution: `$${contributionValue}`
     });
-    incrementDonationsPools(planTier, addDonation);
+    incrementDonationsPools(planTier, costAmount, addDonation);
     setShowGoldenGiftModal(true);
   };
 
@@ -526,7 +726,7 @@ export default function SubscriptionView({
       onUpdateSubscription(showPaymentModal);
       
       triggerGoldenGiftSticker(showPaymentModal);
-      setSuccessMsg(`¡Canje de "${showPaymentModal}" activado con éxito! Se han descontado ${getPlanDetails(showPaymentModal).price} de tu saldo de cuenta y desbloqueado tus cromos.`);
+      setSuccessMsg(`¡Canje de "${showPaymentModal}" activado con éxito! Se ha procesado tu suscripción y desbloqueado tus tarjetas oficiales.`);
       setShowPaymentModal(null);
       return;
     }
@@ -581,6 +781,7 @@ export default function SubscriptionView({
         });
         const data = await response.json();
         
+        const targetName = showPaymentModal === 'flash-player' ? (selectedFlashPlayer?.realName || 'Tarjeta') : showPaymentModal;
         if (data.status === 'simulated_success') {
           // Process simulated success right away
           const subscribeRes = await fetch('/api/user/subscribe', {
@@ -597,16 +798,16 @@ export default function SubscriptionView({
           const subData = await subscribeRes.json();
           if (subData.status === 'success') {
             processPurchaseUnlocks(showPaymentModal);
-            onUpdateSubscription(showPaymentModal);
+            if (showPaymentModal !== 'flash-player') onUpdateSubscription(showPaymentModal);
             triggerGoldenGiftSticker(showPaymentModal);
-            setSuccessMsg(`¡Pago validado con éxito! Has canjeado "${showPaymentModal}". Tu ID de transacción es ${data.transactionId}.`);
+            setSuccessMsg(`¡Pago validado con éxito! Has canjeado "${targetName}". Tu ID de transacción es ${data.transactionId}.`);
             setShowPaymentModal(null);
           } else {
             // Simulated fallback client unlock
             processPurchaseUnlocks(showPaymentModal);
-            onUpdateSubscription(showPaymentModal);
+            if (showPaymentModal !== 'flash-player') onUpdateSubscription(showPaymentModal);
             triggerGoldenGiftSticker(showPaymentModal);
-            setSuccessMsg(`¡Pago de Payphone simulado con éxito! Has desbloqueado "${showPaymentModal}" y tus puntos.`);
+            setSuccessMsg(`¡Pago de Payphone simulado con éxito! Has desbloqueado "${targetName}" y tus puntos.`);
             setShowPaymentModal(null);
           }
         } else if (data.url) {
@@ -646,21 +847,22 @@ export default function SubscriptionView({
         
         const referenceVal = deunaReference || bankReference || cashCodeVal;
         const isTransfer = paymentGateway === 'transferencia';
+        const targetName = showPaymentModal === 'flash-player' ? (selectedFlashPlayer?.realName || 'Tarjeta') : showPaymentModal;
         if (data.status === 'success') {
-          onUpdateSubscription(showPaymentModal);
+          if (showPaymentModal !== 'flash-player') onUpdateSubscription(showPaymentModal);
           triggerGoldenGiftSticker(showPaymentModal);
           if (isTransfer) {
-            setSuccessMsg(`¡Transferencia y Código Verificados! El comprobante al Banco de Guayaquil (#${referenceVal}) ha sido convalidado exitosamente con el código del administrador. Tu plan "${showPaymentModal}" se ha activado.`);
+            setSuccessMsg(`¡Transferencia y Código Verificados! El comprobante al Banco de Guayaquil (#${referenceVal}) ha sido convalidado exitosamente con el código del administrador. Tu canje "${targetName}" se ha activado.`);
           } else {
-            setSuccessMsg(`¡Gracias! Código verificado. Has completado tu canje de "${showPaymentModal}". Se te han acreditado +${unlockInfo?.pointsToAdd || 0} puntos.`);
+            setSuccessMsg(`¡Gracias! Código verificado. Has completado tu canje de "${targetName}". Tu selección ha sido habilitada con éxito.`);
           }
         } else {
-          onUpdateSubscription(showPaymentModal);
+          if (showPaymentModal !== 'flash-player') onUpdateSubscription(showPaymentModal);
           triggerGoldenGiftSticker(showPaymentModal);
           if (isTransfer) {
-            setSuccessMsg(`¡Transferencia y Código Verificados! El comprobante al Banco de Guayaquil (#${referenceVal}) ha sido convalidado exitosamente con el código del administrador. Tu plan "${showPaymentModal}" se ha activado.`);
+            setSuccessMsg(`¡Transferencia y Código Verificados! El comprobante al Banco de Guayaquil (#${referenceVal}) ha sido convalidado exitosamente con el código del administrador. Tu canje "${targetName}" se ha activado.`);
           } else {
-            setSuccessMsg(`¡Gracias! Conectado con éxito. Se ha activado tu canje "${showPaymentModal}" y sumado tus respectivos puntos.`);
+            setSuccessMsg(`¡Gracias! Conectado con éxito. Se ha activado tu canje "${targetName}" y tu selección ya está disponible.`);
           }
         }
       } catch (err) {
@@ -670,9 +872,10 @@ export default function SubscriptionView({
         const transactionDesc = unlockInfo ? `${unlockInfo.desc} (${paymentGateway})` : `Licencia ${showPaymentModal} (${paymentGateway})`;
         let cost = getPlanDetails(showPaymentModal).amount;
         onAddTransaction(transactionDesc, -cost, 'cash');
-        onUpdateSubscription(showPaymentModal);
+        if (showPaymentModal !== 'flash-player') onUpdateSubscription(showPaymentModal);
         triggerGoldenGiftSticker(showPaymentModal);
-        setSuccessMsg(`¡Suscripción desbloqueada con éxito! Disfruta de tu plan premium "${showPaymentModal}" y tus puntos.`);
+        const targetName = showPaymentModal === 'flash-player' ? (selectedFlashPlayer?.realName || 'Tarjeta') : showPaymentModal;
+        setSuccessMsg(`¡Suscripción desbloqueada con éxito! Disfruta de tu plan premium "${targetName}" de forma segura.`);
       } finally {
         setSubmittingPayment(false);
         setShowPaymentModal(null);
@@ -739,6 +942,91 @@ export default function SubscriptionView({
         </div>
       </div>
 
+      {/* MIDNIGHT TRANSFER MARKET: FICHAJES FLASH (12H ROTATION) */}
+      <div className="bg-[#0b0c16] border-[3.5px] border-black rounded-3xl p-5 shadow-[6px_6px_0px_#8b5cf6] relative overflow-hidden my-6">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
+        
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-black pb-4 mb-4">
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl shrink-0">⚡</span>
+            <div>
+              <h3 className="font-bangers text-2xl text-white tracking-wider uppercase">Fichajes Flash de Medianoche</h3>
+              <p className="text-purple-400 font-mono text-[10.5px] uppercase tracking-wider font-bold">Rotación Automática cada 12 Horas • Micro-adquisiciones Directas</p>
+            </div>
+          </div>
+
+          {/* Countdown Clock */}
+          <div className="flex items-center gap-2 bg-black border border-slate-800 rounded-xl px-3 py-1.5 self-start md:self-auto shadow-md">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-ping" />
+            <span className="text-[10px] text-gray-500 font-mono uppercase">Rotación en:</span>
+            <span className="text-xs text-purple-300 font-bold font-mono tracking-widest">{timeLeft || 'Calculando...'}</span>
+          </div>
+        </div>
+
+        {/* Market Description */}
+        <p className="text-[11.5px] text-slate-300 leading-normal mb-5">
+          ¿Te falta esa estrella clave para completar tu álbum o tu pizarra táctica PvP? El mercado flash te permite <strong className="text-purple-300">adquirir tarjetas individuales</strong> mediante pasarelas de pago directo. Al igual que con los pases, el <strong>5% de cada fichaje flash se destina automáticamente</strong> a causas sociales infantiles.
+        </p>
+
+        {/* Rotating Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {getFichajesFlashPlayers().map((p) => {
+            const isOwned = manuallyUnlockedPlayerIds[p.id];
+            
+            return (
+              <div 
+                key={p.id} 
+                className={`bg-slate-950 border-3 border-black rounded-2xl p-4.5 flex flex-col justify-between transition-all relative ${
+                  isOwned 
+                    ? 'opacity-85 border-emerald-500/40 bg-emerald-950/5 shadow-[3px_3px_0px_rgba(16,185,129,0.2)]' 
+                    : 'shadow-[4px_4px_0px_#000] hover:border-purple-500/40 hover:-translate-y-0.5'
+                }`}
+              >
+                {/* Visual Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[8.5px] font-mono uppercase font-black text-purple-400 bg-purple-500/10 border border-purple-500/15 px-2 py-0.5 rounded-lg">
+                    {p.country}
+                  </span>
+                  <div className="flex items-center gap-1 bg-black px-2 py-0.5 rounded border border-slate-800">
+                    <span className="text-[8.5px] text-gray-400 font-mono">VAL:</span>
+                    <span className="text-xs font-black text-amber-400 font-mono">{p.rating}</span>
+                  </div>
+                </div>
+
+                {/* Player details */}
+                <div className="space-y-1 mb-4">
+                  <span className="text-[9.5px] text-slate-500 uppercase font-mono block tracking-wider">{p.name}</span>
+                  <h4 className="font-extrabold text-white text-sm">{p.realName}</h4>
+                  <p className="text-[10px] text-gray-400">Posición: <strong className="text-slate-300">Superestrella</strong></p>
+                </div>
+
+                {/* Pricing and Action */}
+                <div className="pt-3 border-t border-slate-900 flex items-center justify-between gap-2.5">
+                  <div className="text-left font-mono">
+                    <span className="text-[8.5px] text-gray-500 block uppercase">Precio Directo:</span>
+                    <span className="text-sm font-black text-emerald-400">${p.price.toFixed(2)} USD</span>
+                  </div>
+
+                  {isOwned ? (
+                    <span className="text-[9.5px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/15 px-3 py-1.5 rounded-xl font-bold uppercase text-center block flex-1">
+                      ✓ EN PROPIEDAD
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handlePurchaseFlashPlayer(p)}
+                      className="flex-1 py-2 bg-purple-600 hover:bg-purple-500 text-white font-sans font-black text-[10px] uppercase rounded-xl border border-black shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:shadow-none cursor-pointer transition active:translate-y-0.5"
+                    >
+                      Fichar Tarjeta
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       {/* 2. WARNING ALERT FOR UNREGISTERED USERS */}
       {showUnregisteredAlert && (
         <div className="bg-rose-950/40 border-3 border-black text-white p-5 rounded-3xl shadow-[5px_5px_0px_#ef4444] animate-bounce-short space-y-3">
@@ -774,11 +1062,28 @@ export default function SubscriptionView({
       )}
 
       {/* 3. Plans comparison cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="plans-grid">
         {plans.map((p) => {
           const isActive = currentSubscription === p.id || (p.id === 'Ninguna' && !currentSubscription);
           const isVIP = p.id === 'Pase VIP Elite';
           const isScout = p.id === 'Plan Scout Básico';
+          const isDailyPack = p.id === 'Paquete Diario de Estampas';
+          const isSeasonPass = p.id === 'Pase de Temporada';
+
+          // Inline check if the selected country is unlocked
+          const scoutUnlockedList = JSON.parse(localStorage.getItem('scout_unlocked_countries') || '[]');
+          const dailySpendsMap = JSON.parse(localStorage.getItem('daily_pack_spends') || '{}');
+          const isSelectedCountryUnlocked = 
+            currentSubscription === 'Pase de Temporada' ||
+            scoutUnlockedList.includes(selectedCountryToPurchase) ||
+            (dailySpendsMap[selectedCountryToPurchase] || 0) >= 10;
+
+          const isDailyCountryUnlocked = 
+            currentSubscription === 'Pase de Temporada' ||
+            scoutUnlockedList.includes(selectedCountryToPurchase) ||
+            (dailySpendsMap[selectedCountryToPurchase] || 0) >= 10;
+
+          const currentDailySpend = dailySpendsMap[selectedCountryToPurchase] || 0;
 
           return (
             <div
@@ -802,7 +1107,9 @@ export default function SubscriptionView({
                   <h4 className="font-extrabold text-white text-base flex items-center gap-1.5">
                     {p.id === 'Ninguna' && <span className="text-slate-550">🥚</span>}
                     {p.id === 'Plan Scout Básico' && <span className="text-indigo-400">🛡️</span>}
+                    {p.id === 'Paquete Diario de Estampas' && <span className="text-emerald-400">📂</span>}
                     {p.id === 'Pase VIP Elite' && <span className="text-amber-400">👑</span>}
+                    {p.id === 'Pase de Temporada' && <span className="text-pink-400">✨</span>}
                     {p.name}
                   </h4>
                   <p className="text-[10.5px] text-gray-400 mt-1 lines-clamp-2 leading-relaxed">{p.desc}</p>
@@ -817,7 +1124,7 @@ export default function SubscriptionView({
                 {isScout && (
                   <div className="mt-4 mb-5 p-3.5 bg-slate-950/80 border border-slate-850 rounded-2xl space-y-2">
                     <label className="text-[10px] text-indigo-400 font-mono font-bold uppercase tracking-wider block">
-                      🎯 Elige Selección de País:
+                      🎯 Elige Selección de País ($5):
                     </label>
                     <select
                       value={selectedCountryToPurchase}
@@ -830,6 +1137,43 @@ export default function SubscriptionView({
                         </option>
                       ))}
                     </select>
+                  </div>
+                )}
+
+                {isDailyPack && (
+                  <div className="mt-4 mb-5 p-3.5 bg-slate-950/80 border border-slate-850 rounded-2xl space-y-2">
+                    <label className="text-[10px] text-emerald-400 font-mono font-bold uppercase tracking-wider block">
+                      📂 Elige Selección para Sobre Diario ($2):
+                    </label>
+                    <select
+                      value={selectedCountryToPurchase}
+                      onChange={(e) => setSelectedCountryToPurchase(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-800 text-white rounded-xl py-2 px-2.5 text-xs focus:ring-1 focus:ring-emerald-500 focus:outline-none"
+                    >
+                      {COUNTRIES.map((c) => (
+                        <option className="bg-slate-900 text-white" key={c.name} value={c.name}>
+                          {c.flag} {c.name}
+                        </option>
+                      ))}
+                    </select>
+                    
+                    <div className="pt-1.5">
+                      <div className="flex justify-between text-[9px] font-mono font-bold text-slate-400">
+                        <span>Límite Legal Acumulado:</span>
+                        <span className={currentDailySpend >= 10 ? 'text-emerald-400' : 'text-amber-400'}>
+                          ${currentDailySpend} / $10
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-900 h-2 rounded-full overflow-hidden mt-1 border border-slate-850">
+                        <div 
+                          className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                          style={{ width: `${Math.min(100, (currentDailySpend / 10) * 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[8.5px] text-slate-500 font-sans block mt-1 leading-snug">
+                        Al llegar a $10, se desbloquea permanentemente de forma gratuita.
+                      </span>
+                    </div>
                   </div>
                 )}
 
@@ -912,23 +1256,12 @@ export default function SubscriptionView({
                   })()
                 ) : isScout ? (
                   (() => {
-                    const countriesList = scoutChosenCountry ? scoutChosenCountry.split(',').map(s => s.trim().toUpperCase()) : [];
-                    const isSelectedCountryPurchased = countriesList.includes(selectedCountryToPurchase.toUpperCase());
-                    
-                    if (isSelectedCountryPurchased) {
+                    if (isSelectedCountryUnlocked) {
                       return (
                         <div className="space-y-2">
                           <div className="w-full py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider rounded-xl bg-slate-850 border-2 border-slate-800 text-emerald-400 flex items-center justify-center gap-1.5">
                             <ShieldCheck className="w-4 h-4 text-emerald-400" /> {selectedCountryToPurchase} Desbloqueado 🏆
                           </div>
-                          {currentSubscription !== 'Plan Scout Básico' && (
-                            <button
-                              onClick={() => handlePlanSelection(p.id)}
-                              className="w-full py-2.5 text-xs font-black uppercase tracking-wider rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white border-2 border-black shadow-[2.5px_2.5px_0px_#000] cursor-pointer"
-                            >
-                              Activar Plan Scout Básico
-                            </button>
-                          )}
                         </div>
                       );
                     } else {
@@ -944,6 +1277,44 @@ export default function SubscriptionView({
                       );
                     }
                   })()
+                ) : isDailyPack ? (
+                  (() => {
+                    if (isDailyCountryUnlocked) {
+                      return (
+                        <div className="space-y-2">
+                          <div className="w-full py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider rounded-xl bg-slate-850 border-2 border-slate-800 text-emerald-400 flex items-center justify-center gap-1.5">
+                            <ShieldCheck className="w-4 h-4 text-emerald-400" /> {selectedCountryToPurchase} Desbloqueado 🏆
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      return (
+                        <button
+                          onClick={() => handlePlanSelection(p.id)}
+                          disabled={purchaseLoading !== null}
+                          className="w-full py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 relative border-2 border-black shadow-[2.5px_2.5px_0px_#000] bg-emerald-600 hover:bg-emerald-500 text-white active:translate-y-0.5"
+                        >
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Comprar Sobre Diario ($2) 📂</span>
+                        </button>
+                      );
+                    }
+                  })()
+                ) : isSeasonPass ? (
+                  currentSubscription === 'Pase de Temporada' ? (
+                    <div className="w-full py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider rounded-xl bg-slate-850 border-2 border-slate-800 text-emerald-400 flex items-center justify-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" /> Pase de Temporada Activo ✨
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handlePlanSelection(p.id)}
+                      disabled={purchaseLoading !== null}
+                      className="w-full py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 relative border-2 border-black shadow-[2.5px_2.5px_0px_#000] bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:opacity-90 active:translate-y-0.5"
+                    >
+                      <CreditCard className="w-3.5 h-3.5" />
+                      <span>Adquirir Pase de Temporada ($20)</span>
+                    </button>
+                  )
                 ) : isActive ? (
                   <div className="w-full py-2.5 text-[11px] font-bold font-mono uppercase tracking-wider rounded-xl bg-slate-850 border-2 border-slate-800 text-emerald-400 flex items-center justify-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-emerald-400" /> Plan Activo Actual
@@ -959,6 +1330,12 @@ export default function SubscriptionView({
                   </button>
                 )}
               </div>
+
+              {p.id !== 'Ninguna' && (
+                <p className="text-[8.5px] text-slate-400 mt-4 leading-normal bg-slate-950/40 p-2 rounded-lg border border-slate-850/60 font-sans">
+                  Al adquirir este paquete, el 5% se destina automáticamente al fondo de desarrollo deportivo de la Fundación Guerreros de luz, apoyando a niños en condiciones vulnerables.
+                </p>
+              )}
             </div>
           );
         })}
@@ -1013,7 +1390,7 @@ export default function SubscriptionView({
             <div>
               <h4 className="font-extrabold text-amber-400 text-sm">👑 ¡Pase VIP Elite Activado (+15 puntos)!</h4>
               <p className="text-[11.5px] text-gray-300 mt-1 max-w-2xl leading-relaxed">
-                ¡Enhorabuena! Has desbloqueado <strong>todos los países y todos sus cromos al 100% al instante</strong>. Ya no requieres superar trivias para coleccionar. Además has recibido tu boost de 15 puntos y tu inscripción oficial al sorteo auditable de premios físicos.
+                ¡Enhorabuena! Has desbloqueado <strong>todos los países y todas sus tarjetas al 100% al instante</strong>. Ya no requieres superar trivias para coleccionar. Además has recibido tu boost de 15 puntos y tu inscripción oficial al sorteo auditable de premios físicos.
               </p>
             </div>
           </div>
@@ -1027,7 +1404,7 @@ export default function SubscriptionView({
             <ShieldCheck className="w-4 h-4" /> Garantía de Sorteo
           </h4>
           <p className="text-[11px] text-gray-400 mt-1.5 leading-relaxed">
-            Todos los cobros y adquisiciones de licencias quedan registrados bajo el amparo de tu credencial única de Director Técnico. Esto previene re-intentos fallidos, duplicaciones de cromos y garantiza una auditoría pública.
+            Todos los cobros y adquisiciones de licencias quedan registrados bajo el amparo de tu credencial única de Director Técnico. Esto previene re-intentos fallidos, duplicaciones de tarjetas y garantiza una auditoría pública.
           </p>
         </div>
 
@@ -1037,226 +1414,16 @@ export default function SubscriptionView({
             <p className="text-[10px] text-slate-300 leading-normal">{successMsg}</p>
           </div>
         )}
-
-
       </div>
 
-      {/* SECCIÓN SOLIDARIA: DEPORTISTAS POR LA INFANCIA */}
-      <div className="bg-[#0b0e17] border-[3.5px] border-black rounded-3xl p-6 shadow-[6px_6px_0px_#EF4444] relative overflow-hidden mt-8" id="social-responsibility-portal">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-2xl pointer-events-none" />
-        
-        <div className="flex items-center gap-3 border-b-2 border-black pb-4 mb-5">
-          <Heart className="w-7 h-7 text-[#EF4444] animate-pulse shrink-0 fill-[#EF4444]" />
-          <div>
-            <h3 className="font-bangers text-2xl text-white tracking-wider uppercase">MÓDULO SOLIDARIO: DEPORTISTAS POR LA INFANCIA</h3>
-            <p className="text-[#10B981] font-mono text-xs uppercase tracking-widest font-bold">5% de Utilidad Neto Donado Automáticamente & Aportes Voluntarios</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left panel info */}
-          <div className="lg:col-span-5 space-y-4">
-            <div className="bg-slate-950/80 border border-slate-850 p-4.5 rounded-2xl">
-              <h4 className="font-extrabold text-sm text-white mb-2 flex items-center gap-2">
-                <Globe className="w-4 h-4 text-emerald-400" /> Nuestro Compromiso Real
-              </h4>
-              <p className="text-xs text-gray-400 leading-relaxed">
-                Este álbum no solo es para divertirnos y competir: <strong className="text-white">nos comprometemos a donar el 5% de la utilidad neta</strong> de cada pase VIP y paquete de stickers adquirido para <strong className="text-emerald-405">impulsar fondos de Inteligencia nutricional, para niños-as en situación de riesgo</strong>.
-              </p>
-            </div>
-
-            {/* Pooled statistics widgets with real counts */}
-            <div className="space-y-3">
-              <div className="bg-slate-950/50 border border-slate-900 p-3 rounded-xl flex justify-between items-center">
-                <span className="text-[11px] text-gray-500 font-mono uppercase">Fondo 5% de Utilidad:</span>
-                <span className="text-xs text-emerald-400 font-bold font-mono">
-                  {communityBasePool.toLocaleString('es-EC', { style: 'currency', currency: 'USD' })}
-                </span>
-              </div>
-
-              <div className="bg-slate-950/50 border border-slate-900 p-3 rounded-xl flex justify-between items-center">
-                <span className="text-[11px] text-gray-500 font-mono uppercase">Tus Donaciones Directas:</span>
-                <span className="text-xs text-[#EF4444] font-bold font-mono">
-                  {personalDonationTotal.toLocaleString('es-EC', { style: 'currency', currency: 'USD' })}
-                </span>
-              </div>
-
-              <div className="bg-gradient-to-r from-red-950/20 to-emerald-950/20 border-2 border-black p-3.5 rounded-xl flex justify-between items-center">
-                <span className="text-xs text-white font-mono uppercase font-bold">Pool Solidario Total:</span>
-                <span className="text-sm text-yellow-450 font-extrabold font-mono animate-pulse">
-                  {(communityBasePool + personalDonationTotal).toLocaleString('es-EC', { style: 'currency', currency: 'USD' })}
-                </span>
-              </div>
-            </div>
-
-
-          </div>
-
-          {/* Right form widget */}
-          <div className="lg:col-span-7 bg-brand-sidebar border-2 border-black rounded-2xl p-5 shadow-[4px_4px_0_#000] relative">
-            <h4 className="font-extrabold text-sm text-white mb-3.5 flex items-center gap-1.5 uppercase font-mono tracking-wide text-indigo-400">
-              <Sparkles className="w-4 h-4" /> Realizar Aporte Voluntario
-            </h4>
-
-            {showDonationSuccessAlert && (
-              <div className="bg-[#10B981]/15 border border-[#10B981]/40 text-[#10B981] p-4 rounded-xl mb-4 text-xs font-mono relative">
-                <button 
-                  onClick={() => setShowDonationSuccessAlert(false)}
-                  className="absolute top-2 right-2 text-gray-500 hover:text-white transition cursor-pointer font-bold text-xs"
-                >
-                  ✕
-                </button>
-                <div className="flex items-start gap-2 text-left">
-                  <span className="text-lg">💖</span>
-                  <div>
-                    <strong className="block text-white">¡Aporte Solidario Registrado!</strong>
-                    Haz donado <strong className="text-yellow-405">${lastDonatedAmount} USD</strong> con éxito. Tu nombre de D.T. y aporte han quedado anotados en el registro público de causas sociales infantiles del Torneo. ¡Muchas gracias por tu corazón solidario!
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <form onSubmit={handleDonationSubmit} className="space-y-4">
-              {/* Select preset amount */}
-              <div>
-                <label className="text-[10px] text-gray-500 font-mono uppercase tracking-wider block mb-1.5 text-left">Monto del Aporte (USD)</label>
-                <div className="grid grid-cols-4 gap-2 mb-2">
-                  {['5', '10', '25', '50'].map((preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => setDonationInput(preset)}
-                      className={`py-2 text-xs font-bold font-mono rounded-xl border transition-all cursor-pointer ${
-                        donationInput === preset
-                          ? 'bg-[#EF4444] text-white border-black shadow-[2px_2px_0_#000]'
-                          : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                      }`}
-                    >
-                      ${preset}
-                    </button>
-                  ))}
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-400 font-mono">$</span>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Otro valor personalizado"
-                    value={donationInput}
-                    onChange={(e) => setDonationInput(e.target.value)}
-                    className="bg-slate-950 border border-slate-850 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 text-white font-mono placeholder:text-gray-600 w-full"
-                  />
-                </div>
-              </div>
-
-              {/* Donation simulated payment methods */}
-              <div>
-                <label className="text-[10px] text-gray-500 font-mono uppercase tracking-wider block mb-1.5 text-left">Canal de Pago (Simulado Ecuador)</label>
-                <div className="grid grid-cols-3 gap-2 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => { setDonationPaymentMethod('deuna'); setDonationFormReference(''); }}
-                    className={`py-1.5 text-[10.5px] font-bold rounded-xl border text-center transition cursor-pointer ${
-                      donationPaymentMethod === 'deuna'
-                        ? 'bg-teal-500/10 text-teal-400 border-teal-500'
-                        : 'bg-slate-950 text-slate-400 border-slate-850'
-                    }`}
-                  >
-                    Deuna QR
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => { setDonationPaymentMethod('payphone'); setDonationFormReference(''); }}
-                    className={`py-1.5 text-[10.5px] font-bold rounded-xl border text-center transition cursor-pointer ${
-                      donationPaymentMethod === 'payphone'
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500'
-                        : 'bg-slate-950 text-slate-400 border-slate-855'
-                    }`}
-                  >
-                    Payphone App
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => { setDonationPaymentMethod('transferencia'); setDonationFormReference(''); }}
-                    className={`py-1.5 text-[10.5px] font-bold rounded-xl border text-center transition cursor-pointer ${
-                      donationPaymentMethod === 'transferencia'
-                        ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500'
-                        : 'bg-slate-950 text-slate-400 border-slate-855'
-                    }`}
-                  >
-                    Transferencia
-                  </button>
-                </div>
-
-                {donationPaymentMethod === 'deuna' && (
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2">
-                    <p className="text-[10px] text-gray-400 leading-relaxed font-mono text-left">
-                      Deuna el monto al celular de la Fundación <strong className="text-white">0998765432</strong> o ingresa la referencia ficticia de transacción para validar.
-                    </p>
-                    <input
-                      type="text"
-                      placeholder="Monto enviado o referencia (ej: 098123456)"
-                      value={donationFormReference}
-                      onChange={(e) => setDonationFormReference(e.target.value)}
-                      className="bg-brand-deep border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-gray-600 w-full font-mono focus:outline-none focus:ring-1 focus:ring-teal-500"
-                    />
-                  </div>
-                )}
-
-                {donationPaymentMethod === 'payphone' && (
-                  <div className="bg-slate-955 p-3 rounded-xl border border-slate-850 text-left">
-                    <p className="text-[10px] text-gray-400 font-mono leading-relaxed">
-                      Lanzaremos una petición segura a la app móvil de PayPhone vinculada a tu ID. Cobro en simulación inmediata de fondos de prueba.
-                    </p>
-                  </div>
-                )}
-
-                {donationPaymentMethod === 'transferencia' && (
-                  <div className="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2 text-left">
-                    <div className="text-[9.5px] text-gray-400 leading-normal font-mono space-y-0.5">
-                      <p><strong className="text-white">Banco:</strong> Banco Solidario S.A. (Ecuador)</p>
-                      <p><strong className="text-white">Cuenta de Ahorros:</strong> 1200456111</p>
-                      <p><strong className="text-white">Beneficiario:</strong> Ayuda Infantil y Educación Global</p>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Número de Comprobante / Voucher"
-                      value={donationFormReference}
-                      onChange={(e) => setDonationFormReference(e.target.value)}
-                      className="bg-brand-deep border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder:text-gray-600 w-full font-mono focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {donationErrorStr && (
-                <div className="text-[10px] text-rose-450 italic font-mono text-left">
-                  ⚠ {donationErrorStr}
-                </div>
-              )}
-
-              {/* Form submit button */}
-              <button
-                type="submit"
-                disabled={isDonatingProgress}
-                className="w-full py-3 bg-[#EF4444] hover:bg-[#DC2626] text-white font-bangers text-sm rounded-xl tracking-widest border-2 border-black uppercase cursor-pointer shadow-[4px_4px_0px_#000] active:translate-y-0.5 select-none transition-all flex items-center justify-center gap-1.5"
-              >
-                {isDonatingProgress ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin" /> Procesando Donación...
-                  </>
-                ) : (
-                  <>
-                    <Heart className="w-4.5 h-4.5 fill-white text-white" /> Donar ${donationInput} USD de Corazón 💖
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
+      {/* SECCIÓN SOLIDARIA: ESTADIO SOCIAL 3D */}
+      <div className="mt-8" id="social-responsibility-portal">
+        <SocialImpactStadium
+          socialFundTotal={communityBasePool}
+          personalDonationTotal={personalDonationTotal}
+          onDonateDirectly={handleDonateDirectly}
+          userCashBalance={userCashBalance}
+        />
       </div>
 
       {/* 6. ADAPTIVE PREMIUM PASARELA DE PAGOS MODAL OVERLAY */}
@@ -1341,20 +1508,6 @@ export default function SubscriptionView({
                   <Building className="w-4 h-4 text-indigo-300" />
                   <span>Transf. Bancaria</span>
                   <span className="text-[7.5px] uppercase bg-black/40 text-indigo-400 px-1 rounded">Manual / Depósito</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => { setPaymentGateway('saldo'); setPaymentError(''); }}
-                  className={`py-2 px-1 text-[10.5px] font-black rounded-xl transition-all cursor-pointer text-center flex flex-col items-center justify-center gap-1 border ${
-                    paymentGateway === 'saldo' 
-                      ? 'bg-emerald-500 text-black border-black shadow-[2px_2px_0_#000]' 
-                      : 'text-gray-400 hover:text-white border-transparent'
-                  }`}
-                >
-                  <Coins className="w-4 h-4 text-emerald-350" />
-                  <span>Mi Saldo DT</span>
-                  <span className="text-[7.5px] uppercase bg-black/40 text-emerald-400 px-1 rounded">${userCashBalance.toFixed(2)} USD</span>
                 </button>
 
                 <button
@@ -1661,45 +1814,7 @@ export default function SubscriptionView({
                 </div>
               )}
 
-              {/* 5. PAY WITH BALANCE (SALDO) */}
-              {paymentGateway === 'saldo' && (
-                <div className="space-y-3.5 animate-fade-in bg-emerald-950/20 border-2 border-black p-4 rounded-2xl text-center">
-                  <div className="flex justify-center items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-mono font-bold">DEBITAR DE MI SALDO DE BIEN ESTAR</span>
-                  </div>
 
-                  <div className="bg-slate-950 p-4 rounded-xl border border-emerald-500/25">
-                    <p className="text-xs text-slate-350 leading-relaxed">
-                      Tienes un dinero cargado en tu billetera digital táctica que puedes utilizar inmediatamente para comprar este plan sin necesidad de escanear o transferir.
-                    </p>
-                    
-                    <div className="grid grid-cols-2 gap-4 my-3 text-left">
-                      <div className="bg-emerald-950/40 p-2.5 rounded-xl border border-emerald-500/10 text-center">
-                        <span className="text-[9px] text-emerald-400 font-mono block uppercase">Mi Saldo Disponible</span>
-                        <span className="text-lg font-black text-white font-mono">${userCashBalance.toFixed(2)}</span>
-                      </div>
-                      
-                      <div className="bg-[#1f1616] p-2.5 rounded-xl border border-rose-500/10 text-center">
-                        <span className="text-[9px] text-gray-400 font-mono block uppercase">Costo del Plan</span>
-                        <span className="text-lg font-black text-rose-400 font-mono">
-                          {getPlanDetails(showPaymentModal).price}
-                        </span>
-                      </div>
-                    </div>
-
-                    {userCashBalance >= getPlanDetails(showPaymentModal).amount ? (
-                      <span className="text-xs text-emerald-400 font-mono font-bold flex items-center justify-center gap-1.5 mt-2 bg-emerald-500/5 px-2 py-1 rounded">
-                        ✅ Saldo suficiente. Presiona "Confirmar Pago" abajo para activar.
-                      </span>
-                    ) : (
-                      <span className="text-xs text-rose-400 font-mono font-bold flex items-center justify-center gap-1.5 mt-2 bg-rose-500/5 px-2 py-1 rounded animate-pulse">
-                        ❌ Saldo insuficiente ({getPlanDetails(showPaymentModal).price}). Recárgalo en tu panel de Billetera.
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
 
               {/* Desglose Social y Donación Sugerida 10% */}
               {showPaymentModal && showPaymentModal !== 'Ninguna' && (() => {
@@ -1778,9 +1893,7 @@ export default function SubscriptionView({
                         ? 'bg-[#635BFF] text-white hover:bg-[#5249f0]'
                         : paymentGateway === 'transferencia'
                           ? 'bg-indigo-600 text-white hover:bg-indigo-500'
-                          : paymentGateway === 'saldo'
-                            ? 'bg-emerald-500 text-black hover:bg-emerald-400'
-                            : 'bg-rose-500 text-black hover:bg-rose-400'
+                          : 'bg-rose-500 text-black hover:bg-rose-400'
                 }`}
               >
                 {submittingPayment ? (
@@ -1828,10 +1941,10 @@ export default function SubscriptionView({
             
             {/* Golden Header Badge */}
             <div className="bg-gradient-to-r from-amber-500 to-yellow-300 text-slate-950 font-black text-[10px] uppercase tracking-widest px-4 py-1 rounded-full shadow border border-amber-200 mt-2 font-mono">
-              ★ REGALO EXCLUSIVO: CROMO GOLDEN ★
+              ★ REGALO EXCLUSIVO: TARJETA GOLDEN ★
             </div>
 
-            {/* The Actual Golden Cromo Box */}
+            {/* The Actual Golden Card Box */}
             <div className="my-6 relative bg-gradient-to-b from-amber-400/20 via-yellow-500/5 to-slate-950 border-3 border-amber-400 p-5 rounded-2xl w-full max-w-[280px] shadow-[0_10px_25px_rgba(234,179,8,0.2)] text-center relative overflow-hidden group">
               {/* Inner glowing badge */}
               <div className="absolute top-1 right-1 bg-amber-400 text-slate-950 font-black text-[8px] px-2 py-0.5 rounded-full uppercase tracking-wider">
@@ -1868,7 +1981,7 @@ export default function SubscriptionView({
               <div className="bg-slate-950/80 border border-amber-400/30 p-2.5 rounded-xl flex items-center gap-2 text-left text-[10.5px] text-amber-200">
                 <Gift className="w-5 h-5 shrink-0 text-amber-400 animate-bounce" />
                 <span className="leading-normal font-medium">
-                  Gracias héroe del deporte, con tu contribución ayudas a proyectos de ayuda social para la fundación Guerreros de Luz. Este cromo dorado de edición especial es tuyo.
+                  Gracias héroe del deporte, con tu contribución ayudas a proyectos de ayuda social para la fundación Guerreros de Luz. Esta tarjeta dorada de edición especial es tuya.
                 </span>
               </div>
             </div>
@@ -1879,7 +1992,7 @@ export default function SubscriptionView({
                 onClick={() => setShowGoldenGiftModal(false)}
                 className="w-full py-2.5 bg-gradient-to-r from-amber-500 to-yellow-400 hover:from-amber-400 hover:to-yellow-300 text-slate-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-[4px_4px_0px_#000] border-2 border-slate-950 active:translate-y-0.5 transition cursor-pointer"
               >
-                Reclamar Cromo Dorado ✨
+                Reclamar Tarjeta Dorada ✨
               </button>
             </div>
           </motion.div>
