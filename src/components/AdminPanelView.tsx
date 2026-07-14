@@ -4242,6 +4242,29 @@ app.post('/api/webhooks/fal', async (req, res) => {
                               "{bObj.predictionReason}"
                             </p>
                           )}
+
+                          {(bObj.prediction?.mvp || bObj.prediction?.goleadorTorneo || bObj.prediction?.mejorArquero) && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 border-t border-slate-900/60 pt-2.5 mt-2.5 text-left text-[10px] font-mono">
+                              {bObj.prediction.mvp && (
+                                <div className="bg-slate-900/40 p-2 rounded-lg border border-slate-900/50">
+                                  <span className="text-emerald-400 uppercase text-[8px] block">⭐ MVP del Partido</span>
+                                  <span className="text-white font-sans font-bold block mt-0.5 truncate" title={bObj.prediction.mvp}>{bObj.prediction.mvp}</span>
+                                </div>
+                              )}
+                              {bObj.prediction.goleadorTorneo && (
+                                <div className="bg-slate-900/40 p-2 rounded-lg border border-slate-900/50">
+                                  <span className="text-amber-500/85 uppercase text-[8px] block">🏆 Goleador Torneo</span>
+                                  <span className="text-white font-sans font-bold block mt-0.5 truncate" title={bObj.prediction.goleadorTorneo}>{bObj.prediction.goleadorTorneo}</span>
+                                </div>
+                              )}
+                              {bObj.prediction.mejorArquero && (
+                                <div className="bg-slate-900/40 p-2 rounded-lg border border-slate-900/50">
+                                  <span className="text-blue-400 uppercase text-[8px] block">🛡️ Mejor Arquero</span>
+                                  <span className="text-white font-sans font-bold block mt-0.5 truncate" title={bObj.prediction.mejorArquero}>{bObj.prediction.mejorArquero}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
 
                         {/* Detalle de los Jugadores alineados por Posición */}

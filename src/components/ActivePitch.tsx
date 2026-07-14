@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Player, UserTacticalBoard, Match, getCountryOfPlay } from '../types';
-import { Eye, Check, RefreshCw, Send, HelpCircle, Save, Info, Sparkles, Flame, Trash2 } from 'lucide-react';
+import { Eye, Check, RefreshCw, Send, HelpCircle, Save, Info, Sparkles, Flame, Trash2, User, Award, Shield } from 'lucide-react';
 import { DTAvatarRenderer } from './DTAvatarRenderer';
 import { ValeriaRenderer } from './ValeriaRenderer';
 
@@ -121,10 +121,22 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
   const [is3D, setIs3D] = useState<boolean>(true);
   const [predictionLocal, setPredictionLocal] = useState<number>(savedBoard?.prediction?.golesLocal ?? 0);
   const [predictionVisitante, setPredictionVisitante] = useState<number>(savedBoard?.prediction?.golesVisitante ?? 0);
+  const [predictionMvp, setPredictionMvp] = useState<string>(savedBoard?.prediction?.mvp ?? '');
+  const [predictionGoleadorTorneo, setPredictionGoleadorTorneo] = useState<string>(savedBoard?.prediction?.goleadorTorneo ?? '');
+  const [predictionMejorArquero, setPredictionMejorArquero] = useState<string>(savedBoard?.prediction?.mejorArquero ?? '');
   const [activeSlotSelection, setActiveSlotSelection] = useState<string | null>(null); // slot position label currently being configured
   const [scoutDetailsPlayer, setScoutDetailsPlayer] = useState<Player | null>(null);
   const [showConfirmModal, setShowConfirmModal] = useState<boolean>(false);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
+
+  // Sync predictions and inputs whenever savedBoard or country changes
+  React.useEffect(() => {
+    setPredictionLocal(savedBoard?.prediction?.golesLocal ?? 0);
+    setPredictionVisitante(savedBoard?.prediction?.golesVisitante ?? 0);
+    setPredictionMvp(savedBoard?.prediction?.mvp ?? '');
+    setPredictionGoleadorTorneo(savedBoard?.prediction?.goleadorTorneo ?? '');
+    setPredictionMejorArquero(savedBoard?.prediction?.mejorArquero ?? '');
+  }, [savedBoard, country]);
 
   // Helper to retrieve player objects currently set on various spots
   const getAssignedPlayer = (idStr: string | null) => {
@@ -715,6 +727,63 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
                 </div>
               </div>
             </div>
+
+            {/* Pronósticos adicionales */}
+            <div className="mt-5 pt-4 border-t border-slate-900 text-left space-y-4">
+              <span className="text-[10px] font-mono text-[#10b981] uppercase block tracking-wider font-extrabold">Pronósticos Especiales</span>
+              
+              {/* MVP del Partido */}
+              <div>
+                <label className="text-[10.5px] text-gray-400 flex items-center gap-1.5 mb-1.5 font-sans font-semibold">
+                  <User className="w-3.5 h-3.5 text-[#10b981]" /> MVP del Partido (Jugador de {country})
+                </label>
+                <select
+                  value={predictionMvp}
+                  onChange={(e) => setPredictionMvp(e.target.value)}
+                  className="w-full bg-slate-900 text-xs border border-slate-800 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-white cursor-pointer"
+                >
+                  <option className="bg-[#0f172a]" value="">Selecciona MVP de {country}...</option>
+                  {players.map(p => (
+                    <option className="bg-[#0f172a]" key={p.id} value={p.realName}>{p.realName} ({p.subPosition} - GL {p.rating})</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Goleador del Torneo */}
+              <div>
+                <label className="text-[10.5px] text-gray-400 flex items-center gap-1.5 mb-1.5 font-sans font-semibold">
+                  <Award className="w-3.5 h-3.5 text-amber-400" /> Goleador del Torneo (Predicción)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={predictionGoleadorTorneo}
+                    onChange={(e) => setPredictionGoleadorTorneo(e.target.value)}
+                    placeholder="Ej. Erling Haaland, Kylian Mbappé..."
+                    className="w-full bg-slate-900 text-xs border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-white placeholder-gray-600 font-medium"
+                  />
+                  <Award className="w-4 h-4 text-amber-500/50 absolute left-3 top-3" />
+                </div>
+              </div>
+
+              {/* Mejor Arquero */}
+              <div>
+                <label className="text-[10.5px] text-gray-400 flex items-center gap-1.5 mb-1.5 font-sans font-semibold">
+                  <Shield className="w-3.5 h-3.5 text-blue-400" /> Mejor Arquero del Torneo (Predicción)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={predictionMejorArquero}
+                    onChange={(e) => setPredictionMejorArquero(e.target.value)}
+                    placeholder="Ej. Emi Martínez, Unai Simón..."
+                    className="w-full bg-slate-900 text-xs border border-slate-800 rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500 text-white placeholder-gray-600 font-medium"
+                  />
+                  <Shield className="w-4 h-4 text-blue-500/50 absolute left-3 top-3" />
+                </div>
+              </div>
+            </div>
+
           </div>
 
           <button
@@ -759,6 +828,16 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
               <p className="text-xs font-semibold leading-relaxed text-slate-200">
                 ¿Deseas confirmar y guardar la alineación táctica (Formación: <strong className="text-emerald-400">{formationKey}</strong>) y tu pronóstico oficial (<strong>{predictionLocal} - {predictionVisitante}</strong>) para <strong>{country}</strong>?
               </p>
+
+              {(predictionMvp || predictionGoleadorTorneo || predictionMejorArquero) && (
+                <div className="bg-slate-950 p-3 rounded-xl border border-slate-900 text-[10px] space-y-1.5 text-slate-300 font-mono">
+                  <span className="text-emerald-400 font-bold block mb-1 uppercase tracking-wider text-[9.5px]">Tus Predicciones Guardadas:</span>
+                  {predictionMvp && <div>• MVP: <span className="text-white font-sans font-semibold">{predictionMvp}</span></div>}
+                  {predictionGoleadorTorneo && <div>• Goleador: <span className="text-white font-sans font-semibold">{predictionGoleadorTorneo}</span></div>}
+                  {predictionMejorArquero && <div>• Arquero: <span className="text-white font-sans font-semibold">{predictionMejorArquero}</span></div>}
+                </div>
+              )}
+
               <p className="text-[11px] text-gray-405 italic">
                 Se guardará de forma segura en las estadísticas del DT y se sincronizará inmediatamente con el panel del administrador para la auditoría física y digital de sorteos.
               </p>
@@ -783,7 +862,10 @@ export default function ActivePitch({ country, players, savedBoard, match, onSav
                       prediction: {
                         matchId: match.id,
                         golesLocal: predictionLocal,
-                        golesVisitante: predictionVisitante
+                        golesVisitante: predictionVisitante,
+                        mvp: predictionMvp,
+                        goleadorTorneo: predictionGoleadorTorneo,
+                        mejorArquero: predictionMejorArquero
                       }
                     });
                   }}

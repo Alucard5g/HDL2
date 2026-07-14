@@ -2604,6 +2604,9 @@ export default function App() {
             return;
           }
         }
+      } else {
+        alert('❌ No se ha podido iniciar sesión.\n\nEl correo ingresado no se encuentra registrado en nuestra base de datos central ni en este dispositivo. Por favor, regístrate primero.');
+        return;
       }
     }
 
@@ -6667,10 +6670,13 @@ export default function App() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  const form = document.getElementById('google-registration-form-hidden') as HTMLFormElement;
-                  if (form) {
-                    form.requestSubmit();
+                onClick={(e) => {
+                  if (isRecoveryMode) {
+                    handleCommitRecovery(e);
+                  } else if (isLoginMode) {
+                    handleCommitLogin(e);
+                  } else {
+                    handleCommitRegistration(e);
                   }
                 }}
                 className="bg-[#FDDF2B] hover:bg-[#ffe338] text-black border-2 border-black font-comic font-black text-xs px-6 py-2.5 rounded-xl shadow-[3.5px_3.5px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 active:translate-y-1 transition duration-150 cursor-pointer uppercase tracking-wider"
@@ -6681,13 +6687,6 @@ export default function App() {
                 }
               </button>
             </div>
-
-            {/* Hidden Form to support HTML validation native submission */}
-            <form 
-              id="google-registration-form-hidden" 
-              onSubmit={isRecoveryMode ? handleCommitRecovery : (isLoginMode ? handleCommitLogin : handleCommitRegistration)} 
-              className="hidden" 
-            />
 
           </div>
         </div>

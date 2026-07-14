@@ -60,6 +60,8 @@ export interface UserPrediction {
   penalesLocal?: number;
   penalesVisitante?: number;
   mvp?: string; // Player ID of the predicted MVP
+  goleadorTorneo?: string; // Predicted top tournament scorer
+  mejorArquero?: string;   // Predicted top goalkeeper
 }
 
 export interface UserTacticalBoard {

@@ -673,7 +673,8 @@ export const KNOCKOUT_FIXTURES: Match[] = [
     fecha: 'Jueves 9 de julio',
     grupo: 'Cuartos de Final',
     onceInicialReal: [],
-    jugado: false,
+    jugado: true,
+    marcadorReal: { golesLocal: 2, golesVisitante: 1 },
     equipo_local: 'Francia',
     equipo_visitante: 'Marruecos',
     hora_ect: '14:00 ECT',
@@ -687,7 +688,8 @@ export const KNOCKOUT_FIXTURES: Match[] = [
     fecha: 'Viernes 10 de julio',
     grupo: 'Cuartos de Final',
     onceInicialReal: [],
-    jugado: false,
+    jugado: true,
+    marcadorReal: { golesLocal: 2, golesVisitante: 1 },
     equipo_local: 'España',
     equipo_visitante: 'Bélgica',
     hora_ect: '18:00 ECT',
@@ -701,7 +703,8 @@ export const KNOCKOUT_FIXTURES: Match[] = [
     fecha: 'Sábado 11 de julio',
     grupo: 'Cuartos de Final',
     onceInicialReal: [],
-    jugado: false,
+    jugado: true,
+    marcadorReal: { golesLocal: 1, golesVisitante: 2 },
     equipo_local: 'Noruega',
     equipo_visitante: 'Inglaterra',
     hora_ect: '14:00 ECT',
@@ -715,30 +718,91 @@ export const KNOCKOUT_FIXTURES: Match[] = [
     fecha: 'Sábado 11 de julio',
     grupo: 'Cuartos de Final',
     onceInicialReal: [],
-    jugado: false,
+    jugado: true,
+    marcadorReal: { golesLocal: 2, golesVisitante: 0 },
     equipo_local: 'Argentina',
     equipo_visitante: 'Suiza',
     hora_ect: '18:00 ECT',
     estadio: 'Estadio de Kansas City',
     fase: 'Cuartos de Final'
+  },
+  {
+    id: 'ko-29',
+    local: 'Francia',
+    visitante: 'España',
+    fecha: 'Martes 14 de julio',
+    grupo: 'Semifinal',
+    onceInicialReal: [],
+    jugado: false,
+    equipo_local: 'Francia',
+    equipo_visitante: 'España',
+    hora_ect: '18:00 ECT',
+    estadio: 'Dallas Stadium',
+    fase: 'Semifinal'
+  },
+  {
+    id: 'ko-30',
+    local: 'Argentina',
+    visitante: 'Inglaterra',
+    fecha: 'Miércoles 15 de julio',
+    grupo: 'Semifinal',
+    onceInicialReal: [],
+    jugado: false,
+    equipo_local: 'Argentina',
+    equipo_visitante: 'Inglaterra',
+    hora_ect: '18:00 ECT',
+    estadio: 'Atlanta Stadium',
+    fase: 'Semifinal'
   }
 ];
 
+const STAGE_PRIORITY: { [key: string]: number } = {
+  'Semifinal': 5,
+  'Semifinales': 5,
+  'Cuartos de Final': 4,
+  'Octavos de Final': 3,
+  'Dieciseisavos de Final': 2,
+  'Fase de Grupos': 1
+};
+
 // Generates correct Fútbol Internacional match information and onceInicial for the matches
 export function getPopulatedMatch(country: string, playersOfCountry: Player[]): Match {
-  // Find real match containing country (Prioritizing KNOCKOUT_FIXTURES / Octavos de Final, then any other KNOCKOUT_FIXTURES, falling back to MATCH_FIXTURES)
-  const bases = KNOCKOUT_FIXTURES.find(m => (m.local === country || m.visitante === country) && m.grupo === 'Octavos de Final') ||
-                KNOCKOUT_FIXTURES.find(m => m.local === country || m.visitante === country) ||
-                MATCH_FIXTURES.find(m => m.local === country || m.visitante === country) || {
-    id: `match-gen-${country.substring(0,3).toLowerCase()}`,
-    local: country,
-    visitante: 'Uruguay',
-    fecha: '20 de Junio, 19:30',
-    grupo: 'Fase de Grupos',
-    marcadorReal: { golesLocal: 2, golesVisitante: 0 },
-    onceInicialReal: [],
-    jugado: true
-  };
+  // Find all matches containing country in KNOCKOUT_FIXTURES or MATCH_FIXTURES
+  const koMatches = KNOCKOUT_FIXTURES.filter(m => m.local === country || m.visitante === country);
+  const gpMatches = MATCH_FIXTURES.filter(m => m.local === country || m.visitante === country);
+  
+  // Combine all matches and sort them by phase priority (highest stage first)
+  const allMatches = [...koMatches, ...gpMatches];
+  
+  let bases: Match | undefined = undefined;
+  if (allMatches.length > 0) {
+    allMatches.sort((a, b) => {
+      const pA = STAGE_PRIORITY[a.grupo] || STAGE_PRIORITY[a.fase || ''] || 1;
+      const pB = STAGE_PRIORITY[b.grupo] || STAGE_PRIORITY[b.fase || ''] || 1;
+      if (pA !== pB) {
+        return pB - pA; // highest priority first
+      }
+      // if same stage, prefer unplayed
+      if (a.jugado !== b.jugado) {
+        return a.jugado ? 1 : -1;
+      }
+      return 0;
+    });
+    bases = allMatches[0];
+  }
+
+  if (!bases) {
+    bases = {
+      id: `match-gen-${country.substring(0,3).toLowerCase()}`,
+      local: country,
+      visitante: 'Uruguay',
+      fecha: '20 de Junio, 19:30',
+      grupo: 'Fase de Grupos',
+      marcadorReal: { golesLocal: 2, golesVisitante: 0 },
+      onceInicialReal: [],
+      jugado: true
+    };
+  }
 
   // Pre-seed matching players automatically from their generated players
   const onceIds: string[] = [];

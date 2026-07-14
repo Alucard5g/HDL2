@@ -612,6 +612,29 @@ export default function LeaderboardView({
                       </div>
                     </div>
 
+                    {(b.prediction?.mvp || b.prediction?.goleadorTorneo || b.prediction?.mejorArquero) && (
+                      <div className="border-t border-slate-900/60 pt-2 mt-2 text-[9px] font-mono space-y-1 bg-slate-900/20 p-1.5 rounded">
+                        {b.prediction.mvp && (
+                          <div className="flex justify-between gap-1">
+                            <span className="text-gray-500">⭐ MVP:</span>
+                            <span className="text-white font-sans font-bold truncate max-w-[110px]" title={b.prediction.mvp}>{b.prediction.mvp}</span>
+                          </div>
+                        )}
+                        {b.prediction.goleadorTorneo && (
+                          <div className="flex justify-between gap-1">
+                            <span className="text-gray-500">🏆 Goleador:</span>
+                            <span className="text-white font-sans font-bold truncate max-w-[110px]" title={b.prediction.goleadorTorneo}>{b.prediction.goleadorTorneo}</span>
+                          </div>
+                        )}
+                        {b.prediction.mejorArquero && (
+                          <div className="flex justify-between gap-1">
+                            <span className="text-gray-500">🛡️ Arquero:</span>
+                            <span className="text-white font-sans font-bold truncate max-w-[110px]" title={b.prediction.mejorArquero}>{b.prediction.mejorArquero}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     {b.predictionReason && (
                       <p className="text-[10px] text-gray-400 line-clamp-2 mt-2 leading-relaxed bg-slate-900/60 p-1.5 rounded border border-slate-850 font-sans italic">
                         "{b.predictionReason}"
