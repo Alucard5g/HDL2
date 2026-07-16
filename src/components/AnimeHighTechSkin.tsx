@@ -351,6 +351,64 @@ export const AnimeHighTechSkin: React.FC<AnimeHighTechSkinProps> = ({ children, 
             text-shadow: none !important;
           }
 
+          /* Charity / Milestones Light Background Cards in High-Tech Skin */
+          .high-tech-active .bg-\\[\\#f0fdf4\\],
+          .high-tech-active [class*="bg-[#f0fdf4]"] {
+            background: rgba(34, 197, 94, 0.08) !important;
+            border: 1.5px solid rgba(34, 197, 94, 0.3) !important;
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.15) !important;
+          }
+          .high-tech-active .bg-\\[\\#f0fdf4\\] h4,
+          .high-tech-active [class*="bg-[#f0fdf4]"] h4 {
+            color: #4ade80 !important;
+          }
+          .high-tech-active .bg-\\[\\#f0fdf4\\] p,
+          .high-tech-active [class*="bg-[#f0fdf4]"] p {
+            color: #a7f3d0 !important;
+          }
+          .high-tech-active .bg-\\[\\#f0fdf4\\] span,
+          .high-tech-active [class*="bg-[#f0fdf4]"] span {
+            color: #34d399 !important;
+          }
+
+          .high-tech-active .bg-\\[\\#fffbeb\\],
+          .high-tech-active [class*="bg-[#fffbeb]"] {
+            background: rgba(253, 223, 43, 0.08) !important;
+            border: 1.5px solid rgba(253, 223, 43, 0.3) !important;
+            box-shadow: 0 4px 15px rgba(253, 223, 43, 0.1) !important;
+          }
+          .high-tech-active .bg-\\[\\#fffbeb\\] h4,
+          .high-tech-active [class*="bg-[#fffbeb]"] h4 {
+            color: #fbbf24 !important;
+          }
+          .high-tech-active .bg-\\[\\#fffbeb\\] p,
+          .high-tech-active [class*="bg-[#fffbeb]"] p {
+            color: #fde68a !important;
+          }
+          .high-tech-active .bg-\\[\\#fffbeb\\] span,
+          .high-tech-active [class*="bg-[#fffbeb]"] span {
+            color: #fbbf24 !important;
+          }
+
+          .high-tech-active .bg-\\[\\#fff1f2\\],
+          .high-tech-active [class*="bg-[#fff1f2]"] {
+            background: rgba(239, 68, 68, 0.08) !important;
+            border: 1.5px solid rgba(239, 68, 68, 0.3) !important;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.15) !important;
+          }
+          .high-tech-active .bg-\\[\\#fff1f2\\] h4,
+          .high-tech-active [class*="bg-[#fff1f2]"] h4 {
+            color: #f87171 !important;
+          }
+          .high-tech-active .bg-\\[\\#fff1f2\\] p,
+          .high-tech-active [class*="bg-[#fff1f2]"] p {
+            color: #fecdd3 !important;
+          }
+          .high-tech-active .bg-\\[\\#fff1f2\\] span,
+          .high-tech-active [class*="bg-[#fff1f2]"] span {
+            color: #f87171 !important;
+          }
+
           /* Highlighted red/crimson accents - subtle minimalist glow */
           .high-tech-active .text-[#EF4444],
           .high-tech-active .text-rose-500,

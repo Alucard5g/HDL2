@@ -5169,7 +5169,7 @@ export default function App() {
                       🌱 FUNDACIÓN GUERREROS DE LUZ
                     </h2>
                     <p className="text-xs sm:text-sm font-comic font-bold text-emerald-200 max-w-xl">
-                      Creemos firmemente en el poder transformador del deporte infantil. Por eso, nos aliamos con la Fundación Guerreros de luz para dotar de canchas, uniformes y nutrición integral a niños en condiciones de vulnerabilidad.
+                      Creemos firmemente en el poder transformador del deporte infantil. Por eso, nos aliamos con la Fundación Guerreros de luz para suplementos, uniformes y nutrición integral a niños en condiciones de vulnerabilidad.
                     </p>
                   </div>
                   

@@ -61,6 +61,81 @@ try {
 import App from './App.tsx';
 import './index.css';
 
+// Meta Pixel dynamic initializer
+const initMetaPixel = (pixelId: string) => {
+  if (typeof window === 'undefined') return;
+  const w = window as any;
+  if (w.fbq) return;
+
+  w.fbq = function (...args: any[]) {
+    if (w.fbq.callMethod) {
+      w.fbq.callMethod.apply(w.fbq, args);
+    } else {
+      w.fbq.queue.push(args);
+    }
+  };
+  if (!w._fbq) w._fbq = w.fbq;
+  w.fbq.push = w.fbq;
+  w.fbq.loaded = true;
+  w.fbq.version = '2.0';
+  w.fbq.queue = [];
+
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = 'https://connect.facebook.net/en_US/fbevents.js';
+  const firstScript = document.getElementsByTagName('script')[0];
+  if (firstScript && firstScript.parentNode) {
+    firstScript.parentNode.insertBefore(script, firstScript);
+  } else {
+    document.head.appendChild(script);
+  }
+
+  w.fbq('init', pixelId);
+  w.fbq('track', 'PageView');
+  console.log('%c✓ Meta Pixel activo con ID:', 'color: #10b981; font-weight: bold;', pixelId);
+};
+
+// Google Analytics 4 dynamic initializer
+const initGA4 = (measurementId: string) => {
+  if (typeof window === 'undefined') return;
+  const w = window as any;
+
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+
+  const firstScript = document.getElementsByTagName('script')[0];
+  if (firstScript && firstScript.parentNode) {
+    firstScript.parentNode.insertBefore(script, firstScript);
+  } else {
+    document.head.appendChild(script);
+  }
+
+  w.dataLayer = w.dataLayer || [];
+  w.gtag = function (...args: any[]) {
+    w.dataLayer.push(args);
+  };
+  w.gtag('js', new Date());
+  w.gtag('config', measurementId);
+  console.log('%c✓ Google Analytics 4 activo con ID:', 'color: #10b981; font-weight: bold;', measurementId);
+};
+
+// Load configurations dynamically from environments
+try {
+  const metaEnv = (import.meta as any).env || {};
+  const pixelId = metaEnv.VITE_META_PIXEL_ID;
+  const ga4Id = metaEnv.VITE_GA4_MEASUREMENT_ID;
+
+  if (pixelId && pixelId.trim() !== '') {
+    initMetaPixel(pixelId.trim());
+  }
+  if (ga4Id && ga4Id.trim() !== '') {
+    initGA4(ga4Id.trim());
+  }
+} catch (e) {
+  console.error('Failed to load tracking analytics:', e);
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

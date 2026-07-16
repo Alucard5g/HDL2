@@ -38,6 +38,10 @@ service cloud.firestore {
     }
 
     // 2. Collection Rules
+    match /test-connection/{docId} {
+      allow read, write: if true;
+    }
+
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin();
       
