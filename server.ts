@@ -285,30 +285,60 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // Check if the custom database is accessible and has read/write permissions at startup
-  let canUseCustomDb = false;
-  try {
-    console.log(`[Database Sync] Verifying connection for database ID: ${firebaseDatabaseId}...`);
-    await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
-    await db.collection("test-connection").doc("test").get();
-    canUseCustomDb = true;
-    isFirestoreAvailable = true;
-    console.log(`[Database Sync] Connection verified successfully for custom database: ${firebaseDatabaseId}`);
-  } catch (testErr: any) {
-    console.log(`[Database Sync] Custom database ${firebaseDatabaseId} is offline or unauthorized. Safe local filesystem storage fallback is active.`);
-  }
-
-  if (!canUseCustomDb) {
-    console.log("[Database Sync] Trying fallback default database connection...");
+  // Initialize Firestore connection and run cloud hydration in the background to prevent blocking Cloud Run port binding
+  async function initializeAndSyncDatabase() {
+    let canUseCustomDb = false;
     try {
-      db = getFirestore();
-      // Test connection to default database
-      await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
+      console.log(`[Database Sync] Verifying connection for database ID: ${firebaseDatabaseId} in background...`);
+      const customDbPromise = (async () => {
+        await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
+        await db.collection("test-connection").doc("test").get();
+        return true;
+      })();
+      
+      const timeoutPromise = new Promise<boolean>((_, reject) => 
+        setTimeout(() => reject(new Error("Timeout after 3000ms")), 3000)
+      );
+
+      canUseCustomDb = await Promise.race([customDbPromise, timeoutPromise]);
       isFirestoreAvailable = true;
-      console.log("[Database Sync] Connected to default database successfully.");
-    } catch (fbErr: any) {
-      isFirestoreAvailable = false;
-      console.log("[Database Sync] Firestore database connection is inactive. Safe local disk persistence mode is fully active.");
+      console.log(`[Database Sync] Connection verified successfully for custom database: ${firebaseDatabaseId}`);
+    } catch (testErr: any) {
+      console.log(`[Database Sync] Custom database ${firebaseDatabaseId} is offline, unauthorized, or connection timed out. Safe local filesystem storage fallback is active.`);
+    }
+
+    if (!canUseCustomDb) {
+      console.log("[Database Sync] Trying fallback default database connection in background...");
+      try {
+        db = getFirestore();
+        const defaultDbPromise = (async () => {
+          await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
+          return true;
+        })();
+        
+        const timeoutPromise = new Promise<boolean>((_, reject) => 
+          setTimeout(() => reject(new Error("Timeout after 3000ms")), 3000)
+        );
+
+        const canUseDefaultDb = await Promise.race([defaultDbPromise, timeoutPromise]);
+        isFirestoreAvailable = canUseDefaultDb;
+        console.log("[Database Sync] Connected to default database successfully.");
+      } catch (fbErr: any) {
+        isFirestoreAvailable = false;
+        console.log("[Database Sync] Firestore database connection is inactive. Safe local disk persistence mode is fully active.");
+      }
+    }
+
+    if (isFirestoreAvailable) {
+      try {
+        console.log("[Database Sync] Firestore is available. Triggering background sync...");
+        await syncWithFirestore();
+        console.log("[Database Sync] Background database hydration and sync completed successfully.");
+      } catch (syncErr: any) {
+        console.error("[Database Sync Error] Background sync failed:", syncErr);
+      }
+    } else {
+      console.log("[Database Sync] Skipping database sync. Operating in safe local storage fallback mode.");
     }
   }
 
@@ -1524,8 +1554,7 @@ No agregues bloques de código markdown, sólamente responde el JSON directo en 
     }
   }
 
-  // Trigger cloud hydration at startup
-  await syncWithFirestore();
+  // Trigger cloud hydration asynchronously in the background once the server starts
 
   // ==========================================================================
   // BRAND PROMOTER REVENUE & QR REFERRAL SYSTEM DATA STRUCTURES
@@ -3360,7 +3389,14 @@ Reglas clave para tus respuestas:
   }
 
   app.listen(Number(PORT), "0.0.0.0", () => {
-    console.log(`Server running on port ${PORT}...`);
+    console.log(`=========================================`);
+    console.log(`🚀 Server successfully started and listening on port ${PORT}`);
+    console.log(`=========================================`);
+
+    // Trigger background database connection verification and synchronization
+    initializeAndSyncDatabase().catch((err) => {
+      console.error("[Database Sync Error] Failed background database initialization:", err);
+    });
   });
 }
 
