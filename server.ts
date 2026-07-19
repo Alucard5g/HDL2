@@ -33,6 +33,15 @@ import { getPregeneratedTrivia } from "./src/data/triviaData";
 
 dotenv.config();
 
+// Robust global crash prevention handlers to guarantee server uptime and prevent Cloud Run Server Errors
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("CRITICAL SAFETY GUARD: Unhandled Rejection at:", promise, "reason:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  console.error("CRITICAL SAFETY GUARD: Uncaught Exception thrown:", error);
+});
+
 // Default values if envs are missing
 const PORT = process.env.PORT || 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
