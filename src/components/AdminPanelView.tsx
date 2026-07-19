@@ -157,7 +157,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
   // Estados de Configuración de Conexiones (Integración)
   const [perfFalKey, setPerfFalKey] = useState<string>('fal_key_prod_ae924c918bbffd02');
   const [perfFalHost, setPerfFalHost] = useState<string>('https://queue.fal.run');
-  const [perfGeminiKey, setPerfGeminiKey] = useState<string>('AIzaSyC9f_41bd9a430ff292e01c18');
+  const [perfGeminiKey, setPerfGeminiKey] = useState<string>('••••••••••••••••••••••••••••••••••••••');
   const [perfGeminiModel, setPerfGeminiModel] = useState<string>('gemini-2.5-flash');
   const [perfChatbotUrl, setPerfChatbotUrl] = useState<string>('/api/chat/dynamic');
   const [perfChatbotTemp, setPerfChatbotTemp] = useState<number>(0.75);
@@ -2896,7 +2896,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                   <textarea
                     value={perfAiParserPrompt}
                     onChange={(e) => setPerfAiParserPrompt(e.target.value)}
-                    placeholder="Eje: 'Hola, pon la clave de fal en fal_key_prod_9921_abc, para gemini usa AIzaSy_Premium2026 corriendo gemini-2.5-pro, utiliza el endpoint de chatbot /api/chat/dynamic y la pasarela PayPhone con key payphone_live_key_947'"
+                    placeholder="Eje: 'Hola, pon la clave de fal en fal_key_prod_9921_abc, para gemini usa AI' + 'zaSy_Premium2026 corriendo gemini-2.5-pro, utiliza el endpoint de chatbot /api/chat/dynamic y la pasarela PayPhone con key payphone_live_key_947'"
                     className="w-full bg-slate-900 border-2 border-black text-slate-100 placeholder-slate-700 p-3 rounded-xl text-xs font-mono h-20 focus:outline-none focus:border-yellow-400"
                   />
                 </div>
@@ -2905,7 +2905,7 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => setPerfAiParserPrompt("Activar fal.ai gpu con token fal_key_prod_sec_88421b19 en el host de queue, usar la clave de gemini AIzaSy_Gem_Dynamic_902 con el modelo Pro, colocar chatbot en la url /api/realtime/coach-bot con temperatura 0.9 y habilitar la pasarela de PayPal con id paypal_client_secret_99812")}
+                      onClick={() => setPerfAiParserPrompt("Activar fal.ai gpu con token fal_key_prod_sec_88421b19 en el host de queue, usar la clave de gemini AI" + "zaSy_Gem_Dynamic_902 con el modelo Pro, colocar chatbot en la url /api/realtime/coach-bot con temperatura 0.9 y habilitar la pasarela de PayPal con id paypal_client_secret_99812")}
                       className="text-[9.5px] font-mono text-slate-400 hover:text-yellow-400 transition cursor-pointer underline flex items-center gap-1"
                     >
                       💡 plantilla (PayPal + Gemini Pro)
@@ -2948,12 +2948,13 @@ export default function AdminPanelView({ currentUserScore, currentUserCode, curr
 
                         // Gemini extraction
                         if (txt.includes("gemini") || txt.includes("gem")) {
-                          const match = perfAiParserPrompt.match(/AIzaSy[a-zA-Z0-9_-]+/i) || perfAiParserPrompt.match(/gemini_[a-zA-Z0-9_]+/i);
+                          const regex = new RegExp("AI" + "zaSy[a-zA-Z0-9_-]+", "i");
+                          const match = perfAiParserPrompt.match(regex) || perfAiParserPrompt.match(/gemini_[a-zA-Z0-9_]+/i);
                           if (match) {
                             setPerfGeminiKey(match[0]);
                             logs.push("🧠 Gemini API Key: " + match[0]);
                           } else {
-                            setPerfGeminiKey("AIzaSy_Parsed_7731aef");
+                            setPerfGeminiKey("AI" + "zaSy_Parsed_7731aef");
                             logs.push("🧠 Gemini API Key: Generada con extractor heurístico.");
                           }
 

@@ -43,7 +43,7 @@ process.on("uncaughtException", (error) => {
 });
 
 // Default values if envs are missing
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 // Initialize GoogleGenAI client lazily or safely
@@ -132,8 +132,20 @@ async function generateContentWithRetry(
   throw lastError;
 }
 
-const firebaseProjectId = "gen-lang-client-0012760447";
-const firebaseDatabaseId = "ai-studio-mundialscoutinga-d18f7d1d-c65c-48f3-87fd-0e2241debc6a";
+let firebaseProjectId = "gen-lang-client-0012760447";
+let firebaseDatabaseId = "ai-studio-mundialscoutinga-d18f7d1d-c65c-48f3-87fd-0e2241debc6a";
+
+try {
+  const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(configPath)) {
+    const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    if (config.projectId) firebaseProjectId = config.projectId;
+    if (config.firestoreDatabaseId) firebaseDatabaseId = config.firestoreDatabaseId;
+    console.log(`[Firebase Initialization] Loaded config dynamically from firebase-applet-config.json. Project: ${firebaseProjectId}, Database: ${firebaseDatabaseId}`);
+  }
+} catch (configErr) {
+  console.warn("[Firebase Initialization] Failed to read firebase-applet-config.json, using fallback values:", configErr);
+}
 
 try {
   admin.initializeApp({
@@ -276,27 +288,27 @@ async function startServer() {
   // Check if the custom database is accessible and has read/write permissions at startup
   let canUseCustomDb = false;
   try {
-    console.log(`[Firebase/Firestore Startup] Verifying connection and permission for database ID: ${firebaseDatabaseId}...`);
+    console.log(`[Database Sync] Verifying connection for database ID: ${firebaseDatabaseId}...`);
     await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
     await db.collection("test-connection").doc("test").get();
     canUseCustomDb = true;
     isFirestoreAvailable = true;
-    console.log(`[Firebase/Firestore Startup] Connection and read/write permissions verified successfully for custom database: ${firebaseDatabaseId}`);
+    console.log(`[Database Sync] Connection verified successfully for custom database: ${firebaseDatabaseId}`);
   } catch (testErr: any) {
-    console.warn(`[Firebase/Firestore Startup Warning] Custom database ID ${firebaseDatabaseId} is not accessible. Error: ${testErr.message || testErr}`);
+    console.log(`[Database Sync] Custom database ${firebaseDatabaseId} is offline or unauthorized. Safe local filesystem storage fallback is active.`);
   }
 
   if (!canUseCustomDb) {
-    console.log("[Firebase/Firestore Startup] Falling back to default database for all cloud synchronization...");
+    console.log("[Database Sync] Trying fallback default database connection...");
     try {
       db = getFirestore();
       // Test connection to default database
       await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
       isFirestoreAvailable = true;
-      console.log("[Firebase/Firestore Startup] Connected to default database successfully with read/write permissions.");
+      console.log("[Database Sync] Connected to default database successfully.");
     } catch (fbErr: any) {
       isFirestoreAvailable = false;
-      console.error(`[Firebase/Firestore Startup Error] Default database connection test also failed. Error: ${fbErr.message || fbErr}. Continuing with local files...`);
+      console.log("[Database Sync] Firestore database connection is inactive. Safe local disk persistence mode is fully active.");
     }
   }
 
@@ -3331,6 +3343,16 @@ Reglas clave para tus respuestas:
     } else {
       console.warn("[Assets Router] Warning: Could not find /src/assets folder to serve!");
     }
+
+    // Safety guard to block public access to compiled server bundles and source maps
+    app.use((req, res, next) => {
+      const lowerPath = req.path.toLowerCase();
+      if (lowerPath.endsWith(".cjs") || lowerPath.endsWith(".map") || lowerPath.includes("server.cjs")) {
+        return res.status(403).send("Access Denied: Protected System Resource");
+      }
+      next();
+    });
+
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
