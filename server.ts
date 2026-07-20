@@ -155,13 +155,18 @@ try {
   // Safe double-initialization prevention
 }
 
-let db: any;
+let db: any = null;
 let isFirestoreAvailable = false;
 try {
   db = getFirestore(undefined, firebaseDatabaseId);
 } catch (e) {
   console.warn("Could not initialize with custom Database ID. Falling back to default database.", e);
-  db = getFirestore();
+  try {
+    db = getFirestore();
+  } catch (fallbackErr) {
+    console.warn("[Firebase Initialization Warning] Could not initialize default Firestore database. Operating in local-only persistence mode.", fallbackErr);
+    db = null;
+  }
 }
 
 // Firestore synchronization helper functions
@@ -289,6 +294,9 @@ async function startServer() {
   async function initializeAndSyncDatabase() {
     let canUseCustomDb = false;
     try {
+      if (!db) {
+        throw new Error("Firestore instance is uninitialized or null");
+      }
       console.log(`[Database Sync] Verifying connection for database ID: ${firebaseDatabaseId} in background...`);
       const customDbPromise = (async () => {
         await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
@@ -311,6 +319,9 @@ async function startServer() {
       console.log("[Database Sync] Trying fallback default database connection in background...");
       try {
         db = getFirestore();
+        if (!db) {
+          throw new Error("Default Firestore instance is null");
+        }
         const defaultDbPromise = (async () => {
           await db.collection("test-connection").doc("test").set({ timestamp: Date.now() });
           return true;
